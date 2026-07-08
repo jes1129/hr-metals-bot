@@ -1,4 +1,18 @@
 {
-  "copper": [],
-  "aluminum": []
+  "copper": [
+    {
+      "ts": "2026-07-08T04:52:29.832737+00:00",
+      "price": null,
+      "change": null,
+      "change_pct": null
+    }
+  ],
+  "aluminum": [
+    {
+      "ts": "2026-07-08T04:52:29.832737+00:00",
+      "price": null,
+      "change": null,
+      "change_pct": null
+    }
+  ]
 }
