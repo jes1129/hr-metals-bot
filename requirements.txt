@@ -1,0 +1,7 @@
+# 本地開發 / 部署用。Modal Image 內另於 main.py 以 pip_install 安裝執行期依賴。
+modal
+playwright==1.48.0
+playwright-stealth
+httpx
+anthropic
+fastapi[standard]

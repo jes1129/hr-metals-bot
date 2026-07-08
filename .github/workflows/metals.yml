@@ -1,0 +1,42 @@
+name: 銅鋁監控 (功能 B)
+
+on:
+  schedule:
+    - cron: "0 2,14 * * *"   # UTC 02:00 & 14:00 = 台灣 10:00 & 22:00
+  workflow_dispatch:          # 允許在 Actions 頁面手動觸發測試
+
+permissions:
+  contents: write             # 需要把 prices.json / 儀表板 commit 回 repo
+
+concurrency:                  # 避免兩次排程同時寫入
+  group: metals
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安裝依賴
+        run: |
+          pip install playwright playwright-stealth httpx
+          python -m playwright install --with-deps chrome
+
+      - name: 執行銅鋁監控
+        env:
+          METALS_DATA_DIR: data
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python run_metals.py
+
+      - name: 提交歷史與儀表板
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/prices.json docs/index.html
+          git commit -m "更新銅鋁報價 $(date -u +%Y-%m-%dT%H:%MZ)" || echo "無變更，略過提交"
+          git push

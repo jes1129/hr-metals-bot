@@ -1,0 +1,29 @@
+name: 人才搜尋 (功能 A)
+
+on:
+  schedule:
+    - cron: "0 0 * * *"       # UTC 00:00 = 台灣 08:00
+  workflow_dispatch:          # 允許在 Actions 頁面手動觸發測試
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安裝依賴
+        run: |
+          pip install playwright playwright-stealth httpx anthropic
+          python -m playwright install --with-deps chrome
+
+      - name: 執行人才搜尋
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          LOGIN_104_ACCOUNT: ${{ secrets.LOGIN_104_ACCOUNT }}
+          LOGIN_104_PASSWORD: ${{ secrets.LOGIN_104_PASSWORD }}
+        run: python run_talent.py

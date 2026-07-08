@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+dashboard_preview.html
+.modal.toml
+
+# 內部指南 PDF 不進 repo（公開時避免外流）
+*.pdf
