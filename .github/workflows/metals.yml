@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 2,14 * * *"   # UTC 02:00 & 14:00 = 台灣 10:00 & 22:00
   workflow_dispatch:          # 允許在 Actions 頁面手動觸發測試
+  push:
+    branches: [main]
+    paths-ignore:             # 機器人自己 commit 的資料/儀表板不再觸發（防迴圈）
+      - "data/**"
+      - "docs/**"
 
 permissions:
   contents: write             # 需要把 prices.json / 儀表板 commit 回 repo
@@ -38,5 +43,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/prices.json docs/index.html
-          git commit -m "更新銅鋁報價 $(date -u +%Y-%m-%dT%H:%MZ)" || echo "無變更，略過提交"
-          git push
+          git commit -m "更新銅鋁報價 $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]" || echo "無變更，略過提交"
+          git push origin HEAD:main
