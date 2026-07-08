@@ -5,6 +5,12 @@
       "price": null,
       "change": null,
       "change_pct": null
+    },
+    {
+      "ts": "2026-07-08T05:01:32.183965+00:00",
+      "price": 13675.3,
+      "change": -50.7,
+      "change_pct": -0.37
     }
   ],
   "aluminum": [
@@ -13,6 +19,12 @@
       "price": null,
       "change": null,
       "change_pct": null
+    },
+    {
+      "ts": "2026-07-08T05:01:32.183965+00:00",
+      "price": 3369.5,
+      "change": 36.0,
+      "change_pct": 1.08
     }
   ]
 }
