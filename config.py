@@ -55,27 +55,29 @@ SCORING_RUBRIC = (
 )
 
 # =============================================================================
-# 功能 B — 銅鋁監控（對應指南第 8、9、14 頁）
-# 關注區間數值取自指南第 14 頁範例：銅 9,200–9,800、鋁 2,400–2,900。
+# 功能 B — 銅鋁監控
+# 資料源改用 Yahoo Finance 公開報價 API（回傳乾淨 JSON、免登入、不需瀏覽器）。
+# 注意單位：COMEX 銅(HG=F)以 USD/磅報價 → to_tonne 換算每公噸；COMEX 鋁(ALI=F)本就是每公噸。
+# watch 區間已調到現價附近，請依你實際想盯的價位自行調整。
 # =============================================================================
 METALS = {
     "copper": {
         "name": "銅",
-        "en": "COPPER · LME",
+        "en": "COPPER · COMEX",
         "unit": "USD/t",
-        "watch_low": 9200,     # 跌破下線 → 告警
-        "watch_high": 9800,    # 突破上線 → 告警
-        # TODO(verify): 鉅亨網銅報價實際頁面 / API 網址
-        "url": "https://www.cnyes.com/futures/html5chart/COMEX:HG.html",
+        "yahoo": "HG=F",         # Yahoo Finance 代碼
+        "to_tonne": 2204.62,     # USD/磅 → USD/公噸
+        "watch_low": 12500,      # 跌破下線 → 告警
+        "watch_high": 14500,     # 突破上線 → 告警
     },
     "aluminum": {
         "name": "鋁",
-        "en": "ALUMINUM · LME",
+        "en": "ALUMINUM · COMEX",
         "unit": "USD/t",
-        "watch_low": 2400,
-        "watch_high": 2900,
-        # TODO(verify): 鉅亨網鋁報價實際頁面 / API 網址
-        "url": "https://www.cnyes.com/futures/html5chart/LME:AHD.html",
+        "yahoo": "ALI=F",
+        "to_tonne": 1.0,         # 已是 USD/公噸
+        "watch_low": 3000,
+        "watch_high": 3600,
     },
 }
 

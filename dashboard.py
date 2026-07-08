@@ -136,7 +136,7 @@ def render_html(history: dict) -> str:
 </head>
 <body>
   <div class="wrap">
-    <div class="eyebrow">METALS TRACKER · 鉅亨網</div>
+    <div class="eyebrow">METALS TRACKER · Yahoo Finance</div>
     <h1>銅鋁價格追蹤儀表板</h1>
     <div class="sub">每日 10:00 與 22:00（台灣時間）更新 · 突破關注區間時另發 Discord 告警</div>
 
@@ -157,7 +157,7 @@ def render_html(history: dict) -> str:
         <tbody>{''.join(rows_html)}</tbody>
       </table>
     </div>
-    <div class="foot">資料來源：鉅亨網 · 僅供內部參考。狀態燈依 config.py 關注區間自動標示。</div>
+    <div class="foot">資料來源：Yahoo Finance（COMEX）· 僅供內部參考。狀態燈依 config.py 關注區間自動標示。</div>
   </div>
 </body>
 </html>"""

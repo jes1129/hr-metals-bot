@@ -28,9 +28,7 @@ jobs:
           python-version: "3.11"
 
       - name: 安裝依賴
-        run: |
-          pip install playwright playwright-stealth httpx
-          python -m playwright install --with-deps chrome
+        run: pip install httpx    # 功能 B 用 Yahoo API，不需瀏覽器
 
       - name: 執行銅鋁監控
         env:
