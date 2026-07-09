@@ -16,12 +16,13 @@ import notify
 
 
 def main():
-    result = asyncio.run(metals.run())  # 內部已寫入 data/prices.json
+    result = asyncio.run(metals.run())  # 內部已寫入 data/prices.json（Westmetall 現價/告警）
+    daily = metals.backfill_daily()     # 回補一年日線 → data/daily.json（走勢圖）
 
     # 產生儀表板到 docs/（GitHub Pages 來源）
     os.makedirs("docs", exist_ok=True)
     with open(os.path.join("docs", "index.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_html(result["history"]))
+        f.write(dashboard.render_html(result["history"], daily))
     print("[run_metals] 已更新 docs/index.html")
 
     # 突破區間才發 Discord 告警

@@ -73,6 +73,82 @@ def _last_price(series: list):
 
 
 # ---------------------------------------------------------------------------
+# 日線回補（Yahoo Finance 每日收盤，供走勢圖看趨勢；現價/告警仍用 Westmetall）
+# ---------------------------------------------------------------------------
+DAILY_FILE_PATH = os.path.join(DATA_DIR, config.DAILY_FILE)
+
+
+def _yahoo_daily(sym: str) -> dict:
+    """抓 Yahoo 某 symbol 過去一年日收盤，回傳 {date_iso: close}。失敗回 {}。"""
+    import httpx  # 延遲匯入
+
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
+    try:
+        r = httpx.get(url, params={"range": "1y", "interval": "1d"},
+                      headers=_UA, timeout=30)
+        j = r.json()["chart"]["result"][0]
+        ts = j["timestamp"]
+        close = j["indicators"]["quote"][0]["close"]
+    except Exception as e:  # noqa: BLE001
+        print(f"[metals] Yahoo 日線 {sym} 失敗：{e}")
+        return {}
+    out = {}
+    for t, c in zip(ts, close):
+        if c is None:
+            continue
+        d = datetime.datetime.utcfromtimestamp(t).date().isoformat()
+        out[d] = c
+    return out
+
+
+def backfill_daily() -> dict:
+    """回補一年日線並寫入 data/daily.json。回傳 {copper:[{ts,usd,rate}], aluminum:[...], fx:[{ts,rate}]}。"""
+    fxd = _yahoo_daily(config.YH_FX)
+    fx_dates = sorted(fxd)
+
+    def rate_on(d: str):
+        if d in fxd:
+            return fxd[d]
+        prior = [x for x in fx_dates if x <= d]
+        if prior:
+            return fxd[prior[-1]]
+        return fxd[fx_dates[0]] if fx_dates else None
+
+    daily = {"fx": [{"ts": d, "rate": round(fxd[d], 4)} for d in fx_dates]}
+    for key, cfg in config.METALS.items():
+        raw = _yahoo_daily(cfg["yh"])
+        mult = config.LB_PER_TONNE if cfg.get("yh_unit") == "lb" else 1.0
+        series = []
+        for d in sorted(raw):
+            rate = rate_on(d)
+            series.append({
+                "ts": d,
+                "usd": round(raw[d] * mult, 2),
+                "rate": round(rate, 4) if rate else None,
+            })
+        daily[key] = series
+
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(DAILY_FILE_PATH, "w", encoding="utf-8") as f:
+        json.dump(daily, f, ensure_ascii=False, indent=2)
+    cu = len(daily.get("copper", []))
+    al = len(daily.get("aluminum", []))
+    print(f"[metals] 日線回補完成：銅 {cu} 筆、鋁 {al} 筆")
+    return daily
+
+
+def load_daily() -> dict:
+    """讀 daily.json；不存在回 {}。"""
+    if not os.path.exists(DAILY_FILE_PATH):
+        return {}
+    try:
+        with open(DAILY_FILE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+# ---------------------------------------------------------------------------
 # Volume 歷史時間序列
 # ---------------------------------------------------------------------------
 def load_history() -> dict:

@@ -146,6 +146,7 @@ def parse_and_filter(cards: list) -> list:
                 "salary_low": low,
                 "salary_high": high,
                 "salary_kind": kind,
+                "desc": c["text"][:200],  # 供技能/分類挖掘（不嵌前端）
             }
         )
     return jobs
@@ -181,8 +182,54 @@ def aggregate(jobs: list) -> dict:
         "negotiable": negotiable,
         "top_companies": companies.most_common(5),
         "top_areas": areas.most_common(6),
+        "area_salary": _area_salary(jobs),
+        "categories": _categorize(jobs),
+        "skills": _skill_freq(jobs),
     }
     return stats
+
+
+def _area_salary(jobs: list) -> list:
+    """各地區月薪中位數（僅取有可解析薪資、且該地區樣本 >= 2 者）。回傳 [(area, median, n)]。"""
+    from collections import defaultdict
+
+    bucket = defaultdict(list)
+    for j in jobs:
+        v = _salary_mid(j)
+        if v:
+            bucket[j["area"]].append(v)
+    rows = [(a, round(statistics.median(vs)), len(vs)) for a, vs in bucket.items() if len(vs) >= 2]
+    rows.sort(key=lambda x: x[1], reverse=True)
+    return rows[:8]
+
+
+def _categorize(jobs: list) -> list:
+    """依標題關鍵字歸類職務。回傳 [(label, count)]（含「其他」，去零、由多到少）。"""
+    from collections import Counter
+
+    cnt = Counter()
+    for j in jobs:
+        t = j["title"].lower()
+        label = "其他"
+        for name, kws in config.JOB_CATEGORIES:
+            if any(k.lower() in t for k in kws):
+                label = name
+                break
+        cnt[label] += 1
+    return cnt.most_common()
+
+
+def _skill_freq(jobs: list) -> list:
+    """技能詞頻（比對標題 + 描述）。回傳前 12 名 [(skill, count)]。"""
+    from collections import Counter
+
+    cnt = Counter()
+    for j in jobs:
+        blob = (j["title"] + " " + j.get("desc", "")).lower()
+        for skill in config.JOB_SKILLS:
+            if skill.lower() in blob:
+                cnt[skill] += 1
+    return cnt.most_common(12)
 
 
 # ---------------------------------------------------------------------------

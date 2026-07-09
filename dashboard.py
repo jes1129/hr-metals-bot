@@ -2,9 +2,12 @@
 """
 dashboard.py — 儀表板 HTML render（銅鋁 index.html + 人才 jobs.html）。
 
-版面樣式與互動邏輯抽到 docs/assets/style.css、docs/assets/app.js（手寫、常駐、
-只提交一次）。這裡只產出 HTML 骨架，並把資料以 <script>window.XXX = {...}</script>
-內嵌進頁面，前端 JS 負責單位切換、互動走勢圖、職缺搜尋/排序、深色模式。
+樣式與互動在 docs/assets/style.css、docs/assets/app.js（手寫、常駐、只提交一次）。
+這裡產出 HTML 骨架並內嵌資料 <script>window.XXX = {...}</script>，前端 JS 負責
+單位切換、日線走勢圖（含 MA 均線、關注線、期間統計）、匯率/比價圖、職缺搜尋與圖表。
+
+分工：現價與告警用 LME 官方（Westmetall，history/prices.json）；走勢圖用 Yahoo
+每日收盤（daily.json）以看趨勢。
 """
 import datetime
 import html
@@ -13,7 +16,6 @@ import json
 import config
 import metals as metals_mod
 
-# 資產相對路徑（index.html / jobs.html 皆位於 docs/ 根，assets 在 docs/assets/）
 _HEAD = (
     '<meta charset="utf-8">\n'
     '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
@@ -27,7 +29,6 @@ def _fmt(v, nd=1):
 
 
 def _sparkline(points, up: bool, w=120, h=32) -> str:
-    """迷你 SVG 折線（無 JS 時的後備圖）。"""
     vals = [p for p in points if p is not None]
     if len(vals) < 2:
         return f'<svg width="{w}" height="{h}"></svg>'
@@ -57,6 +58,23 @@ def _nav(active: str) -> str:
     )
 
 
+def _hbars(items) -> str:
+    """水平長條圖（伺服器端靜態）。items: [(label, value, display)]。"""
+    items = [i for i in items if i]
+    if not items:
+        return '<div style="padding:14px 16px;color:var(--muted)">資料不足</div>'
+    mx = max(v for _, v, _ in items) or 1
+    rows = []
+    for label, v, disp in items:
+        w = round(v / mx * 100)
+        rows.append(
+            f'<div class="hrow"><div class="hlabel">{html.escape(str(label))}</div>'
+            f'<div class="htrack"><div class="hbar" style="width:{w}%"></div></div>'
+            f'<div class="hval">{html.escape(str(disp))}</div></div>'
+        )
+    return '<div class="hbars">' + "".join(rows) + "</div>"
+
+
 _STATUS_LABEL = {
     "break_high": "突破上線", "break_low": "跌破下線",
     "in_range": "區間內", "unknown": "無資料",
@@ -66,24 +84,30 @@ _STATUS_LABEL = {
 # ===========================================================================
 # 功能 B — 銅鋁儀表板
 # ===========================================================================
-def render_html(history: dict) -> str:
-    data = {}          # 內嵌給前端的資料
+def render_html(history: dict, daily: dict = None) -> str:
+    daily = daily or {}
+    metals_data = {}
     panels = []
     alert_count = 0
     last_update = "—"
 
     for key, cfg in config.METALS.items():
-        series = history.get(key, [])
-        data[key] = {
+        # 走勢圖資料：優先 daily.json 日線；無則退化用 prices.json 快照
+        dseries = daily.get(key) or []
+        if not dseries:
+            dseries = [
+                {"ts": p.get("ts"), "usd": p.get("price"), "rate": p.get("rate")}
+                for p in history.get(key, [])
+            ]
+        metals_data[key] = {
             "name": cfg["name"], "en": cfg["en"],
             "watch_low": cfg["watch_low"], "watch_high": cfg["watch_high"],
-            "series": [
-                {"ts": p.get("ts"), "usd": p.get("price"), "rate": p.get("rate")}
-                for p in series
-            ],
+            "series": dseries,
         }
 
-        latest = series[-1] if series else {}
+        # 現價/告警：LME 官方（Westmetall）最新一筆
+        hist = history.get(key, [])
+        latest = hist[-1] if hist else {}
         price = latest.get("price")
         price_twd = latest.get("price_twd")
         rate = latest.get("rate")
@@ -101,7 +125,6 @@ def render_html(history: dict) -> str:
             except Exception:  # noqa: BLE001
                 pass
 
-        # 無 JS 後備文字（預設單位 NT$/公噸；JS 載入後即接管換算）
         price_txt = f"NT${price_twd:,}/t" if price_twd else "—"
         if change is not None and rate:
             nt_chg = round(change * rate)
@@ -113,8 +136,7 @@ def render_html(history: dict) -> str:
         else:
             watch_txt = f"US${cfg['watch_low']:,}/t ~ US${cfg['watch_high']:,}/t"
 
-        trend_twd = [p.get("price_twd") for p in series[-config.TREND_POINTS:]]
-        fallback = _sparkline(trend_twd, up=(change or 0) >= 0, w=600, h=200)
+        fb = _sparkline([d.get("usd") for d in dseries[-30:]], up=(change or 0) >= 0, w=600, h=200)
 
         panels.append(
             f"""
@@ -124,16 +146,49 @@ def render_html(history: dict) -> str:
         <span class="badge {status}">{_STATUS_LABEL[status]}</span>
       </div>
       <div class="mfigs">
-        <div class="fig"><div class="flabel">現價</div><div class="fval price">{price_txt}</div></div>
+        <div class="fig"><div class="flabel">現價（LME 官方）</div><div class="fval price">{price_txt}</div></div>
         <div class="fig"><div class="flabel">漲跌</div><div class="fval chg">{chg_txt}</div></div>
         <div class="fig"><div class="flabel">關注區間</div><div class="fval watch">{watch_txt}</div></div>
       </div>
-      <div class="chart" data-chart="{key}">{fallback}</div>
+      <div class="mstats">
+        <span class="chip">7日 <b class="c7">—</b></span>
+        <span class="chip">30日 <b class="c30">—</b></span>
+        <span class="chip">90日 <b class="c90">—</b></span>
+        <span class="chip">期間高 <b class="phi">—</b></span>
+        <span class="chip">期間低 <b class="plo">—</b></span>
+        <span class="chip">距上線 <b class="dhi">—</b></span>
+        <span class="chip">距下線 <b class="dlo">—</b></span>
+      </div>
+      <div class="chart" data-chart="{key}">{fb}</div>
+      <div class="legend"><span class="lg-line"></span>每日收盤（Yahoo）　<span class="lg-ma"></span>MA{config.MA_WINDOW} 均線　<span class="lg-watch"></span>關注線</div>
     </section>"""
         )
 
+    # 匯率、銅鋁比價序列
+    fx_series = daily.get("fx", [])
+    cu = {d["ts"]: d["usd"] for d in daily.get("copper", []) if d.get("usd")}
+    al = {d["ts"]: d["usd"] for d in daily.get("aluminum", []) if d.get("usd")}
+    ratio = [{"ts": d, "v": round(cu[d] / al[d], 3)}
+             for d in sorted(set(cu) & set(al)) if al.get(d)]
+
+    fx_panel = """
+    <div class="grid2">
+      <section class="mpanel" data-fx="1">
+        <div class="mhead"><div><span class="mname">匯率</span><span class="men">USD / TWD</span></div><span class="fval sm" id="fxNow">—</span></div>
+        <div class="chart sm" data-chart="fx"></div>
+      </section>
+      <section class="mpanel" data-ratio="1">
+        <div class="mhead"><div><span class="mname">銅鋁比價</span><span class="men">COPPER / ALUMINUM</span></div><span class="fval sm" id="ratioNow">—</span></div>
+        <div class="chart sm" data-chart="ratio"></div>
+      </section>
+    </div>"""
+
     names = " · ".join(m["name"] for m in config.METALS.values())
-    data_script = "<script>window.METALS_DATA = " + json.dumps(data, ensure_ascii=False) + ";</script>"
+    data_script = (
+        "<script>window.METALS_DATA = " + json.dumps(metals_data, ensure_ascii=False) + ";"
+        "window.FX_DATA = " + json.dumps(fx_series, ensure_ascii=False) + ";"
+        "window.RATIO_DATA = " + json.dumps(ratio, ensure_ascii=False) + ";</script>"
+    )
 
     return f"""<!doctype html>
 <html lang="zh-TW">
@@ -146,7 +201,7 @@ def render_html(history: dict) -> str:
     <div class="topbar">{_nav("metals")}{_THEME_BTN}</div>
     <div class="eyebrow">METALS TRACKER · LME 倫敦金屬交易所</div>
     <h1>銅鋁價格追蹤儀表板</h1>
-    <div class="sub">LME 官方結算價 · 台幣依即時匯率換算 · 每日 10:00 與 22:00（台灣時間）更新 · 突破關注區間時另發 Discord 告警</div>
+    <div class="sub">現價與告警＝LME 官方結算價（Westmetall）· 走勢圖＝每日收盤（Yahoo）· 台幣依匯率換算 · 每日 10:00 與 22:00（台灣時間）更新</div>
 
     <div class="cards">
       <div class="card"><div class="k">追蹤金屬</div><div class="v">{len(config.METALS)} <span style="font-size:13px;color:var(--muted)">{names}</span></div></div>
@@ -162,13 +217,14 @@ def render_html(history: dict) -> str:
         <button data-unit="twd_kg">NT$/公斤</button>
       </div>
       <div class="btnbar rangebar">
-        <button data-range="7">近 7 筆</button>
-        <button data-range="30">近 30 筆</button>
-        <button data-range="all">全部</button>
+        <button data-range="30">30 天</button>
+        <button data-range="90">90 天</button>
+        <button data-range="365">1 年</button>
       </div>
     </div>
 {''.join(panels)}
-    <div class="foot">資料來源：LME 官方價（Westmetall）· 匯率 Yahoo Finance · 單位皆由 LME 美元/公噸換算，僅供內部參考。</div>
+{fx_panel}
+    <div class="foot">現價/告警：LME 官方價（Westmetall）· 走勢圖：Yahoo Finance 每日收盤（銅為 COMEX 近月，與 LME 走勢近乎一致）· 匯率 Yahoo · 單位由美元/公噸換算 · 僅供內部參考。</div>
   </div>
 {data_script}
   <script src="assets/app.js"></script>
@@ -229,7 +285,12 @@ def render_jobs_html(stats: dict, summary: dict, jobs: list,
         for a, n in stats["top_areas"]
     ) or "<tr><td>—</td><td></td></tr>"
 
-    # 伺服器端後備：先渲染前 30 筆（依薪資高→低）；JS 載入後接管搜尋/篩選/排序
+    # 三張靜態長條圖
+    area_sal_bars = _hbars([(a, m, f"NT${m:,}") for a, m, _n in stats.get("area_salary", [])])
+    cat_bars = _hbars([(lbl, n, str(n)) for lbl, n in stats.get("categories", [])])
+    skill_bars = _hbars([(s, n, str(n)) for s, n in stats.get("skills", [])])
+
+    # 值得注意職缺（後備）
     def _mid(j):
         lo, hi = j.get("salary_low"), j.get("salary_high")
         return (lo + hi) / 2 if (lo and hi) else (lo or 0)
@@ -245,7 +306,14 @@ def render_jobs_html(stats: dict, summary: dict, jobs: list,
          "salary_low": j["salary_low"], "salary_high": j["salary_high"], "salary_kind": j["salary_kind"]}
         for j in jobs
     ]
-    data_script = "<script>window.JOBS_DATA = " + json.dumps(jobs_min, ensure_ascii=False) + ";</script>"
+    hist_min = [
+        {"ts": h.get("ts"), "total": h.get("total"), "salary_median": h.get("salary_median")}
+        for h in history
+    ]
+    data_script = (
+        "<script>window.JOBS_DATA = " + json.dumps(jobs_min, ensure_ascii=False) + ";"
+        "window.JOBS_HISTORY = " + json.dumps(hist_min, ensure_ascii=False) + ";</script>"
+    )
 
     return f"""<!doctype html>
 <html lang="zh-TW">
@@ -276,8 +344,20 @@ def render_jobs_html(stats: dict, summary: dict, jobs: list,
     </div>
 
     <div class="grid2">
+      <section class="mpanel"><div class="mhead"><div><span class="mname">職缺數</span><span class="men">趨勢</span></div></div><div class="chart sm" data-chart="jobsTotal"></div></section>
+      <section class="mpanel"><div class="mhead"><div><span class="mname">月薪中位數</span><span class="men">趨勢</span></div></div><div class="chart sm" data-chart="jobsMed"></div></section>
+    </div>
+
+    <div class="grid2">
       <div class="panel"><h3>🏢 徵才較多的公司</h3><table><tbody>{comp_rows}</tbody></table></div>
       <div class="panel"><h3>📍 徵才熱區</h3><table><tbody>{area_rows}</tbody></table></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px"><h3>💵 各地區月薪中位數</h3>{area_sal_bars}</div>
+
+    <div class="grid2">
+      <div class="panel"><h3>🗂️ 職務類別分布</h3>{cat_bars}</div>
+      <div class="panel"><h3>🏷️ 熱門技能關鍵字</h3>{skill_bars}</div>
     </div>
 
     <div class="panel" style="margin-bottom:16px">
