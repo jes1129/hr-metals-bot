@@ -3,7 +3,7 @@ name: 銅鋁監控 (功能 B)
 on:
   schedule:
     - cron: "0 2,14 * * *"   # UTC 02:00 & 14:00 = 台灣 10:00 & 22:00
-  workflow_dispatch:          # 允許在 Actions 頁面手動觸發測試
+  workflow_dispatch:          # 允許在 Actions 頁面手動觸發
   push:
     branches: [main]
     paths-ignore:             # 機器人自己 commit 的資料/儀表板不再觸發（防迴圈）
@@ -11,14 +11,16 @@ on:
       - "docs/**"
 
 permissions:
-  contents: write             # 需要把 prices.json / 儀表板 commit 回 repo
+  contents: write             # commit 歷史回 repo
+  pages: write                # 部署 GitHub Pages
+  id-token: write             # Pages 部署驗證
 
-concurrency:                  # 避免兩次排程同時寫入
+concurrency:
   group: metals
   cancel-in-progress: false
 
 jobs:
-  run:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +30,7 @@ jobs:
           python-version: "3.11"
 
       - name: 安裝依賴
-        run: pip install httpx    # 功能 B 用 Yahoo API，不需瀏覽器
+        run: pip install httpx    # LME(Westmetall)+匯率皆用 httpx，不需瀏覽器
 
       - name: 執行銅鋁監控
         env:
@@ -36,10 +38,26 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python run_metals.py
 
-      - name: 提交歷史與儀表板
+      - name: 提交歷史
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/prices.json docs/index.html
-          git commit -m "更新銅鋁報價 $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]" || echo "無變更，略過提交"
+          git commit -m "更新銅鋁報價 $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]" || echo "無變更"
           git push origin HEAD:main
+
+      - name: 上傳 Pages 產物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
