@@ -68,7 +68,7 @@ METALS = {
         "en": "COPPER · LME",
         "field": "LME_Cu_cash",  # Westmetall 欄位代碼（現金結算）
         "watch_low": 12000,      # 跌破下線 → 告警（USD/公噸）
-        "watch_high": 12500,     # [測試中] 暫調至現價之下強制觸發告警，測完改回 14000
+        "watch_high": 14000,     # 突破上線 → 告警（USD/公噸）
     },
     "aluminum": {
         "name": "鋁",
