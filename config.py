@@ -73,6 +73,13 @@ JOBS_FILE = "jobs.json"
 # 官方 SDK，少一層依賴。判斷品質建議 claude-opus-4-8；要更省成本改 claude-haiku-4-5。
 # =============================================================================
 AI_MODEL = "claude-opus-4-8"   # 候選人評分模型；省成本可改 "claude-haiku-4-5"
+
+# AI 供應商自動偵測（market.py 行情分析用）：
+#   有 GEMINI_API_KEY  → 用 Google Gemini（免費額度，免綁卡，推薦）
+#   有 ANTHROPIC_API_KEY → 用 Claude（品質最好，需付費）
+#   兩者皆無 → 退化為純統計摘要
+# Gemini 免費金鑰申請：https://aistudio.google.com/apikey
+GEMINI_MODEL = "gemini-2.5-flash"   # 免費額度模型；一天一次的用量綽綽有餘
 BATCH_SIZE = 10          # 每批 10 位候選人發一次請求
 SCORE_THRESHOLD = 8      # 8 分以上才推送（指南第 3 頁「每日輸出」）
 
@@ -117,6 +124,7 @@ TREND_POINTS = 14
 # Secrets 對應的環境變數名稱（值存在 Modal Secret，不寫在這裡）
 # =============================================================================
 ENV_ANTHROPIC_KEY = "ANTHROPIC_API_KEY"
+ENV_GEMINI_KEY = "GEMINI_API_KEY"
 ENV_DISCORD_WEBHOOK = "DISCORD_WEBHOOK_URL"
 ENV_104_ACCOUNT = "LOGIN_104_ACCOUNT"
 ENV_104_PASSWORD = "LOGIN_104_PASSWORD"

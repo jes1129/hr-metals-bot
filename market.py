@@ -240,22 +240,11 @@ _MARKET_SCHEMA = {
 }
 
 
-def ai_market_summary(stats: dict, jobs: list) -> dict:
-    """把彙整數據交給 Claude，回傳結構化行情分析。無金鑰時回退為規則式摘要。"""
-    api_key = os.environ.get(config.ENV_ANTHROPIC_KEY)
-    if not api_key:
-        print("[market] 缺少 ANTHROPIC_API_KEY，用規則式摘要。")
-        return _fallback_summary(stats)
+_SUMMARY_FIELDS = ("headline", "salary", "demand", "skills", "advice")
 
-    import anthropic  # 延遲匯入
 
-    sample = [
-        {"title": j["title"], "company": j["company"],
-         "area": j["area"], "salary_low": j["salary_low"], "salary_high": j["salary_high"]}
-        for j in jobs[:40]
-    ]
-    payload = {"統計": stats, "職缺樣本": sample}
-    system = (
+def _summary_system() -> str:
+    return (
         "你是台灣製造業的人力資源與薪酬分析顧問，專精金屬加工產業。"
         "根據提供的『104 公開職缺統計 + 樣本』，用繁體中文寫出簡潔、具體、可行動的市場行情分析。"
         "數字要引用實際統計；不要空泛。每欄 2-3 句即可。\n"
@@ -263,21 +252,89 @@ def ai_market_summary(stats: dict, jobs: list) -> dict:
         "salary（薪資行情觀察）、demand（職缺熱度與需求趨勢）、"
         "skills（雇主在找的技能/條件）、advice（給招募方的建議）。"
     )
+
+
+def _summary_payload(stats: dict, jobs: list) -> dict:
+    sample = [
+        {"title": j["title"], "company": j["company"],
+         "area": j["area"], "salary_low": j["salary_low"], "salary_high": j["salary_high"]}
+        for j in jobs[:40]
+    ]
+    return {"統計": stats, "職缺樣本": sample}
+
+
+def _clean_summary(data: dict) -> dict:
+    """只留下需要的欄位並轉字串，避免模型多回/少回欄位。"""
+    return {k: str(data.get(k, "")).strip() for k in _SUMMARY_FIELDS}
+
+
+def ai_market_summary(stats: dict, jobs: list) -> dict:
+    """自動選 AI 供應商產生行情分析：Gemini（免費）優先，其次 Claude，皆無則純統計。"""
+    gemini_key = os.environ.get(config.ENV_GEMINI_KEY)
+    anthropic_key = os.environ.get(config.ENV_ANTHROPIC_KEY)
+
+    if gemini_key:
+        out = _gemini_summary(gemini_key, stats, jobs)
+        if out:
+            return out
+    if anthropic_key:
+        out = _anthropic_summary(anthropic_key, stats, jobs)
+        if out:
+            return out
+    if not gemini_key and not anthropic_key:
+        print("[market] 未設 GEMINI_API_KEY / ANTHROPIC_API_KEY，用規則式摘要。")
+    return _fallback_summary(stats)
+
+
+def _gemini_summary(key: str, stats: dict, jobs: list):
+    """Google Gemini（免費額度）。用 httpx 直打 REST，不需額外套件。失敗回 None。"""
+    import httpx  # 延遲匯入
+
+    prompt = (
+        _summary_system()
+        + "\n\n只輸出一個 JSON 物件，鍵為 headline / salary / demand / skills / advice，"
+        + "值皆為繁體中文字串。\n\n資料：\n"
+        + json.dumps(_summary_payload(stats, jobs), ensure_ascii=False)
+    )
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{config.GEMINI_MODEL}:generateContent"
+    )
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.4},
+    }
     try:
-        client = anthropic.Anthropic(api_key=api_key)
+        r = httpx.post(url, params={"key": key}, json=body, timeout=60)
+        r.raise_for_status()
+        text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+        print("[market] 使用 Gemini 產生行情分析。")
+        return _clean_summary(json.loads(text))
+    except Exception as e:  # noqa: BLE001
+        print(f"[market] Gemini 分析失敗：{e}")
+        return None
+
+
+def _anthropic_summary(key: str, stats: dict, jobs: list):
+    """Anthropic Claude（付費，品質最好）。失敗回 None。"""
+    import anthropic  # 延遲匯入
+
+    try:
+        client = anthropic.Anthropic(api_key=key)
         resp = client.messages.create(
             model=config.AI_MODEL,
             max_tokens=1500,
-            system=system,
+            system=_summary_system(),
             messages=[{"role": "user",
-                       "content": json.dumps(payload, ensure_ascii=False)}],
+                       "content": json.dumps(_summary_payload(stats, jobs), ensure_ascii=False)}],
             output_config={"format": {"type": "json_schema", "schema": _MARKET_SCHEMA}},
         )
         text = next(b.text for b in resp.content if b.type == "text")
-        return json.loads(text)
+        print("[market] 使用 Claude 產生行情分析。")
+        return _clean_summary(json.loads(text))
     except Exception as e:  # noqa: BLE001
-        print(f"[market] Claude 分析失敗，改用規則式摘要：{e}")
-        return _fallback_summary(stats)
+        print(f"[market] Claude 分析失敗：{e}")
+        return None
 
 
 def _fallback_summary(stats: dict) -> dict:

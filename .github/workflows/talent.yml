@@ -32,7 +32,8 @@ jobs:
       - name: 執行公開職缺行情追蹤
         env:
           METALS_DATA_DIR: data
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}       # 免費（推薦）
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 選配，付費
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python run_talent.py
 
