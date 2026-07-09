@@ -585,6 +585,8 @@ def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: 
 <html lang="zh-TW">
 <head>
 {_HEAD}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <title>九上科技 · 供應商雷達</title>
 </head>
 <body>
@@ -622,9 +624,11 @@ def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: 
         <input id="supSearch" placeholder="搜尋公司 / 地區關鍵字…">
         <select id="supCat"><option value="">全部能力類別</option></select>
         <label class="prionly"><input type="checkbox" id="supNear"> 只看 ⭐ 神岡周邊</label>
+        <div class="btnbar viewbar"><button data-view="list" class="on">📋 清單</button><button data-view="map">🗺️ 地圖</button></div>
         <span class="count" id="supCount"></span>
       </div>
-      <table>
+      <div id="supMap" class="supmap" style="display:none"></div>
+      <table id="supTable">
         <thead><tr>
           <th class="sortable" data-key="name">公司 <span class="arrow"></span></th>
           <th class="sortable" data-key="category">能力類別 <span class="arrow"></span></th>

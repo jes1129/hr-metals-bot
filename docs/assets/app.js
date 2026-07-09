@@ -374,6 +374,61 @@
     render();
   }
 
+  // ============================================================ 供應商地圖
+  var TC = {  // 台中各行政區約略中心
+    "神岡":[24.257,120.662],"豐原":[24.253,120.717],"大雅":[24.229,120.647],"潭子":[24.211,120.705],
+    "后里":[24.309,120.711],"清水":[24.269,120.566],"沙鹿":[24.234,120.566],"梧棲":[24.255,120.531],
+    "龍井":[24.192,120.545],"大甲":[24.349,120.622],"外埔":[24.333,120.654],"大安":[24.348,120.588],
+    "石岡":[24.276,120.780],"新社":[24.234,120.809],"東勢":[24.259,120.827],"和平":[24.174,120.900],
+    "西屯":[24.181,120.616],"南屯":[24.138,120.643],"北屯":[24.182,120.686],"西區":[24.141,120.664],
+    "北區":[24.166,120.684],"東區":[24.138,120.694],"南區":[24.119,120.664],"中區":[24.144,120.679],
+    "烏日":[24.104,120.622],"大肚":[24.154,120.541],"霧峰":[24.061,120.700],"太平":[24.126,120.718],"大里":[24.099,120.677]
+  };
+  var COUNTY = {
+    "台北":[25.04,121.56],"新北":[25.01,121.46],"桃園":[24.99,121.30],"台中":[24.15,120.67],"台南":[23.00,120.21],
+    "高雄":[22.62,120.31],"基隆":[25.13,121.74],"新竹":[24.81,120.97],"苗栗":[24.56,120.82],"彰化":[24.05,120.52],
+    "南投":[23.91,120.69],"雲林":[23.71,120.43],"嘉義":[23.48,120.45],"屏東":[22.55,120.55],"宜蘭":[24.70,121.74],
+    "花蓮":[23.99,121.60],"台東":[22.76,121.14],"澎湖":[23.57,119.58],"金門":[24.43,118.32],"連江":[26.16,119.95]
+  };
+  function _latlng(area) {
+    var a = (area || "").replace(/臺/g, "台");
+    for (var k in TC) if (a.indexOf(k) >= 0) return TC[k];
+    for (var c in COUNTY) if (a.indexOf(c) >= 0) return COUNTY[c];
+    return null;
+  }
+  function initSupplierMap(SUP) {
+    var mapEl = document.getElementById("supMap"), tableEl = document.getElementById("supTable");
+    if (!mapEl || typeof L === "undefined") return;
+    var map = null;
+    function build() {
+      map = L.map(mapEl).setView([24.257, 120.662], 10);  // 神岡為中心
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(map);
+      L.marker([24.257, 120.662]).addTo(map).bindPopup("<b>九上科技</b><br>神岡（你的位置）");
+      var esc = function (s) { var d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; };
+      SUP.slice(0, 600).forEach(function (s) {
+        var ll = _latlng(s.area || s.address); if (!ll) return;
+        var lat = ll[0] + (Math.random() - 0.5) * 0.02, lng = ll[1] + (Math.random() - 0.5) * 0.02;
+        var color = s.is_near ? "#c0392b" : "#2c7be5";
+        L.circleMarker([lat, lng], { radius: 5, color: color, weight: 1, fillOpacity: .7 })
+          .addTo(map)
+          .bindPopup("<b>" + esc(s.name) + "</b><br>" + esc(s.category) + " · " + esc(s.area) +
+            "<br>來源：" + esc(s.source) + (s.url ? '<br><a href="' + esc(s.url) + '" target="_blank">公司頁</a>' : ""));
+      });
+    }
+    document.querySelectorAll(".viewbar button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var v = btn.getAttribute("data-view");
+        document.querySelectorAll(".viewbar button").forEach(function (b) { b.classList.toggle("on", b === btn); });
+        if (v === "map") {
+          tableEl.style.display = "none"; mapEl.style.display = "block";
+          if (!map) build();
+          setTimeout(function () { map.invalidateSize(); }, 60);
+        } else { mapEl.style.display = "none"; tableEl.style.display = ""; }
+      });
+    });
+  }
+
   // ============================================================ 報價試算器
   function initQuote(MATS) {
     var matEl = document.getElementById("qMat"), wEl = document.getElementById("qWeight");
@@ -416,7 +471,7 @@
     initTheme();
     if (window.METALS_DATA) initMetals(window.METALS_DATA);
     if (window.JOBS_DATA) { initJobs(window.JOBS_DATA); initJobsCharts(); }
-    if (window.SUPPLIERS_DATA) initSuppliers(window.SUPPLIERS_DATA);
+    if (window.SUPPLIERS_DATA) { initSuppliers(window.SUPPLIERS_DATA); initSupplierMap(window.SUPPLIERS_DATA); }
     if (window.QUOTE_MATERIALS) initQuote(window.QUOTE_MATERIALS);
   });
 })();
