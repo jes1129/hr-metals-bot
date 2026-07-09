@@ -55,29 +55,27 @@ SCORING_RUBRIC = (
 )
 
 # =============================================================================
-# 功能 B — 銅鋁監控
-# 資料源改用 Yahoo Finance 公開報價 API（回傳乾淨 JSON、免登入、不需瀏覽器）。
-# 注意單位：COMEX 銅(HG=F)以 USD/磅報價 → to_tonne 換算每公噸；COMEX 鋁(ALI=F)本就是每公噸。
-# watch 區間已調到現價附近，請依你實際想盯的價位自行調整。
+# 功能 B — 銅鋁監控（LME 倫敦官方價，以台幣顯示）
+# 資料源：Westmetall 公布的 LME 官方結算價（USD/公噸，免金鑰、免瀏覽器）。
+# 台幣：以 Yahoo 的 USDTWD 即時匯率換算。watch 區間為 USD/公噸，請依實際想盯價位調整。
 # =============================================================================
+LME_URL = "https://www.westmetall.com/en/markdaten.php"
+FX_URL = "https://query1.finance.yahoo.com/v8/finance/chart/USDTWD=X"  # USD→TWD 匯率
+
 METALS = {
     "copper": {
         "name": "銅",
-        "en": "COPPER · COMEX",
-        "unit": "USD/t",
-        "yahoo": "HG=F",         # Yahoo Finance 代碼
-        "to_tonne": 2204.62,     # USD/磅 → USD/公噸
-        "watch_low": 12500,      # 跌破下線 → 告警
-        "watch_high": 14500,     # 突破上線 → 告警
+        "en": "COPPER · LME",
+        "field": "LME_Cu_cash",  # Westmetall 欄位代碼（現金結算）
+        "watch_low": 12000,      # 跌破下線 → 告警（USD/公噸）
+        "watch_high": 14000,     # 突破上線 → 告警（USD/公噸）
     },
     "aluminum": {
         "name": "鋁",
-        "en": "ALUMINUM · COMEX",
-        "unit": "USD/t",
-        "yahoo": "ALI=F",
-        "to_tonne": 1.0,         # 已是 USD/公噸
-        "watch_low": 3000,
-        "watch_high": 3600,
+        "en": "ALUMINUM · LME",
+        "field": "LME_Al_cash",
+        "watch_low": 2900,
+        "watch_high": 3400,
     },
 }
 

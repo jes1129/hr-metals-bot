@@ -57,7 +57,8 @@ def render_html(history: dict) -> str:
     for key, cfg in config.METALS.items():
         series = history.get(key, [])
         latest = series[-1] if series else {}
-        price = latest.get("price")
+        price = latest.get("price")           # USD/公噸
+        price_twd = latest.get("price_twd")   # NT$/公噸
         change = latest.get("change")
         pct = latest.get("change_pct")
         status = metals_mod.check_status(key, price)
@@ -87,7 +88,7 @@ def render_html(history: dict) -> str:
             <div class="m-name">{html.escape(cfg['name'])}</div>
             <div class="m-en">{html.escape(cfg['en'])}</div>
           </td>
-          <td class="num price">{_fmt(price)} <span class="unit">{cfg['unit']}</span></td>
+          <td class="num price">{('NT$' + format(price_twd, ',')) if price_twd else '—'}<div class="usd">{('US$' + _fmt(price)) if price is not None else ''}</div></td>
           <td class="num" style="color:{chg_color}">{('+' if up else '')}{_fmt(change)}</td>
           <td class="num" style="color:{chg_color}">{('+' if up else '')}{_fmt(pct,2)}%</td>
           <td class="spark">{spark}</td>
@@ -125,6 +126,7 @@ def render_html(history: dict) -> str:
   .metal .m-en {{ font-size: 11px; color: #aaa; letter-spacing: 1px; }}
   .num {{ font-variant-numeric: tabular-nums; }}
   .price {{ font-size: 17px; font-weight: 700; }}
+  .price .usd {{ font-size: 11px; color: #aaa; font-weight: 400; margin-top: 2px; }}
   .unit {{ font-size: 11px; color: #aaa; font-weight: 400; }}
   .spark {{ text-align: center; }}
   .watch {{ color: #aaa; font-size: 12px; }}
@@ -136,9 +138,9 @@ def render_html(history: dict) -> str:
 </head>
 <body>
   <div class="wrap">
-    <div class="eyebrow">METALS TRACKER · Yahoo Finance</div>
+    <div class="eyebrow">METALS TRACKER · LME 倫敦金屬交易所</div>
     <h1>銅鋁價格追蹤儀表板</h1>
-    <div class="sub">每日 10:00 與 22:00（台灣時間）更新 · 突破關注區間時另發 Discord 告警</div>
+    <div class="sub">LME 官方結算價 · 台幣依即時匯率換算 · 每日 10:00 與 22:00（台灣時間）更新 · 突破關注區間時另發 Discord 告警</div>
 
     <div class="cards">
       <div class="card"><div class="k">追蹤金屬</div><div class="v">{len(config.METALS)} <span style="font-size:13px;color:#999">{' · '.join(m['name'] for m in config.METALS.values())}</span></div></div>
@@ -150,14 +152,14 @@ def render_html(history: dict) -> str:
       <table>
         <thead>
           <tr>
-            <th>金屬</th><th>現價</th><th>漲跌</th><th>漲跌幅</th>
-            <th>近 {config.TREND_POINTS} 筆走勢</th><th>狀態</th><th>關注區間</th>
+            <th>金屬</th><th>現價 (NT$/t)</th><th>漲跌 (US$)</th><th>漲跌幅</th>
+            <th>近 {config.TREND_POINTS} 筆走勢</th><th>狀態</th><th>關注區間 (US$)</th>
           </tr>
         </thead>
         <tbody>{''.join(rows_html)}</tbody>
       </table>
     </div>
-    <div class="foot">資料來源：Yahoo Finance（COMEX）· 僅供內部參考。狀態燈依 config.py 關注區間自動標示。</div>
+    <div class="foot">資料來源：LME 官方價（Westmetall）· 匯率 Yahoo Finance · 僅供內部參考。狀態燈依 config.py 關注區間自動標示。</div>
   </div>
 </body>
 </html>"""
