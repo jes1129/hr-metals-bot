@@ -108,6 +108,10 @@ def render_html(history: dict) -> str:
   body {{ font-family: -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
          margin: 0; background: #f5f5f4; color: #1a1a1a; }}
   .wrap {{ max-width: 920px; margin: 32px auto; padding: 0 20px; }}
+  .nav {{ display: flex; gap: 8px; margin-bottom: 18px; }}
+  .nav a {{ font-size: 13px; text-decoration: none; padding: 7px 14px; border-radius: 999px;
+            border: 1px solid #e2e2e2; color: #555; background: #fff; }}
+  .nav a.on {{ background: #1a1a1a; color: #fff; border-color: #1a1a1a; }}
   .eyebrow {{ font-size: 12px; letter-spacing: 2px; color: #999; }}
   h1 {{ font-size: 26px; margin: 4px 0 2px; }}
   .sub {{ color: #666; font-size: 13px; margin-bottom: 20px; }}
@@ -138,6 +142,7 @@ def render_html(history: dict) -> str:
 </head>
 <body>
   <div class="wrap">
+    <div class="nav"><a class="on" href="index.html">🔩 銅鋁價格</a><a href="jobs.html">🔧 人才行情</a></div>
     <div class="eyebrow">METALS TRACKER · LME 倫敦金屬交易所</div>
     <h1>銅鋁價格追蹤儀表板</h1>
     <div class="sub">LME 官方結算價 · 台幣依即時匯率換算 · 每日 10:00 與 22:00（台灣時間）更新 · 突破關注區間時另發 Discord 告警</div>
@@ -160,6 +165,160 @@ def render_html(history: dict) -> str:
       </table>
     </div>
     <div class="foot">資料來源：LME 官方價（Westmetall）· 匯率 Yahoo Finance · 僅供內部參考。狀態燈依 config.py 關注區間自動標示。</div>
+  </div>
+</body>
+</html>"""
+
+
+# ===========================================================================
+# 功能 A（實驗版）— 金屬加工人才行情儀表板
+# ===========================================================================
+def _salary_disp(j: dict) -> str:
+    lo, hi, kind = j.get("salary_low"), j.get("salary_high"), j.get("salary_kind")
+    if lo is None:
+        return {"面議": "面議", "時薪": "時薪", "yearly": "年薪制"}.get(kind, "—")
+    if hi:
+        return f"NT${lo:,}~{hi:,}"
+    return f"NT${lo:,} 以上"
+
+
+def _delta_span(v, unit="") -> str:
+    if v is None:
+        return ""
+    if v > 0:
+        return f'<span style="color:#c0392b;font-size:13px">▲{v:,}{unit}</span>'
+    if v < 0:
+        return f'<span style="color:#1e8449;font-size:13px">▼{abs(v):,}{unit}</span>'
+    return '<span style="color:#999;font-size:13px">持平</span>'
+
+
+def render_jobs_html(stats: dict, summary: dict, jobs: list,
+                     history: list, delta: dict) -> str:
+    """金屬加工人才行情儀表板。history: [{ts,total,salary_median,salary_avg},...]。"""
+    # 最後更新時間（取 history 最後一筆或現在）
+    last_update = "—"
+    if history:
+        try:
+            dt = datetime.datetime.fromisoformat(history[-1]["ts"]).astimezone(
+                datetime.timezone(datetime.timedelta(hours=8))
+            )
+            last_update = dt.strftime("%Y-%m-%d %H:%M")
+        except Exception:  # noqa: BLE001
+            pass
+
+    # 走勢：職缺數 / 月薪中位數
+    totals = [h.get("total") for h in history[-config.TREND_POINTS:]]
+    meds = [h.get("salary_median") for h in history[-config.TREND_POINTS:]]
+    spark_total = _sparkline(totals, up=(len(totals) >= 2 and (totals[-1] or 0) >= (totals[0] or 0)))
+    spark_med = _sparkline(meds, up=(len(meds) >= 2 and (meds[-1] or 0) >= (meds[0] or 0)))
+
+    med = f"NT${stats['salary_median']:,}" if stats["salary_median"] else "—"
+    avg = f"NT${stats['salary_avg']:,}" if stats["salary_avg"] else "—"
+    rng = (f"NT${stats['salary_min']:,} ~ NT${stats['salary_max']:,}"
+           if stats["salary_min"] else "—")
+
+    # 熱門公司 / 熱區
+    comp_rows = "".join(
+        f"<tr><td>{html.escape(c)}</td><td class='num'>{n}</td></tr>"
+        for c, n in stats["top_companies"]
+    ) or "<tr><td>—</td><td></td></tr>"
+    area_rows = "".join(
+        f"<tr><td>{html.escape(a)}</td><td class='num'>{n}</td></tr>"
+        for a, n in stats["top_areas"]
+    ) or "<tr><td>—</td><td></td></tr>"
+
+    # 值得注意的職缺：可解析薪資者取薪資最高前 8
+    def _mid(j):
+        lo, hi = j.get("salary_low"), j.get("salary_high")
+        return (lo + hi) / 2 if (lo and hi) else (lo or 0)
+    notable = sorted([j for j in jobs if j.get("salary_low")],
+                     key=_mid, reverse=True)[:8]
+    job_rows = "".join(
+        f"""<tr>
+          <td><a href="{html.escape(j['url'])}" target="_blank" rel="noopener">{html.escape(j['title'][:38])}</a></td>
+          <td>{html.escape(j['company'][:20])}</td>
+          <td>{html.escape(j['area'])}</td>
+          <td class="num">{_salary_disp(j)}</td>
+        </tr>""" for j in notable
+    ) or "<tr><td colspan='4'>—</td></tr>"
+
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>金屬加工人才行情儀表板</title>
+<style>
+  * {{ box-sizing: border-box; }}
+  body {{ font-family: -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+         margin: 0; background: #f5f5f4; color: #1a1a1a; }}
+  .wrap {{ max-width: 920px; margin: 32px auto; padding: 0 20px; }}
+  .nav {{ display: flex; gap: 8px; margin-bottom: 18px; }}
+  .nav a {{ font-size: 13px; text-decoration: none; padding: 7px 14px; border-radius: 999px;
+            border: 1px solid #e2e2e2; color: #555; background: #fff; }}
+  .nav a.on {{ background: #1a1a1a; color: #fff; border-color: #1a1a1a; }}
+  .eyebrow {{ font-size: 12px; letter-spacing: 2px; color: #999; }}
+  h1 {{ font-size: 26px; margin: 4px 0 2px; }}
+  .sub {{ color: #666; font-size: 13px; margin-bottom: 20px; }}
+  .cards {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }}
+  .card {{ background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 14px 16px; }}
+  .card .k {{ font-size: 11px; color: #999; letter-spacing: 1px; }}
+  .card .v {{ font-size: 20px; font-weight: 700; margin-top: 4px; }}
+  .card .spk {{ margin-top: 6px; }}
+  .ai {{ background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }}
+  .ai h2 {{ font-size: 15px; margin: 0 0 12px; }}
+  .ai .row {{ margin-bottom: 10px; }}
+  .ai .lbl {{ font-size: 12px; color: #2c7be5; font-weight: 600; }}
+  .ai .txt {{ font-size: 14px; color: #333; margin-top: 2px; line-height: 1.55; }}
+  .grid2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }}
+  .panel {{ background: #fff; border: 1px solid #eee; border-radius: 12px; overflow-x: auto; }}
+  .panel h3 {{ font-size: 13px; margin: 0; padding: 14px 16px 8px; color: #444; }}
+  table {{ width: 100%; border-collapse: collapse; }}
+  th, td {{ padding: 10px 16px; text-align: left; font-size: 13px; }}
+  th {{ font-size: 11px; color: #999; font-weight: 500; letter-spacing: 1px; border-bottom: 1px solid #eee; }}
+  tr + tr td {{ border-top: 1px solid #f5f5f5; }}
+  td a {{ color: #2c7be5; text-decoration: none; }}
+  .num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+  th.num {{ text-align: right; }}
+  .foot {{ color: #aaa; font-size: 12px; margin-top: 14px; }}
+  @media (max-width: 640px) {{ .cards {{ grid-template-columns: 1fr 1fr; }} .grid2 {{ grid-template-columns: 1fr; }} }}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav"><a href="index.html">🔩 銅鋁價格</a><a class="on" href="jobs.html">🔧 人才行情</a></div>
+    <div class="eyebrow">TALENT MARKET · 104 公開職缺</div>
+    <h1>金屬加工人才行情</h1>
+    <div class="sub">104 公開職缺每日彙整 · 每日 08:00（台灣時間）更新 · 資料來源為公開徵才頁，僅供招募行情參考</div>
+
+    <div class="cards">
+      <div class="card"><div class="k">職缺總數</div><div class="v">{stats['total']} {_delta_span(delta.get('total'))}</div><div class="spk">{spark_total}</div></div>
+      <div class="card"><div class="k">月薪中位數</div><div class="v">{med} {_delta_span(delta.get('salary_median'))}</div><div class="spk">{spark_med}</div></div>
+      <div class="card"><div class="k">月薪平均</div><div class="v">{avg}</div><div class="k" style="margin-top:6px">區間 {rng}</div></div>
+      <div class="card"><div class="k">面議職缺</div><div class="v">{stats['negotiable']}</div><div class="k" style="margin-top:6px">未列薪資</div></div>
+    </div>
+
+    <div class="ai">
+      <h2>🔧 {html.escape(summary.get('headline',''))}</h2>
+      <div class="row"><div class="lbl">💰 薪資行情</div><div class="txt">{html.escape(summary.get('salary',''))}</div></div>
+      <div class="row"><div class="lbl">📈 需求趨勢</div><div class="txt">{html.escape(summary.get('demand',''))}</div></div>
+      <div class="row"><div class="lbl">🛠️ 雇主要的技能</div><div class="txt">{html.escape(summary.get('skills',''))}</div></div>
+      <div class="row"><div class="lbl">💡 招募建議</div><div class="txt">{html.escape(summary.get('advice',''))}</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel"><h3>🏢 徵才較多的公司</h3><table><tbody>{comp_rows}</tbody></table></div>
+      <div class="panel"><h3>📍 徵才熱區</h3><table><tbody>{area_rows}</tbody></table></div>
+    </div>
+
+    <div class="panel">
+      <h3>⭐ 值得注意的職缺（薪資最高）</h3>
+      <table>
+        <thead><tr><th>職缺</th><th>公司</th><th>地區</th><th class="num">月薪</th></tr></thead>
+        <tbody>{job_rows}</tbody>
+      </table>
+    </div>
+    <div class="foot">資料來源：104 人力銀行公開職缺 · 最後更新 {last_update} · 僅供內部招募行情參考，非即時、不含企業人才庫。</div>
   </div>
 </body>
 </html>"""

@@ -361,7 +361,14 @@ async def run() -> dict:
     history = load_history()
     delta = _delta(history, stats)
     summary = ai_market_summary(stats, jobs)
-    save_snapshot(history, stats)
+    save_snapshot(history, stats)  # history 追加今日 → 供走勢圖含今日
+
+    # 產生網頁儀表板到 docs/jobs.html（與銅鋁 index.html 同一個 GitHub Pages）
+    import dashboard  # 延遲匯入，避免無關流程也載入
+    os.makedirs("docs", exist_ok=True)
+    with open(os.path.join("docs", "jobs.html"), "w", encoding="utf-8") as f:
+        f.write(dashboard.render_jobs_html(stats, summary, jobs, history, delta))
+    print("[market] 已更新 docs/jobs.html")
 
     content = f"**🔧 金屬加工人才 · 每日行情**（{datetime.date.today():%Y/%m/%d}）"
     notify.send_embeds(build_embeds(stats, summary, delta, jobs), content=content)

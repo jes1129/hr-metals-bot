@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>金屬加工人才行情儀表板</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+         margin: 0; background: #f5f5f4; color: #1a1a1a; }
+  .wrap { max-width: 920px; margin: 32px auto; padding: 0 20px; }
+  .nav { display: flex; gap: 8px; margin-bottom: 18px; }
+  .nav a { font-size: 13px; text-decoration: none; padding: 7px 14px; border-radius: 999px;
+            border: 1px solid #e2e2e2; color: #555; background: #fff; }
+  .nav a.on { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .eyebrow { font-size: 12px; letter-spacing: 2px; color: #999; }
+  h1 { font-size: 26px; margin: 4px 0 2px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 20px; }
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+  .card { background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 14px 16px; }
+  .card .k { font-size: 11px; color: #999; letter-spacing: 1px; }
+  .card .v { font-size: 20px; font-weight: 700; margin-top: 4px; }
+  .card .spk { margin-top: 6px; }
+  .ai { background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }
+  .ai h2 { font-size: 15px; margin: 0 0 12px; }
+  .ai .row { margin-bottom: 10px; }
+  .ai .lbl { font-size: 12px; color: #2c7be5; font-weight: 600; }
+  .ai .txt { font-size: 14px; color: #333; margin-top: 2px; line-height: 1.55; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+  .panel { background: #fff; border: 1px solid #eee; border-radius: 12px; overflow-x: auto; }
+  .panel h3 { font-size: 13px; margin: 0; padding: 14px 16px 8px; color: #444; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 10px 16px; text-align: left; font-size: 13px; }
+  th { font-size: 11px; color: #999; font-weight: 500; letter-spacing: 1px; border-bottom: 1px solid #eee; }
+  tr + tr td { border-top: 1px solid #f5f5f5; }
+  td a { color: #2c7be5; text-decoration: none; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  th.num { text-align: right; }
+  .foot { color: #aaa; font-size: 12px; margin-top: 14px; }
+  @media (max-width: 640px) { .cards { grid-template-columns: 1fr 1fr; } .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav"><a href="index.html">🔩 銅鋁價格</a><a class="on" href="jobs.html">🔧 人才行情</a></div>
+    <div class="eyebrow">TALENT MARKET · 104 公開職缺</div>
+    <h1>金屬加工人才行情</h1>
+    <div class="sub">104 公開職缺每日彙整 · 每日 08:00（台灣時間）更新 · 資料來源為公開徵才頁，僅供招募行情參考</div>
+
+    <div class="cards">
+      <div class="card"><div class="k">職缺總數</div><div class="v">202 </div><div class="spk"><svg width="120" height="32"></svg></div></div>
+      <div class="card"><div class="k">月薪中位數</div><div class="v">NT$40,000 </div><div class="spk"><svg width="120" height="32"></svg></div></div>
+      <div class="card"><div class="k">月薪平均</div><div class="v">NT$43,216</div><div class="k" style="margin-top:6px">區間 NT$29,500 ~ NT$100,000</div></div>
+      <div class="card"><div class="k">面議職缺</div><div class="v">48</div><div class="k" style="margin-top:6px">未列薪資</div></div>
+    </div>
+
+    <div class="ai">
+      <h2>🔧 今日金屬加工相關公開職缺 202 筆</h2>
+      <div class="row"><div class="lbl">💰 薪資行情</div><div class="txt">可解析月薪的職缺中位數約 NT$40,000，面議 48 筆。</div></div>
+      <div class="row"><div class="lbl">📈 需求趨勢</div><div class="txt">徵才熱區：桃園市、台中市、新北市。</div></div>
+      <div class="row"><div class="lbl">🛠️ 雇主要的技能</div><div class="txt">（未啟用 AI 分析，僅提供統計數據）</div></div>
+      <div class="row"><div class="lbl">💡 招募建議</div><div class="txt">目前釋出較多職缺的公司：台灣林吉金屬股份有限公司、大華金屬工業股份有限公司、豐祥金屬工業股份有限公司。</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel"><h3>🏢 徵才較多的公司</h3><table><tbody><tr><td>台灣林吉金屬股份有限公司</td><td class='num'>4</td></tr><tr><td>大華金屬工業股份有限公司</td><td class='num'>4</td></tr><tr><td>豐祥金屬工業股份有限公司</td><td class='num'>4</td></tr><tr><td>橋椿金屬股份有限公司</td><td class='num'>4</td></tr><tr><td>復盛應用科技股份有限公司</td><td class='num'>3</td></tr></tbody></table></div>
+      <div class="panel"><h3>📍 徵才熱區</h3><table><tbody><tr><td>桃園市</td><td class='num'>48</td></tr><tr><td>台中市</td><td class='num'>41</td></tr><tr><td>新北市</td><td class='num'>40</td></tr><tr><td>台南市</td><td class='num'>25</td></tr><tr><td>彰化縣</td><td class='num'>17</td></tr><tr><td>其他/海外</td><td class='num'>10</td></tr></tbody></table></div>
+    </div>
+
+    <div class="panel">
+      <h3>⭐ 值得注意的職缺（薪資最高）</h3>
+      <table>
+        <thead><tr><th>職缺</th><th>公司</th><th>地區</th><th class="num">月薪</th></tr></thead>
+        <tbody><tr>
+          <td><a href="https://www.104.com.tw/job/7395g" target="_blank" rel="noopener">沖壓主管</a></td>
+          <td>英屬開曼群島商銀聯有限公司台灣分公司</td>
+          <td>台北市</td>
+          <td class="num">NT$80,000~120,000</td>
+        </tr><tr>
+          <td><a href="https://www.104.com.tw/job/8gypx" target="_blank" rel="noopener">Cnc铣床工程師</a></td>
+          <td>昌峰實業有限公司</td>
+          <td>桃園市</td>
+          <td class="num">NT$60,000~120,000</td>
+        </tr><tr>
+          <td><a href="https://www.104.com.tw/job/8uqja" target="_blank" rel="noopener">模具部課長/副理</a></td>
+          <td>群達企業有限公司</td>
+          <td>新北市</td>
+          <td class="num">NT$60,000~100,000</td>
+        </tr><tr>
+          <td><a href="https://www.104.com.tw/job/7zhyi" target="_blank" rel="noopener">台中門窗維修業務銷售人員</a></td>
+          <td>彩睿企業有限公司</td>
+          <td>台中市</td>
+          <td class="num">NT$38,000~120,000</td>
+        </tr><tr>
+          <td><a href="https://www.104.com.tw/job/918nt" target="_blank" rel="noopener">精品鑑定 / 日商企業 / 日語【新莊區】</a></td>
+          <td>台灣伊夫蘭股份有限公司</td>
+          <td>新北市</td>
+          <td class="num">NT$55,000~100,000</td>
+        </tr><tr>
+          <td><a href="https://www.104.com.tw/job/5a1id" target="_blank" rel="noopener">CNC / CAM 精密加工工程師</a></td>
+          <td>海成未來股份有限公司</td>
+          <td>台中市</td>
+          <td class="num">NT$50,000~100,000</td>
+        </tr><tr>
+          <td><a href="https://www.104.com.tw/job/6zuc6" target="_blank" rel="noopener">模具技術工程師</a></td>
+          <td>安泰汽車興業股份有限公司</td>
+          <td>桃園市</td>
+          <td class="num">NT$50,000~100,000</td>
+        </tr><tr>
+          <td><a href="https://www.104.com.tw/job/8vb22" target="_blank" rel="noopener">塑膠模具技術人員</a></td>
+          <td>鈺晟精密工具有限公司</td>
+          <td>其他/海外</td>
+          <td class="num">NT$50,000~100,000</td>
+        </tr></tbody>
+      </table>
+    </div>
+    <div class="foot">資料來源：104 人力銀行公開職缺 · 最後更新 2026-07-09 11:30 · 僅供內部招募行情參考，非即時、不含企業人才庫。</div>
+  </div>
+</body>
+</html>
