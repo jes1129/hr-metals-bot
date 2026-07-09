@@ -27,6 +27,7 @@
   .metal .m-en { font-size: 11px; color: #aaa; letter-spacing: 1px; }
   .num { font-variant-numeric: tabular-nums; }
   .price { font-size: 17px; font-weight: 700; }
+  .price .usd { font-size: 11px; color: #aaa; font-weight: 400; margin-top: 2px; }
   .unit { font-size: 11px; color: #aaa; font-weight: 400; }
   .spark { text-align: center; }
   .watch { color: #aaa; font-size: 12px; }
@@ -38,52 +39,52 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="eyebrow">METALS TRACKER · Yahoo Finance</div>
+    <div class="eyebrow">METALS TRACKER · LME 倫敦金屬交易所</div>
     <h1>銅鋁價格追蹤儀表板</h1>
-    <div class="sub">每日 10:00 與 22:00（台灣時間）更新 · 突破關注區間時另發 Discord 告警</div>
+    <div class="sub">LME 官方結算價 · 台幣依即時匯率換算 · 每日 10:00 與 22:00（台灣時間）更新 · 突破關注區間時另發 Discord 告警</div>
 
     <div class="cards">
       <div class="card"><div class="k">追蹤金屬</div><div class="v">2 <span style="font-size:13px;color:#999">銅 · 鋁</span></div></div>
       <div class="card"><div class="k">告警中</div><div class="v">0 <span style="font-size:13px;color:#999">項突破區間</span></div></div>
-      <div class="card"><div class="k">最後更新</div><div class="v" style="font-size:18px">2026-07-09 02:55</div></div>
+      <div class="card"><div class="k">最後更新</div><div class="v" style="font-size:18px">2026-07-09 10:48</div></div>
     </div>
 
     <div class="panel">
       <table>
         <thead>
           <tr>
-            <th>金屬</th><th>現價</th><th>漲跌</th><th>漲跌幅</th>
-            <th>近 14 筆走勢</th><th>狀態</th><th>關注區間</th>
+            <th>金屬</th><th>現價 (NT$/t)</th><th>漲跌 (US$)</th><th>漲跌幅</th>
+            <th>近 14 筆走勢</th><th>狀態</th><th>關注區間 (US$)</th>
           </tr>
         </thead>
         <tbody>
         <tr>
           <td class="metal">
             <div class="m-name">銅</div>
-            <div class="m-en">COPPER · COMEX</div>
+            <div class="m-en">COPPER · LME</div>
           </td>
-          <td class="num price">13,523.1 <span class="unit">USD/t</span></td>
-          <td class="num" style="color:#1e8449">-202.9</td>
-          <td class="num" style="color:#1e8449">-1.48%</td>
-          <td class="spark"><svg width="120" height="32" viewBox="0 0 120 32"><polyline fill="none" stroke="#1e8449" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="2.0,2.0 118.0,30.0"/></svg></td>
+          <td class="num price">NT$420,254<div class="usd">US$13,090.0</div></td>
+          <td class="num" style="color:#1e8449">-433.1</td>
+          <td class="num" style="color:#1e8449">-3.20%</td>
+          <td class="spark"><svg width="120" height="32" viewBox="0 0 120 32"><polyline fill="none" stroke="#1e8449" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="2.0,2.0 60.0,9.3 118.0,30.0"/></svg></td>
           <td><span class="badge" style="color:#2e7d32;background:#eef7ee">區間內 </span></td>
-          <td class="watch">12,500–14,500</td>
+          <td class="watch">12,000–14,000</td>
         </tr>
         <tr>
           <td class="metal">
             <div class="m-name">鋁</div>
-            <div class="m-en">ALUMINUM · COMEX</div>
+            <div class="m-en">ALUMINUM · LME</div>
           </td>
-          <td class="num price">3,314.5 <span class="unit">USD/t</span></td>
-          <td class="num" style="color:#1e8449">-19.0</td>
-          <td class="num" style="color:#1e8449">-0.57%</td>
-          <td class="spark"><svg width="120" height="32" viewBox="0 0 120 32"><polyline fill="none" stroke="#1e8449" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="2.0,2.0 118.0,30.0"/></svg></td>
+          <td class="num price">NT$100,842<div class="usd">US$3,141.0</div></td>
+          <td class="num" style="color:#1e8449">-173.5</td>
+          <td class="num" style="color:#1e8449">-5.23%</td>
+          <td class="spark"><svg width="120" height="32" viewBox="0 0 120 32"><polyline fill="none" stroke="#1e8449" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="2.0,2.0 60.0,8.7 118.0,30.0"/></svg></td>
           <td><span class="badge" style="color:#2e7d32;background:#eef7ee">區間內 </span></td>
-          <td class="watch">3,000–3,600</td>
+          <td class="watch">2,900–3,400</td>
         </tr></tbody>
       </table>
     </div>
-    <div class="foot">資料來源：Yahoo Finance（COMEX）· 僅供內部參考。狀態燈依 config.py 關注區間自動標示。</div>
+    <div class="foot">資料來源：LME 官方價（Westmetall）· 匯率 Yahoo Finance · 僅供內部參考。狀態燈依 config.py 關注區間自動標示。</div>
   </div>
 </body>
 </html>
