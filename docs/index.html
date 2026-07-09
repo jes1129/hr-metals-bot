@@ -3,93 +3,63 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/style.css">
 <title>銅鋁價格追蹤儀表板</title>
-<style>
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
-         margin: 0; background: #f5f5f4; color: #1a1a1a; }
-  .wrap { max-width: 920px; margin: 32px auto; padding: 0 20px; }
-  .nav { display: flex; gap: 8px; margin-bottom: 18px; }
-  .nav a { font-size: 13px; text-decoration: none; padding: 7px 14px; border-radius: 999px;
-            border: 1px solid #e2e2e2; color: #555; background: #fff; }
-  .nav a.on { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
-  .eyebrow { font-size: 12px; letter-spacing: 2px; color: #999; }
-  h1 { font-size: 26px; margin: 4px 0 2px; }
-  .sub { color: #666; font-size: 13px; margin-bottom: 20px; }
-  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
-  .card { background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 14px 16px; }
-  .card .k { font-size: 11px; color: #999; letter-spacing: 1px; }
-  .card .v { font-size: 22px; font-weight: 700; margin-top: 4px; }
-  .panel { background: #fff; border: 1px solid #eee; border-radius: 12px; overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; min-width: 640px; }
-  th, td { padding: 14px 16px; text-align: right; font-size: 14px; }
-  th { font-size: 11px; color: #999; font-weight: 500; letter-spacing: 1px;
-        border-bottom: 1px solid #eee; text-align: right; }
-  th:first-child, td:first-child { text-align: left; }
-  tr + tr td { border-top: 1px solid #f2f2f2; }
-  .metal .m-name { font-size: 17px; font-weight: 700; }
-  .metal .m-en { font-size: 11px; color: #aaa; letter-spacing: 1px; }
-  .num { font-variant-numeric: tabular-nums; }
-  .price { font-size: 17px; font-weight: 700; }
-  .price .usd { font-size: 11px; color: #aaa; font-weight: 400; margin-top: 2px; }
-  .unit { font-size: 11px; color: #aaa; font-weight: 400; }
-  .spark { text-align: center; }
-  .watch { color: #aaa; font-size: 12px; }
-  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px;
-            font-size: 12px; font-weight: 600; white-space: nowrap; }
-  .foot { color: #aaa; font-size: 12px; margin-top: 14px; }
-  @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } }
-</style>
 </head>
 <body>
   <div class="wrap">
-    <div class="nav"><a class="on" href="index.html">🔩 銅鋁價格</a><a href="jobs.html">🔧 人才行情</a></div>
+    <div class="topbar"><div class="nav"><a class="on" href="index.html">🔩 銅鋁價格</a><a href="jobs.html">🔧 人才行情</a></div><button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button></div>
     <div class="eyebrow">METALS TRACKER · LME 倫敦金屬交易所</div>
     <h1>銅鋁價格追蹤儀表板</h1>
     <div class="sub">LME 官方結算價 · 台幣依即時匯率換算 · 每日 10:00 與 22:00（台灣時間）更新 · 突破關注區間時另發 Discord 告警</div>
 
     <div class="cards">
-      <div class="card"><div class="k">追蹤金屬</div><div class="v">2 <span style="font-size:13px;color:#999">銅 · 鋁</span></div></div>
-      <div class="card"><div class="k">告警中</div><div class="v">0 <span style="font-size:13px;color:#999">項突破區間</span></div></div>
+      <div class="card"><div class="k">追蹤金屬</div><div class="v">2 <span style="font-size:13px;color:var(--muted)">銅 · 鋁</span></div></div>
+      <div class="card"><div class="k">告警中</div><div class="v">0 <span style="font-size:13px;color:var(--muted)">項突破區間</span></div></div>
       <div class="card"><div class="k">最後更新</div><div class="v" style="font-size:18px">2026-07-09 11:48</div></div>
     </div>
 
-    <div class="panel">
-      <table>
-        <thead>
-          <tr>
-            <th>金屬</th><th>現價 (NT$/t)</th><th>漲跌 (US$)</th><th>漲跌幅</th>
-            <th>近 14 筆走勢</th><th>狀態</th><th>關注區間 (US$)</th>
-          </tr>
-        </thead>
-        <tbody>
-        <tr>
-          <td class="metal">
-            <div class="m-name">銅</div>
-            <div class="m-en">COPPER · LME</div>
-          </td>
-          <td class="num price">NT$420,124<div class="usd">US$13,090.0</div></td>
-          <td class="num" style="color:#c0392b">+0.0</td>
-          <td class="num" style="color:#c0392b">+0.00%</td>
-          <td class="spark"><svg width="120" height="32" viewBox="0 0 120 32"><polyline fill="none" stroke="#c0392b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="2.0,30.0 25.2,30.0 48.4,30.0 71.6,30.0 94.8,30.0 118.0,30.0"/></svg></td>
-          <td><span class="badge" style="color:#2e7d32;background:#eef7ee">區間內 </span></td>
-          <td class="watch">12,000–14,000</td>
-        </tr>
-        <tr>
-          <td class="metal">
-            <div class="m-name">鋁</div>
-            <div class="m-en">ALUMINUM · LME</div>
-          </td>
-          <td class="num price">NT$100,810<div class="usd">US$3,141.0</div></td>
-          <td class="num" style="color:#c0392b">+0.0</td>
-          <td class="num" style="color:#c0392b">+0.00%</td>
-          <td class="spark"><svg width="120" height="32" viewBox="0 0 120 32"><polyline fill="none" stroke="#c0392b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="2.0,30.0 25.2,30.0 48.4,30.0 71.6,30.0 94.8,30.0 118.0,30.0"/></svg></td>
-          <td><span class="badge" style="color:#2e7d32;background:#eef7ee">區間內 </span></td>
-          <td class="watch">2,900–3,400</td>
-        </tr></tbody>
-      </table>
+    <div class="controls">
+      <div class="btnbar unitbar">
+        <button data-unit="twd_t">NT$/公噸</button>
+        <button data-unit="usd_t">US$/公噸</button>
+        <button data-unit="usd_lb">US$/磅</button>
+        <button data-unit="twd_kg">NT$/公斤</button>
+      </div>
+      <div class="btnbar rangebar">
+        <button data-range="7">近 7 筆</button>
+        <button data-range="30">近 30 筆</button>
+        <button data-range="all">全部</button>
+      </div>
     </div>
-    <div class="foot">資料來源：LME 官方價（Westmetall）· 匯率 Yahoo Finance · 僅供內部參考。狀態燈依 config.py 關注區間自動標示。</div>
+
+    <section class="mpanel" data-key="copper">
+      <div class="mhead">
+        <div><span class="mname">銅</span><span class="men">COPPER · LME</span></div>
+        <span class="badge in_range">區間內</span>
+      </div>
+      <div class="mfigs">
+        <div class="fig"><div class="flabel">現價</div><div class="fval price">NT$420,124/t</div></div>
+        <div class="fig"><div class="flabel">漲跌</div><div class="fval chg">+NT$0/t</div></div>
+        <div class="fig"><div class="flabel">關注區間</div><div class="fval watch">NT$385,140/t ~ NT$449,330/t</div></div>
+      </div>
+      <div class="chart" data-chart="copper"><svg width="600" height="200" viewBox="0 0 600 200"><polyline fill="none" stroke="#c0392b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="2.0,2.0 121.2,182.5 240.4,198.0 359.6,92.2 478.8,107.2 598.0,190.0"/></svg></div>
+    </section>
+    <section class="mpanel" data-key="aluminum">
+      <div class="mhead">
+        <div><span class="mname">鋁</span><span class="men">ALUMINUM · LME</span></div>
+        <span class="badge in_range">區間內</span>
+      </div>
+      <div class="mfigs">
+        <div class="fig"><div class="flabel">現價</div><div class="fval price">NT$100,810/t</div></div>
+        <div class="fig"><div class="flabel">漲跌</div><div class="fval chg">+NT$0/t</div></div>
+        <div class="fig"><div class="flabel">關注區間</div><div class="fval watch">NT$93,076/t ~ NT$109,123/t</div></div>
+      </div>
+      <div class="chart" data-chart="aluminum"><svg width="600" height="200" viewBox="0 0 600 200"><polyline fill="none" stroke="#c0392b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="2.0,2.0 121.2,181.3 240.4,198.0 359.6,92.8 478.8,107.2 598.0,190.8"/></svg></div>
+    </section>
+    <div class="foot">資料來源：LME 官方價（Westmetall）· 匯率 Yahoo Finance · 單位皆由 LME 美元/公噸換算，僅供內部參考。</div>
   </div>
+<script>window.METALS_DATA = {"copper": {"name": "銅", "en": "COPPER · LME", "watch_low": 12000, "watch_high": 14000, "series": [{"ts": "2026-07-09T02:59:27.160459+00:00", "usd": 13090.0, "rate": 32.12}, {"ts": "2026-07-09T03:02:50.628871+00:00", "usd": 13090.0, "rate": 32.096}, {"ts": "2026-07-09T03:03:48.861127+00:00", "usd": 13090.0, "rate": 32.094}, {"ts": "2026-07-09T03:24:22.747111+00:00", "usd": 13090.0, "rate": 32.108}, {"ts": "2026-07-09T03:41:17.233799+00:00", "usd": 13090.0, "rate": 32.106}, {"ts": "2026-07-09T03:48:50.488593+00:00", "usd": 13090.0, "rate": 32.095}]}, "aluminum": {"name": "鋁", "en": "ALUMINUM · LME", "watch_low": 2900, "watch_high": 3400, "series": [{"ts": "2026-07-09T02:59:27.160459+00:00", "usd": 3141.0, "rate": 32.12}, {"ts": "2026-07-09T03:02:50.628871+00:00", "usd": 3141.0, "rate": 32.096}, {"ts": "2026-07-09T03:03:48.861127+00:00", "usd": 3141.0, "rate": 32.094}, {"ts": "2026-07-09T03:24:22.747111+00:00", "usd": 3141.0, "rate": 32.108}, {"ts": "2026-07-09T03:41:17.233799+00:00", "usd": 3141.0, "rate": 32.106}, {"ts": "2026-07-09T03:48:50.488593+00:00", "usd": 3141.0, "rate": 32.095}]}};</script>
+  <script src="assets/app.js"></script>
 </body>
 </html>
