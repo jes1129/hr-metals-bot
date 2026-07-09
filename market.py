@@ -296,22 +296,8 @@ def _delta(history: list, stats: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 5. Claude 產生市場行情分析（複用結構化輸出模式）
+# 5. AI 產生市場行情分析（共用 ai.summarize：Gemini 免費優先 → Claude → 後備）
 # ---------------------------------------------------------------------------
-_MARKET_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "headline": {"type": "string"},
-        "salary": {"type": "string"},
-        "demand": {"type": "string"},
-        "skills": {"type": "string"},
-        "advice": {"type": "string"},
-    },
-    "required": ["headline", "salary", "demand", "skills", "advice"],
-    "additionalProperties": False,
-}
-
-
 _SUMMARY_FIELDS = ("headline", "salary", "demand", "skills", "advice")
 
 
@@ -340,78 +326,12 @@ def _summary_payload(stats: dict, jobs: list) -> dict:
     return {"統計": stats, "職缺樣本": sample}
 
 
-def _clean_summary(data: dict) -> dict:
-    """只留下需要的欄位並轉字串，避免模型多回/少回欄位。"""
-    return {k: str(data.get(k, "")).strip() for k in _SUMMARY_FIELDS}
-
-
 def ai_market_summary(stats: dict, jobs: list) -> dict:
-    """自動選 AI 供應商產生行情分析：Gemini（免費）優先，其次 Claude，皆無則純統計。"""
-    gemini_key = os.environ.get(config.ENV_GEMINI_KEY)
-    anthropic_key = os.environ.get(config.ENV_ANTHROPIC_KEY)
+    """行情分析：共用 ai.summarize（Gemini 免費優先 → Claude），皆無或失敗則純統計後備。"""
+    import ai
 
-    if gemini_key:
-        out = _gemini_summary(gemini_key, stats, jobs)
-        if out:
-            return out
-    if anthropic_key:
-        out = _anthropic_summary(anthropic_key, stats, jobs)
-        if out:
-            return out
-    if not gemini_key and not anthropic_key:
-        print("[market] 未設 GEMINI_API_KEY / ANTHROPIC_API_KEY，用規則式摘要。")
-    return _fallback_summary(stats)
-
-
-def _gemini_summary(key: str, stats: dict, jobs: list):
-    """Google Gemini（免費額度）。用 httpx 直打 REST，不需額外套件。失敗回 None。"""
-    import httpx  # 延遲匯入
-
-    prompt = (
-        _summary_system()
-        + "\n\n只輸出一個 JSON 物件，鍵為 headline / salary / demand / skills / advice，"
-        + "值皆為繁體中文字串。\n\n資料：\n"
-        + json.dumps(_summary_payload(stats, jobs), ensure_ascii=False)
-    )
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{config.GEMINI_MODEL}:generateContent"
-    )
-    body = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.4},
-    }
-    try:
-        r = httpx.post(url, params={"key": key}, json=body, timeout=60)
-        r.raise_for_status()
-        text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        print("[market] 使用 Gemini 產生行情分析。")
-        return _clean_summary(json.loads(text))
-    except Exception as e:  # noqa: BLE001
-        print(f"[market] Gemini 分析失敗：{e}")
-        return None
-
-
-def _anthropic_summary(key: str, stats: dict, jobs: list):
-    """Anthropic Claude（付費，品質最好）。失敗回 None。"""
-    import anthropic  # 延遲匯入
-
-    try:
-        client = anthropic.Anthropic(api_key=key)
-        resp = client.messages.create(
-            model=config.AI_MODEL,
-            max_tokens=1500,
-            system=_summary_system(),
-            messages=[{"role": "user",
-                       "content": json.dumps(_summary_payload(stats, jobs), ensure_ascii=False)}],
-            output_config={"format": {"type": "json_schema", "schema": _MARKET_SCHEMA}},
-        )
-        text = next(b.text for b in resp.content if b.type == "text")
-        print("[market] 使用 Claude 產生行情分析。")
-        return _clean_summary(json.loads(text))
-    except Exception as e:  # noqa: BLE001
-        print(f"[market] Claude 分析失敗：{e}")
-        return None
+    out = ai.summarize(_summary_system(), _summary_payload(stats, jobs), _SUMMARY_FIELDS)
+    return out or _fallback_summary(stats)
 
 
 def _fallback_summary(stats: dict) -> dict:

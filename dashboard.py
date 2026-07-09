@@ -54,6 +54,7 @@ def _nav(active: str) -> str:
         '<div class="nav">'
         f'<a{a if active == "metals" else ""} href="index.html">🔩 銅鋁價格</a>'
         f'<a{a if active == "jobs" else ""} href="jobs.html">🔧 人才行情</a>'
+        f'<a{a if active == "suppliers" else ""} href="suppliers.html">🏭 供應商</a>'
         "</div>"
     )
 
@@ -422,6 +423,129 @@ def render_jobs_html(stats: dict, summary: dict, jobs: list,
       </table>
     </div>
     <div class="foot">資料來源：104 人力銀行公開職缺（聚焦台中）· 最後更新 {last_update} · ⭐＝品管職且命中量測/金屬關鍵字 · 僅供內部招募參考，非即時、不含企業人才庫。</div>
+  </div>
+{data_script}
+  <script src="assets/app.js"></script>
+</body>
+</html>"""
+
+
+# ===========================================================================
+# 功能 C — 供應商雷達（九上科技找金屬加工供應商）
+# ===========================================================================
+_SRC_LABEL = {"104": "104", "gov": "政府", "both": "政府+104"}
+
+
+def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: list) -> str:
+    EMBED_CAP = 1200  # 前端內嵌上限（已依 score 排序，取前段）
+    embed = suppliers[:EMBED_CAP]
+
+    cat_bars = _hbars([(c, n, str(n)) for c, n in stats.get("categories", [])])
+    area_bars = _hbars([(a, n, str(n)) for a, n in stats.get("top_areas", [])])
+
+    def _size(s):
+        if s.get("capital"):
+            return f"資本額 {s['capital']}"
+        if s.get("employees"):
+            return f"員工 {s['employees']} 人"
+        return "—"
+
+    fb = suppliers[:40]
+    fb_rows = ""
+    for s in fb:
+        name_cell = (
+            f'<a href="{html.escape(s["url"])}" target="_blank" rel="noopener">{html.escape(s["name"][:34])}</a>'
+            if s.get("url") else html.escape(s["name"][:34])
+        )
+        star = "⭐ " if s.get("is_near") else ""
+        fb_rows += (
+            f"<tr><td>{star}{name_cell}</td><td>{html.escape(s.get('category',''))}</td>"
+            f"<td>{html.escape(s.get('area','') or '—')}</td><td>{html.escape(_size(s))}</td>"
+            f"<td>{_SRC_LABEL.get(s.get('source'),'')}</td></tr>"
+        )
+    fb_rows = fb_rows or '<tr><td colspan="5">—</td></tr>'
+
+    sup_min = [
+        {"name": s["name"], "url": s.get("url", ""), "area": s.get("area", ""),
+         "category": s.get("category", ""), "size": _size(s),
+         "source": _SRC_LABEL.get(s.get("source"), ""), "is_near": bool(s.get("is_near")),
+         "address": s.get("address", ""), "ban": s.get("ban", "")}
+        for s in embed
+    ]
+    data_script = ("<script>window.SUPPLIERS_DATA = "
+                   + json.dumps(sup_min, ensure_ascii=False) + ";</script>")
+
+    needs = "".join(f'<span class="rtag">{html.escape(n)}</span>' for n in profile["needs"])
+    ref_card = f"""
+    <div class="ai" style="border-left:3px solid var(--accent)">
+      <h2>🎯 找供應商的客戶（{html.escape(profile['name'])}）</h2>
+      <div class="refgrid">
+        <div><span class="rk">地址</span>{html.escape(profile['address'])}（{html.escape(profile['phone'])}）</div>
+        <div><span class="rk">本業</span>{html.escape(profile['business'])}</div>
+      </div>
+      <div class="reftags">要找的供應商能力：{needs}
+        <span class="rnote">※ 神岡周邊（豐原/大雅/潭子/后里/大甲）標 ⭐近</span></div>
+    </div>"""
+
+    total = stats["total"]
+    shown = len(embed)
+    src_txt = "、".join(f"{_SRC_LABEL.get(k, k)} {v}" for k, v in stats.get("sources", {}).items())
+
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+{_HEAD}
+<title>九上科技 · 供應商雷達</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">{_nav("suppliers")}{_THEME_BTN}</div>
+    <div class="eyebrow">SUPPLIER RADAR · 104 公司 + 政府稅籍登記</div>
+    <h1>供應商雷達 · 九上科技</h1>
+    <div class="sub">幫九上科技（神岡）找台灣金屬加工供應商 · 全台皆列、神岡周邊優先 ⭐ · 每週一更新 · 僅供採購參考</div>
+
+    {ref_card}
+
+    <div class="cards four">
+      <div class="card"><div class="k">供應商總數</div><div class="v">{total}</div></div>
+      <div class="card"><div class="k">⭐ 神岡周邊</div><div class="v">{stats['near_count']}</div><div class="k" style="margin-top:6px">豐原/大雅/潭子…</div></div>
+      <div class="card"><div class="k">來源</div><div class="v" style="font-size:15px">{src_txt or '—'}</div></div>
+      <div class="card"><div class="k">有官網連結</div><div class="v">{stats.get('with_url', 0)}</div><div class="k" style="margin-top:6px">可直接看公司</div></div>
+    </div>
+
+    <div class="ai">
+      <h2>🏭 {html.escape(summary.get('headline',''))}</h2>
+      <div class="row"><div class="lbl">🎯 優先推薦</div><div class="txt">{html.escape(summary.get('recommend',''))}</div></div>
+      <div class="row"><div class="lbl">🔍 評估重點</div><div class="txt">{html.escape(summary.get('evaluate',''))}</div></div>
+      <div class="row"><div class="lbl">💬 詢價 / 打樣</div><div class="txt">{html.escape(summary.get('quote',''))}</div></div>
+      <div class="row"><div class="lbl">⚠️ 風險提醒</div><div class="txt">{html.escape(summary.get('risk',''))}</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel"><h3>🗂️ 能力類別分布</h3>{cat_bars}</div>
+      <div class="panel"><h3>📍 供應商所在地</h3>{area_bars}</div>
+    </div>
+
+    <div class="panel">
+      <h3>🔎 供應商名錄（顯示前 {shown} 家 · 共 {total} 家）</h3>
+      <div class="toolbar" style="padding:0 16px 12px">
+        <input id="supSearch" placeholder="搜尋公司 / 地區關鍵字…">
+        <select id="supCat"><option value="">全部能力類別</option></select>
+        <label class="prionly"><input type="checkbox" id="supNear"> 只看 ⭐ 神岡周邊</label>
+        <span class="count" id="supCount"></span>
+      </div>
+      <table>
+        <thead><tr>
+          <th class="sortable" data-key="name">公司 <span class="arrow"></span></th>
+          <th class="sortable" data-key="category">能力類別 <span class="arrow"></span></th>
+          <th class="sortable" data-key="area">地區 <span class="arrow"></span></th>
+          <th>規模</th>
+          <th class="sortable" data-key="source">來源 <span class="arrow"></span></th>
+        </tr></thead>
+        <tbody id="supBody">{fb_rows}</tbody>
+      </table>
+    </div>
+    <div class="foot">來源：104 公司搜尋（Playwright）＋ 財政部營業稅籍登記開放資料（篩臺中金屬）· 完整名單見 repo 的 data/suppliers.json · 名單為公開資料，實際產能/品質/認證請自行電話與實地查核。</div>
   </div>
 {data_script}
   <script src="assets/app.js"></script>

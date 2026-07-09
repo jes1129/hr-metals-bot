@@ -323,9 +323,61 @@
     render();
   }
 
+  // ============================================================ 供應商頁
+  function initSuppliers(SUP) {
+    var searchEl = document.getElementById("supSearch"), catEl = document.getElementById("supCat");
+    var nearEl = document.getElementById("supNear"), countEl = document.getElementById("supCount");
+    var tbody = document.getElementById("supBody");
+    var sort = { key: "name", dir: 1 };
+    function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
+
+    if (catEl) {
+      var cats = {};
+      SUP.forEach(function (s) { var c = s.category || "其他"; cats[c] = (cats[c] || 0) + 1; });
+      Object.keys(cats).sort(function (a, b) { return cats[b] - cats[a]; }).forEach(function (c) {
+        var o = document.createElement("option"); o.value = c; o.textContent = c + "（" + cats[c] + "）"; catEl.appendChild(o);
+      });
+    }
+    function render() {
+      var q = (searchEl && searchEl.value.trim().toLowerCase()) || "";
+      var cat = (catEl && catEl.value) || "", nearOnly = nearEl && nearEl.checked;
+      var rows = SUP.filter(function (s) {
+        if (nearOnly && !s.is_near) return false;
+        if (cat && s.category !== cat) return false;
+        if (q && (s.name + " " + s.area + " " + (s.address || "")).toLowerCase().indexOf(q) < 0) return false;
+        return true;
+      });
+      rows.sort(function (a, b) {
+        var va = (a[sort.key] || ""), vb = (b[sort.key] || "");
+        if (va < vb) return -sort.dir; if (va > vb) return sort.dir; return 0;
+      });
+      if (countEl) countEl.textContent = rows.length + " / " + SUP.length + " 家";
+      tbody.innerHTML = rows.map(function (s) {
+        var star = s.is_near ? '<span class="star">⭐</span> ' : "";
+        var name = s.url ? '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.name.slice(0, 34)) + "</a>" : esc(s.name.slice(0, 34));
+        return "<tr><td>" + star + name + "</td><td>" + esc(s.category) + "</td><td>" +
+          esc(s.area || s.address || "—") + "</td><td>" + esc(s.size || "—") + "</td><td>" + esc(s.source) + "</td></tr>";
+      }).join("") || '<tr><td colspan="5" style="color:var(--muted)">找不到符合的供應商</td></tr>';
+    }
+    if (searchEl) searchEl.addEventListener("input", render);
+    if (catEl) catEl.addEventListener("change", render);
+    if (nearEl) nearEl.addEventListener("change", render);
+    document.querySelectorAll("th.sortable").forEach(function (th) {
+      th.addEventListener("click", function () {
+        var k = th.getAttribute("data-key");
+        if (sort.key === k) sort.dir *= -1; else { sort.key = k; sort.dir = 1; }
+        document.querySelectorAll("th.sortable .arrow").forEach(function (a) { a.textContent = ""; });
+        var arw = th.querySelector(".arrow"); if (arw) arw.textContent = sort.dir > 0 ? "▲" : "▼";
+        render();
+      });
+    });
+    render();
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     if (window.METALS_DATA) initMetals(window.METALS_DATA);
     if (window.JOBS_DATA) { initJobs(window.JOBS_DATA); initJobsCharts(); }
+    if (window.SUPPLIERS_DATA) initSuppliers(window.SUPPLIERS_DATA);
   });
 })();
