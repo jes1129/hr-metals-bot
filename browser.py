@@ -40,27 +40,45 @@ REAL_UA = (
 
 @contextlib.asynccontextmanager
 async def real_chrome(headless: bool = True):
-    """開一個帶 stealth 的真實 Chrome context，yield (page, context)。"""
+    """開一個帶 stealth 的真實 Chrome context，yield (page, context)。
+
+    用 playwright-stealth v2 的 Stealth().use_async() 在 context 層 hook，
+    才會連 UA-CH、navigator 指紋一起蓋掉——實測這樣才過得了 104 的 Cloudflare；
+    只對單一 page 套 apply_stealth_async 不夠。沒裝 stealth 時退化為純 Chrome。
+    """
     from playwright.async_api import async_playwright  # 延遲匯入
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            channel="chrome",  # 真實 Google Chrome，而非內建 Chromium
-            headless=headless,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-            ],
-        )
-        context = await browser.new_context(
-            user_agent=REAL_UA,
-            locale="zh-TW",
-            timezone_id="Asia/Taipei",
-            viewport={"width": 1440, "height": 900},
-        )
+    launch_kwargs = dict(
+        channel="chrome",  # 真實 Google Chrome，而非內建 Chromium
+        headless=headless,
+        args=[
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+        ],
+    )
+    context_kwargs = dict(
+        user_agent=REAL_UA,
+        locale="zh-TW",
+        timezone_id="Asia/Taipei",
+        viewport={"width": 1440, "height": 900},
+    )
+
+    try:
+        from playwright_stealth import Stealth  # type: ignore
+
+        pw_ctx = Stealth().use_async(async_playwright())
+        stealth_on = True
+    except Exception:  # noqa: BLE001  # 沒裝 stealth：退化成一般 playwright
+        pw_ctx = async_playwright()
+        stealth_on = False
+
+    async with pw_ctx as p:
+        browser = await p.chromium.launch(**launch_kwargs)
+        context = await browser.new_context(**context_kwargs)
         page = await context.new_page()
-        await apply_stealth_async(page)
+        if not stealth_on:
+            print("[browser] 未啟用 stealth，Cloudflare 可能會擋。")
         try:
             yield page, context
         finally:
@@ -69,9 +87,12 @@ async def real_chrome(headless: bool = True):
 
 
 async def warm_up(page, home_url: str):
-    """訪問首頁讓 Cloudflare 發 Cookie（指南「首頁暖機」）。"""
-    await page.goto(home_url, wait_until="networkidle", timeout=60000)
-    await page.wait_for_timeout(2000)  # 稍等 Cloudflare 挑戰完成
+    """訪問首頁讓 Cloudflare 發 Cookie（指南「首頁暖機」）。
+
+    104 有長輪詢，networkidle 幾乎不會觸發 → 一律用 domcontentloaded 再固定等待。
+    """
+    await page.goto(home_url, wait_until="domcontentloaded", timeout=60000)
+    await page.wait_for_timeout(3500)  # 等 Cloudflare 挑戰完成、發 Cookie
 
 
 async def login_104(page, account: str, password: str):

@@ -1,24 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-run_talent.py — 功能 A 的 GitHub Actions 入口（取代 Modal 的排程 function）。
+run_talent.py — 功能 A 的 GitHub Actions 入口。
 
-流程：登入 104 → 爬候選人 → Claude AI 評分 → 8 分以上以 Discord embed 卡片推送。
-需要 Secrets：LOGIN_104_ACCOUNT / LOGIN_104_PASSWORD / ANTHROPIC_API_KEY / DISCORD_WEBHOOK_URL
+【目前：實驗版】追蹤 104 公開職缺行情（免登入、免企業帳號）：
+  Playwright 爬公開職缺 → 解析薪資/地區 → 彙整 → Claude 行情分析 → Discord 推播。
+  需要 Secrets：ANTHROPIC_API_KEY / DISCORD_WEBHOOK_URL（沒有 ANTHROPIC 也能跑，退化為純統計）。
+
+【未來：企業版】拿到 104 企業人才庫帳號後，把下面的 market.run() 換成：
+      import talent
+      asyncio.run(talent.run(account, password))
+  並在 workflow 補回 LOGIN_104_ACCOUNT / LOGIN_104_PASSWORD 兩個 Secret。
+  「Claude 分析 → Discord 推播」的後段架構兩版共用，不用改。
 """
 import asyncio
-import os
 
-import config
-import talent
+import market
 
 
 def main():
-    account = os.environ.get(config.ENV_104_ACCOUNT, "")
-    password = os.environ.get(config.ENV_104_PASSWORD, "")
-    if not account or not password:
-        print("[run_talent] 缺少 104 帳密 Secret，功能 A 略過。")
-        return
-    asyncio.run(talent.run(account, password))
+    asyncio.run(market.run())
 
 
 if __name__ == "__main__":
