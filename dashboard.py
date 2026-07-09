@@ -502,7 +502,7 @@ def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: 
     <div class="topbar">{_nav("suppliers")}{_THEME_BTN}</div>
     <div class="eyebrow">SUPPLIER RADAR · 104 公司 + 政府稅籍登記</div>
     <h1>供應商雷達 · 九上科技</h1>
-    <div class="sub">幫九上科技（神岡）找台灣金屬加工供應商 · 全台皆列、神岡周邊優先 ⭐ · 每週一更新 · 僅供採購參考</div>
+    <div class="sub">幫九上科技（神岡）找台灣金屬加工供應商 · 全台皆列、神岡周邊優先 ⭐ · 每月 1 號更新 · 僅供採購參考</div>
 
     {ref_card}
 

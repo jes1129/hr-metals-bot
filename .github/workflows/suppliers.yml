@@ -2,7 +2,7 @@ name: 供應商雷達 (功能 C · 九上科技)
 
 on:
   schedule:
-    - cron: "0 1 * * 1"       # UTC 週一 01:00 = 台灣週一 09:00
+    - cron: "0 1 1 * *"       # 每月 1 號 UTC 01:00 = 台灣每月 1 號 09:00（供應商資料變動慢、政府檔大，月更即可）
   workflow_dispatch:
 
 permissions:
