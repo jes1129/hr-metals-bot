@@ -9,6 +9,7 @@ run_metals.py — 功能 B 的 GitHub Actions 入口（取代 Modal 的排程 fu
 import asyncio
 import os
 
+# 歷史已於此重置為純 LME 起點
 import dashboard
 import metals
 import notify
