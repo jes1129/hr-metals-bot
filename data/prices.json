@@ -15,6 +15,14 @@
       "rate": 32.096,
       "change": 0.0,
       "change_pct": 0.0
+    },
+    {
+      "ts": "2026-07-09T03:03:48.861127+00:00",
+      "price": 13090.0,
+      "price_twd": 420110,
+      "rate": 32.094,
+      "change": 0.0,
+      "change_pct": 0.0
     }
   ],
   "aluminum": [
@@ -31,6 +39,14 @@
       "price": 3141.0,
       "price_twd": 100814,
       "rate": 32.096,
+      "change": 0.0,
+      "change_pct": 0.0
+    },
+    {
+      "ts": "2026-07-09T03:03:48.861127+00:00",
+      "price": 3141.0,
+      "price_twd": 100807,
+      "rate": 32.094,
       "change": 0.0,
       "change_pct": 0.0
     }
