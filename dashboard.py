@@ -52,9 +52,11 @@ def _nav(active: str) -> str:
     a = ' class="on"'
     return (
         '<div class="nav">'
-        f'<a{a if active == "metals" else ""} href="index.html">🔩 銅鋁價格</a>'
-        f'<a{a if active == "jobs" else ""} href="jobs.html">🔧 人才行情</a>'
+        f'<a{a if active == "home" else ""} href="index.html">🏠 首頁</a>'
+        f'<a{a if active == "metals" else ""} href="metals.html">🔩 原料</a>'
+        f'<a{a if active == "jobs" else ""} href="jobs.html">🔧 招募</a>'
         f'<a{a if active == "suppliers" else ""} href="suppliers.html">🏭 供應商</a>'
+        f'<a{a if active == "quote" else ""} href="quote.html">🧮 報價</a>'
         "</div>"
     )
 
@@ -80,6 +82,94 @@ _STATUS_LABEL = {
     "break_high": "突破上線", "break_low": "跌破下線",
     "in_range": "區間內", "unknown": "無資料",
 }
+
+
+# ===========================================================================
+# 首頁總覽（簡單、白話、大卡片；給非科技用戶）
+# ===========================================================================
+def _hcard(href: str, emoji: str, title: str, lines: str, cta: str) -> str:
+    return (
+        f'<a class="hcard" href="{href}">'
+        f'<div class="he">{emoji}</div>'
+        f'<div class="ht">{html.escape(title)}</div>'
+        f'<div class="hl">{lines}</div>'
+        f'<div class="hcta">{html.escape(cta)} →</div>'
+        "</a>"
+    )
+
+
+def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None) -> str:
+    # 原料卡：每個金屬一行白話（買方視角：漲=成本高要注意、跌/區間=OK）
+    metal_lines = []
+    for key, cfg in config.METALS.items():
+        series = history.get(key, [])
+        latest = series[-1] if series else {}
+        price_twd = latest.get("price_twd")
+        pct = latest.get("change_pct")
+        status = metals_mod.check_status(key, latest.get("price"))
+        if status == "break_high":
+            light, note = "🔴", "漲破上線，原料變貴注意成本"
+        elif status == "break_low":
+            light, note = "🟢", "跌破下線，變便宜可考慮進貨"
+        elif status == "in_range":
+            light, note = "🟢", "區間內，正常不用擔心"
+        else:
+            light, note = "⚪", "尚無資料"
+        price_s = f"NT${price_twd:,}/噸" if price_twd else "—"
+        if pct is not None:
+            arrow = "▲" if pct >= 0 else "▼"
+            pct_s = f'<span style="color:{"var(--up)" if pct >= 0 else "var(--down)"}">{arrow}{abs(pct):.1f}%</span>'
+        else:
+            pct_s = ""
+        metal_lines.append(
+            f'<div class="mrow">{light} <b>{html.escape(cfg["name"])}</b> {price_s} {pct_s}'
+            f'<div class="mnote">{note}</div></div>'
+        )
+    metals_card = _hcard("metals.html", "🔩", "原料行情", "".join(metal_lines), "看銅鋁鎳鋼走勢")
+
+    jobs_card = _hcard(
+        "jobs.html", "🔧", "招募雷達",
+        f'<div class="big">{jobs_total} <span>筆</span></div>'
+        '<div class="mnote">台中金屬加工・品管職缺（⭐符合重點者已標）</div>',
+        "看招募行情")
+
+    near_s = f'<div class="mnote">神岡周邊 {sup_near} 家 ⭐</div>' if sup_near is not None else ""
+    sup_card = _hcard(
+        "suppliers.html", "🏭", "供應商雷達",
+        f'<div class="big">{sup_total} <span>家</span></div>{near_s}',
+        "找金屬加工供應商")
+
+    quote_card = _hcard(
+        "quote.html", "🧮", "報價試算",
+        '<div class="mnote">選材質、輸入重量，用<b>當下行情</b>算料錢＋建議報價</div>',
+        "開始試算")
+
+    cards = [metals_card, jobs_card, sup_card, quote_card]
+    if cust_total is not None:
+        cards.insert(3, _hcard(
+            "customers.html", "🎯", "客戶開發雷達",
+            f'<div class="big">{cust_total} <span>家</span></div>'
+            '<div class="mnote">會買精密金屬零件的潛在客戶</div>',
+            "找新客戶"))
+
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+{_HEAD}
+<title>九上科技 · 智慧儀表板</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">{_nav("home")}{_THEME_BTN}</div>
+    <div class="eyebrow">九上科技 · 智慧儀表板</div>
+    <h1>今日重點總覽</h1>
+    <div class="sub">點下面任一張卡片進入該功能 · 資料每日自動更新 · 更新於 {now}</div>
+    <div class="hcards">{''.join(cards)}</div>
+    <div class="foot">原料價／招募／供應商每日自動更新；報價用最新原料行情試算。全部免費、關機也會自己跑。</div>
+  </div>
+</body>
+</html>"""
 
 
 # ===========================================================================
@@ -546,6 +636,80 @@ def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: 
       </table>
     </div>
     <div class="foot">來源：104 公司搜尋（Playwright）＋ 財政部營業稅籍登記開放資料（篩臺中金屬）· 完整名單見 repo 的 data/suppliers.json · 名單為公開資料，實際產能/品質/認證請自行電話與實地查核。</div>
+  </div>
+{data_script}
+  <script src="assets/app.js"></script>
+</body>
+</html>"""
+
+
+# ===========================================================================
+# 報價試算器（純前端；內嵌各金屬當前 NT$/kg 與密度）
+# ===========================================================================
+_DENSITY = {"copper": 8.96, "aluminum": 2.70, "steel": 7.85, "stainless": 7.93}
+
+
+def render_quote_html(history: dict) -> str:
+    def _nt_per_kg(key):
+        s = history.get(key, [])
+        twd = s[-1].get("price_twd") if s else None
+        return round(twd / 1000, 1) if twd else None
+
+    mats = [
+        {"key": "copper", "name": "銅", "nt": _nt_per_kg("copper"),
+         "density": _DENSITY["copper"], "live": True},
+        {"key": "aluminum", "name": "鋁", "nt": _nt_per_kg("aluminum"),
+         "density": _DENSITY["aluminum"], "live": True},
+        {"key": "stainless", "name": "不鏽鋼(304)", "nt": 90.0,
+         "density": _DENSITY["stainless"], "live": False,
+         "note": "不鏽鋼無即時行情，預設為參考值，請填你的實際採購價"},
+        {"key": "steel", "name": "鋼(碳鋼)", "nt": _nt_per_kg("steel"),
+         "density": _DENSITY["steel"], "live": True},
+    ]
+    data_script = "<script>window.QUOTE_MATERIALS = " + json.dumps(mats, ensure_ascii=False) + ";</script>"
+
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+{_HEAD}
+<title>報價試算器 · 九上科技</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">{_nav("quote")}{_THEME_BTN}</div>
+    <div class="eyebrow">QUOTE · 原料成本 / 報價試算</div>
+    <h1>報價試算器</h1>
+    <div class="sub">選材質、填重量，用<b>當前原料行情</b>幫你算料錢＋建議報價 · 料價已帶入最新價、可自行修改</div>
+
+    <div class="panel" style="padding:18px 20px;margin-bottom:16px">
+      <div class="qform">
+        <label class="qf"><span>材質</span>
+          <select id="qMat"></select></label>
+        <label class="qf"><span>重量（公斤）</span>
+          <input id="qWeight" type="number" min="0" step="0.01" placeholder="直接輸入重量"></label>
+        <div class="qf qdim"><span>或用尺寸算重量（公分）</span>
+          <div class="qrow">
+            <input id="qL" type="number" min="0" step="0.1" placeholder="長">
+            <input id="qW" type="number" min="0" step="0.1" placeholder="寬">
+            <input id="qH" type="number" min="0" step="0.1" placeholder="高">
+            <button id="qCalc" type="button">算重量</button>
+          </div></div>
+        <label class="qf"><span>每公斤料價（NT$）</span>
+          <input id="qPrice" type="number" min="0" step="0.1"></label>
+        <div class="qnote" id="qPriceNote"></div>
+        <label class="qf"><span>加工費（NT$，選填）</span>
+          <input id="qProc" type="number" min="0" step="1" placeholder="車削/表面處理等"></label>
+        <label class="qf"><span>利潤（%）</span>
+          <input id="qMargin" type="number" min="0" step="1" value="20"></label>
+      </div>
+    </div>
+
+    <div class="qresult" id="qResult">
+      <div class="qr"><div class="qk">料錢</div><div class="qv" id="qMatCost">—</div></div>
+      <div class="qr"><div class="qk">總成本（料＋工）</div><div class="qv" id="qTotal">—</div></div>
+      <div class="qr big"><div class="qk">建議報價</div><div class="qv" id="qQuote">—</div></div>
+    </div>
+    <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。</div>
   </div>
 {data_script}
   <script src="assets/app.js"></script>

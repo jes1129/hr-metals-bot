@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/style.css">
+<title>報價試算器 · 九上科技</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar"><div class="nav"><a href="index.html">🏠 首頁</a><a href="metals.html">🔩 原料</a><a href="jobs.html">🔧 招募</a><a href="suppliers.html">🏭 供應商</a><a class="on" href="quote.html">🧮 報價</a></div><button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button></div>
+    <div class="eyebrow">QUOTE · 原料成本 / 報價試算</div>
+    <h1>報價試算器</h1>
+    <div class="sub">選材質、填重量，用<b>當前原料行情</b>幫你算料錢＋建議報價 · 料價已帶入最新價、可自行修改</div>
+
+    <div class="panel" style="padding:18px 20px;margin-bottom:16px">
+      <div class="qform">
+        <label class="qf"><span>材質</span>
+          <select id="qMat"></select></label>
+        <label class="qf"><span>重量（公斤）</span>
+          <input id="qWeight" type="number" min="0" step="0.01" placeholder="直接輸入重量"></label>
+        <div class="qf qdim"><span>或用尺寸算重量（公分）</span>
+          <div class="qrow">
+            <input id="qL" type="number" min="0" step="0.1" placeholder="長">
+            <input id="qW" type="number" min="0" step="0.1" placeholder="寬">
+            <input id="qH" type="number" min="0" step="0.1" placeholder="高">
+            <button id="qCalc" type="button">算重量</button>
+          </div></div>
+        <label class="qf"><span>每公斤料價（NT$）</span>
+          <input id="qPrice" type="number" min="0" step="0.1"></label>
+        <div class="qnote" id="qPriceNote"></div>
+        <label class="qf"><span>加工費（NT$，選填）</span>
+          <input id="qProc" type="number" min="0" step="1" placeholder="車削/表面處理等"></label>
+        <label class="qf"><span>利潤（%）</span>
+          <input id="qMargin" type="number" min="0" step="1" value="20"></label>
+      </div>
+    </div>
+
+    <div class="qresult" id="qResult">
+      <div class="qr"><div class="qk">料錢</div><div class="qv" id="qMatCost">—</div></div>
+      <div class="qr"><div class="qk">總成本（料＋工）</div><div class="qv" id="qTotal">—</div></div>
+      <div class="qr big"><div class="qk">建議報價</div><div class="qv" id="qQuote">—</div></div>
+    </div>
+    <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。</div>
+  </div>
+<script>window.QUOTE_MATERIALS = [{"key": "copper", "name": "銅", "nt": 420.2, "density": 8.96, "live": true}, {"key": "aluminum", "name": "鋁", "nt": 100.8, "density": 2.7, "live": true}, {"key": "stainless", "name": "不鏽鋼(304)", "nt": 90.0, "density": 7.93, "live": false, "note": "不鏽鋼無即時行情，預設為參考值，請填你的實際採購價"}, {"key": "steel", "name": "鋼(碳鋼)", "nt": 41.3, "density": 7.85, "live": true}];</script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

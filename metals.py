@@ -45,8 +45,19 @@ def _usdtwd() -> float:
 # ---------------------------------------------------------------------------
 # 取價（Westmetall LME 官方價 + Yahoo 匯率，皆不需瀏覽器）
 # ---------------------------------------------------------------------------
+def _yh_mult(cfg: dict) -> float:
+    """Yahoo 原始單位 → USD/公噸 的乘數。"""
+    u = cfg.get("yh_unit")
+    if u == "lb":
+        return config.LB_PER_TONNE
+    if u == "short_ton":
+        return config.SHORT_TON_PER_TONNE
+    return 1.0
+
+
 async def scrape_prices() -> dict:
-    """回傳 {metal_key: {price(USD/t), price_twd, rate}}。漲跌在 run() 依歷史計算。"""
+    """回傳 {metal_key: {price(USD/t), price_twd, rate}}。
+    有 field 者用 Westmetall（LME 官方）；只有 yh 者（鋼）現價取自 Yahoo 最新收盤。"""
     import httpx  # 延遲匯入
 
     result = {}
@@ -58,7 +69,13 @@ async def scrape_prices() -> dict:
 
     rate = _usdtwd()
     for key, cfg in config.METALS.items():
-        price = _parse_lme(html, cfg["field"]) if html else None
+        if cfg.get("field"):
+            price = _parse_lme(html, cfg["field"]) if html else None
+        elif cfg.get("yh"):
+            d = _yahoo_daily(cfg["yh"])           # 只有 Yahoo 來源（鋼）
+            price = round(list(d.values())[-1] * _yh_mult(cfg), 2) if d else None
+        else:
+            price = None
         price_twd = round(price * rate) if (price and rate) else None
         result[key] = {"price": price, "price_twd": price_twd, "rate": rate}
     return result
@@ -116,8 +133,10 @@ def backfill_daily() -> dict:
 
     daily = {"fx": [{"ts": d, "rate": round(fxd[d], 4)} for d in fx_dates]}
     for key, cfg in config.METALS.items():
+        if not cfg.get("yh"):          # 無 Yahoo 日線（鎳）→ 走勢圖靠 prices.json 快照
+            continue
         raw = _yahoo_daily(cfg["yh"])
-        mult = config.LB_PER_TONNE if cfg.get("yh_unit") == "lb" else 1.0
+        mult = _yh_mult(cfg)
         series = []
         for d in sorted(raw):
             rate = rate_on(d)

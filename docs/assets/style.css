@@ -129,6 +129,41 @@ th .arrow { opacity: .5; font-size: 10px; }
 .hist .bn { font-size: 15px; font-weight: 700; }
 .hist .bl { font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.2; }
 
+/* 報價試算器 */
+.qform { display: flex; flex-direction: column; gap: 14px; max-width: 460px; }
+.qf { display: flex; flex-direction: column; gap: 5px; font-size: 14px; color: var(--text); }
+.qf > span { font-size: 13px; color: var(--muted); }
+.qform select, .qform input { font-size: 16px; padding: 11px 12px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text); width: 100%; }
+.qrow { display: flex; gap: 8px; }
+.qrow input { flex: 1; min-width: 0; }
+.qrow button { flex-shrink: 0; padding: 0 16px; border-radius: 9px; border: 1px solid var(--accent);
+  background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+.qnote { font-size: 12px; color: var(--muted); margin-top: -6px; }
+.qresult { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.qresult .qr { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; text-align: center; box-shadow: var(--shadow); }
+.qresult .qr.big { border-color: var(--accent); border-width: 2px; }
+.qresult .qk { font-size: 12px; color: var(--muted); }
+.qresult .qv { font-size: 22px; font-weight: 800; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.qresult .qr.big .qv { color: var(--accent); font-size: 26px; }
+@media (max-width: 560px) { .qresult { grid-template-columns: 1fr; } }
+
+/* 首頁大卡片（整張可點，非科技用戶友善） */
+.hcards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 8px 0 18px; }
+.hcard { display: block; text-decoration: none; color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: var(--shadow);
+  transition: transform .12s, box-shadow .12s, border-color .12s; }
+.hcard:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 4px 14px rgba(0,0,0,.1); }
+.hcard .he { font-size: 30px; line-height: 1; }
+.hcard .ht { font-size: 19px; font-weight: 700; margin: 8px 0 8px; }
+.hcard .hl { font-size: 13.5px; color: var(--text); min-height: 46px; }
+.hcard .hcta { margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--accent); }
+.hcard .big { font-size: 30px; font-weight: 800; }
+.hcard .big span { font-size: 14px; font-weight: 500; color: var(--muted); }
+.hcard .mrow { padding: 3px 0; font-variant-numeric: tabular-nums; }
+.hcard .mnote { font-size: 12px; color: var(--muted); margin-top: 1px; }
+@media (max-width: 560px) { .hcards { grid-template-columns: 1fr; } }
+
 /* 招募重點參考卡 */
 .refgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin: 4px 0 10px; }
 .refgrid > div { font-size: 13.5px; color: var(--text); line-height: 1.5; }

@@ -374,10 +374,49 @@
     render();
   }
 
+  // ============================================================ 報價試算器
+  function initQuote(MATS) {
+    var matEl = document.getElementById("qMat"), wEl = document.getElementById("qWeight");
+    var pEl = document.getElementById("qPrice"), noteEl = document.getElementById("qPriceNote");
+    var procEl = document.getElementById("qProc"), mgEl = document.getElementById("qMargin");
+    var lEl = document.getElementById("qL"), wwEl = document.getElementById("qW"), hEl = document.getElementById("qH");
+    var ntd = function (n) { return "NT$" + Math.round(n).toLocaleString("en-US"); };
+
+    MATS.forEach(function (m, i) {
+      var o = document.createElement("option"); o.value = i; o.textContent = m.name; matEl.appendChild(o);
+    });
+    function cur() { return MATS[parseInt(matEl.value, 10) || 0]; }
+    function onMat() {
+      var m = cur();
+      if (m.nt != null && !pEl.value) pEl.value = m.nt;
+      else if (m.nt != null) pEl.value = m.nt;
+      noteEl.textContent = m.live ? "（已帶入最新行情，可修改）" : "⚠️ " + (m.note || "參考值，請填實際採購價");
+      noteEl.style.color = m.live ? "var(--muted)" : "var(--up)";
+      calc();
+    }
+    function calcWeight() {
+      var m = cur(), L = parseFloat(lEl.value), W = parseFloat(wwEl.value), H = parseFloat(hEl.value);
+      if (L > 0 && W > 0 && H > 0) { wEl.value = (L * W * H * m.density / 1000).toFixed(2); calc(); }
+    }
+    function calc() {
+      var w = parseFloat(wEl.value) || 0, p = parseFloat(pEl.value) || 0;
+      var proc = parseFloat(procEl.value) || 0, mg = parseFloat(mgEl.value) || 0;
+      var matCost = w * p, total = matCost + proc, quote = total * (1 + mg / 100);
+      document.getElementById("qMatCost").textContent = w && p ? ntd(matCost) : "—";
+      document.getElementById("qTotal").textContent = w && p ? ntd(total) : "—";
+      document.getElementById("qQuote").textContent = w && p ? ntd(quote) : "—";
+    }
+    matEl.addEventListener("change", onMat);
+    [wEl, pEl, procEl, mgEl].forEach(function (e) { e.addEventListener("input", calc); });
+    document.getElementById("qCalc").addEventListener("click", calcWeight);
+    onMat();
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     if (window.METALS_DATA) initMetals(window.METALS_DATA);
     if (window.JOBS_DATA) { initJobs(window.JOBS_DATA); initJobsCharts(); }
     if (window.SUPPLIERS_DATA) initSuppliers(window.SUPPLIERS_DATA);
+    if (window.QUOTE_MATERIALS) initQuote(window.QUOTE_MATERIALS);
   });
 })();

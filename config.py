@@ -205,6 +205,23 @@ METALS = {
         "watch_low": 2900,
         "watch_high": 3400,
     },
+    "nickel": {
+        "name": "鎳",
+        "en": "NICKEL · LME（不鏽鋼指標）",
+        "field": "LME_Ni_cash",  # 現價/告警用 Westmetall；無 Yahoo 日線→走勢圖靠快照累積
+        "watch_low": 14000,
+        "watch_high": 18000,
+        "note": "不鏽鋼無單一市場價，以鎳為主要成本指標",
+    },
+    "steel": {
+        "name": "鋼",
+        "en": "STEEL · HRC（美國熱軋）",
+        "yh": "HRC=F",           # 無 Westmetall；現價與日線皆用 Yahoo（美國 HRC 期貨）
+        "yh_unit": "short_ton",  # USD/short ton → ×1.10231 換 USD/公噸
+        "watch_low": 1100,
+        "watch_high": 1500,
+        "note": "美國熱軋鋼捲基準，與台灣鋼價有差，僅供趨勢參考",
+    },
 }
 
 # 儀表板迷你走勢取最近幾筆
@@ -214,6 +231,7 @@ TREND_POINTS = 14
 # 走勢圖改用每日收盤以看趨勢。回補一年、每次執行更新。
 YH_FX = "USDTWD=X"            # 匯率日線 symbol
 LB_PER_TONNE = 2204.62       # USD/磅 → USD/公噸
+SHORT_TON_PER_TONNE = 1.10231  # USD/short ton × 此 → USD/公噸（HRC 鋼）
 DAILY_FILE = "daily.json"    # 日線資料（與 prices.json 同一個 data/ 目錄）
 MA_WINDOW = 20               # 移動平均天數（月均）
 
