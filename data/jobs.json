@@ -10,5 +10,11 @@
     "total": 434,
     "salary_median": 40000,
     "salary_avg": 42532
+  },
+  {
+    "ts": "2026-07-09T11:29:54.511151+00:00",
+    "total": 447,
+    "salary_median": 40000,
+    "salary_avg": 42395
   }
 ]
