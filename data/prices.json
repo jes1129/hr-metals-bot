@@ -1,4 +1,22 @@
 {
-  "copper": [],
-  "aluminum": []
+  "copper": [
+    {
+      "ts": "2026-07-09T02:59:27.160459+00:00",
+      "price": 13090.0,
+      "price_twd": 420451,
+      "rate": 32.12,
+      "change": null,
+      "change_pct": null
+    }
+  ],
+  "aluminum": [
+    {
+      "ts": "2026-07-09T02:59:27.160459+00:00",
+      "price": 3141.0,
+      "price_twd": 100889,
+      "rate": 32.12,
+      "change": null,
+      "change_pct": null
+    }
+  ]
 }
