@@ -16,10 +16,14 @@ import json
 import config
 import metals as metals_mod
 
+# 資產版本（破瀏覽器快取）：每次產生頁面時更新，讓 CSS/JS 更新後使用者自動拿到新版，
+# 不必手動強制重新整理（對非科技用戶很重要）。
+_VER = datetime.datetime.utcnow().strftime("%Y%m%d%H%M")
+
 _HEAD = (
     '<meta charset="utf-8">\n'
     '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-    '<link rel="stylesheet" href="assets/style.css">'
+    f'<link rel="stylesheet" href="assets/style.css?v={_VER}">'
 )
 _THEME_BTN = '<button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button>'
 
@@ -319,7 +323,7 @@ def render_html(history: dict, daily: dict = None) -> str:
     <div class="foot">現價/告警：LME 官方價（Westmetall）· 走勢圖：Yahoo Finance 每日收盤（銅為 COMEX 近月，與 LME 走勢近乎一致）· 匯率 Yahoo · 單位由美元/公噸換算 · 僅供內部參考。</div>
   </div>
 {data_script}
-  <script src="assets/app.js"></script>
+  <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
 
@@ -516,7 +520,7 @@ def render_jobs_html(stats: dict, summary: dict, jobs: list,
     <div class="foot">資料來源：104 人力銀行公開職缺（聚焦台中）· 最後更新 {last_update} · ⭐＝品管職且命中量測/金屬關鍵字 · 僅供內部招募參考，非即時、不含企業人才庫。</div>
   </div>
 {data_script}
-  <script src="assets/app.js"></script>
+  <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
 
@@ -643,7 +647,7 @@ def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: 
     <div class="foot">來源：104 公司搜尋（Playwright）＋ 財政部營業稅籍登記開放資料（篩臺中金屬）· 完整名單見 repo 的 data/suppliers.json · 名單為公開資料，實際產能/品質/認證請自行電話與實地查核。</div>
   </div>
 {data_script}
-  <script src="assets/app.js"></script>
+  <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
 
@@ -717,7 +721,7 @@ def render_quote_html(history: dict) -> str:
     <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。</div>
   </div>
 {data_script}
-  <script src="assets/app.js"></script>
+  <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
 
@@ -817,6 +821,6 @@ def render_customers_html(profile: dict, stats: dict, summary: dict, customers: 
     <div class="foot">來源：104 公司搜尋（Playwright）＋ 財政部營業稅籍登記開放資料（依目標產業篩選）· 完整名單見 data/customers.json · 名單為公開資料推估，實際採購需求請自行查證。</div>
   </div>
 {data_script}
-  <script src="assets/app.js"></script>
+  <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
