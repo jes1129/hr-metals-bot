@@ -429,6 +429,50 @@
     });
   }
 
+  // ============================================================ 客戶開發雷達
+  function initCustomers(CUS) {
+    var searchEl = document.getElementById("custSearch"), catEl = document.getElementById("custCat");
+    var countEl = document.getElementById("custCount"), tbody = document.getElementById("custBody");
+    var sort = { key: "name", dir: 1 };
+    function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
+    if (catEl) {
+      var cats = {};
+      CUS.forEach(function (s) { var c = s.category || "其他"; cats[c] = (cats[c] || 0) + 1; });
+      Object.keys(cats).sort(function (a, b) { return cats[b] - cats[a]; }).forEach(function (c) {
+        var o = document.createElement("option"); o.value = c; o.textContent = c + "（" + cats[c] + "）"; catEl.appendChild(o);
+      });
+    }
+    function render() {
+      var q = (searchEl && searchEl.value.trim().toLowerCase()) || "", cat = (catEl && catEl.value) || "";
+      var rows = CUS.filter(function (s) {
+        if (cat && s.category !== cat) return false;
+        if (q && (s.name + " " + s.area + " " + (s.address || "")).toLowerCase().indexOf(q) < 0) return false;
+        return true;
+      });
+      rows.sort(function (a, b) {
+        var va = (a[sort.key] || ""), vb = (b[sort.key] || "");
+        if (va < vb) return -sort.dir; if (va > vb) return sort.dir; return 0;
+      });
+      if (countEl) countEl.textContent = rows.length + " / " + CUS.length + " 家";
+      tbody.innerHTML = rows.map(function (s) {
+        var name = s.url ? '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.name.slice(0, 34)) + "</a>" : esc(s.name.slice(0, 34));
+        return "<tr><td>" + name + "</td><td>" + esc(s.category) + "</td><td>" + esc(s.area || "—") + "</td><td>" + esc(s.source) + "</td></tr>";
+      }).join("") || '<tr><td colspan="4" style="color:var(--muted)">找不到符合的客戶</td></tr>';
+    }
+    if (searchEl) searchEl.addEventListener("input", render);
+    if (catEl) catEl.addEventListener("change", render);
+    document.querySelectorAll("th.sortable").forEach(function (th) {
+      th.addEventListener("click", function () {
+        var k = th.getAttribute("data-key");
+        if (sort.key === k) sort.dir *= -1; else { sort.key = k; sort.dir = 1; }
+        document.querySelectorAll("th.sortable .arrow").forEach(function (a) { a.textContent = ""; });
+        var arw = th.querySelector(".arrow"); if (arw) arw.textContent = sort.dir > 0 ? "▲" : "▼";
+        render();
+      });
+    });
+    render();
+  }
+
   // ============================================================ 報價試算器
   function initQuote(MATS) {
     var matEl = document.getElementById("qMat"), wEl = document.getElementById("qWeight");
@@ -473,5 +517,6 @@
     if (window.JOBS_DATA) { initJobs(window.JOBS_DATA); initJobsCharts(); }
     if (window.SUPPLIERS_DATA) { initSuppliers(window.SUPPLIERS_DATA); initSupplierMap(window.SUPPLIERS_DATA); }
     if (window.QUOTE_MATERIALS) initQuote(window.QUOTE_MATERIALS);
+    if (window.CUSTOMERS_DATA) initCustomers(window.CUSTOMERS_DATA);
   });
 })();

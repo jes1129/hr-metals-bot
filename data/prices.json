@@ -1,25 +1,9 @@
 {
   "copper": [
     {
-      "ts": "2026-07-09T22:29:38.858288+00:00",
+      "ts": "2026-07-09T22:43:07.059910+00:00",
       "price": 13090.0,
-      "price_twd": 420228,
-      "rate": 32.103,
-      "change": null,
-      "change_pct": null
-    },
-    {
-      "ts": "2026-07-09T22:29:56.729352+00:00",
-      "price": 13090.0,
-      "price_twd": 420228,
-      "rate": 32.103,
-      "change": 0.0,
-      "change_pct": 0.0
-    },
-    {
-      "ts": "2026-07-09T22:33:29.442236+00:00",
-      "price": null,
-      "price_twd": null,
+      "price_twd": 420215,
       "rate": 32.102,
       "change": null,
       "change_pct": null
@@ -27,25 +11,9 @@
   ],
   "aluminum": [
     {
-      "ts": "2026-07-09T22:29:38.858288+00:00",
+      "ts": "2026-07-09T22:43:07.059910+00:00",
       "price": 3141.0,
-      "price_twd": 100836,
-      "rate": 32.103,
-      "change": null,
-      "change_pct": null
-    },
-    {
-      "ts": "2026-07-09T22:29:56.729352+00:00",
-      "price": 3141.0,
-      "price_twd": 100836,
-      "rate": 32.103,
-      "change": 0.0,
-      "change_pct": 0.0
-    },
-    {
-      "ts": "2026-07-09T22:33:29.442236+00:00",
-      "price": null,
-      "price_twd": null,
+      "price_twd": 100832,
       "rate": 32.102,
       "change": null,
       "change_pct": null
@@ -53,25 +21,9 @@
   ],
   "nickel": [
     {
-      "ts": "2026-07-09T22:29:38.858288+00:00",
+      "ts": "2026-07-09T22:43:07.059910+00:00",
       "price": 16160.0,
-      "price_twd": 518784,
-      "rate": 32.103,
-      "change": null,
-      "change_pct": null
-    },
-    {
-      "ts": "2026-07-09T22:29:56.729352+00:00",
-      "price": 16160.0,
-      "price_twd": 518784,
-      "rate": 32.103,
-      "change": 0.0,
-      "change_pct": 0.0
-    },
-    {
-      "ts": "2026-07-09T22:33:29.442236+00:00",
-      "price": null,
-      "price_twd": null,
+      "price_twd": 518768,
       "rate": 32.102,
       "change": null,
       "change_pct": null
@@ -79,28 +31,12 @@
   ],
   "steel": [
     {
-      "ts": "2026-07-09T22:29:38.858288+00:00",
-      "price": 1287.5,
-      "price_twd": 41333,
-      "rate": 32.103,
-      "change": null,
-      "change_pct": null
-    },
-    {
-      "ts": "2026-07-09T22:29:56.729352+00:00",
-      "price": 1287.5,
-      "price_twd": 41333,
-      "rate": 32.103,
-      "change": 0.0,
-      "change_pct": 0.0
-    },
-    {
-      "ts": "2026-07-09T22:33:29.442236+00:00",
+      "ts": "2026-07-09T22:43:07.059910+00:00",
       "price": 1287.5,
       "price_twd": 41331,
       "rate": 32.102,
-      "change": 0.0,
-      "change_pct": 0.0
+      "change": null,
+      "change_pct": null
     }
   ]
 }

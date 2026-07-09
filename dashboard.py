@@ -56,6 +56,7 @@ def _nav(active: str) -> str:
         f'<a{a if active == "metals" else ""} href="metals.html">🔩 原料</a>'
         f'<a{a if active == "jobs" else ""} href="jobs.html">🔧 招募</a>'
         f'<a{a if active == "suppliers" else ""} href="suppliers.html">🏭 供應商</a>'
+        f'<a{a if active == "customers" else ""} href="customers.html">🎯 客戶</a>'
         f'<a{a if active == "quote" else ""} href="quote.html">🧮 報價</a>'
         "</div>"
     )
@@ -714,6 +715,106 @@ def render_quote_html(history: dict) -> str:
       <div class="qr big"><div class="qk">建議報價</div><div class="qv" id="qQuote">—</div></div>
     </div>
     <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。</div>
+  </div>
+{data_script}
+  <script src="assets/app.js"></script>
+</body>
+</html>"""
+
+
+# ===========================================================================
+# 功能 D — 客戶開發雷達
+# ===========================================================================
+def render_customers_html(profile: dict, stats: dict, summary: dict, customers: list) -> str:
+    EMBED_CAP = 1200
+    embed = customers[:EMBED_CAP]
+    cat_bars = _hbars([(c, n, str(n)) for c, n in stats.get("categories", [])])
+    area_bars = _hbars([(a, n, str(n)) for a, n in stats.get("top_areas", [])])
+
+    fb = customers[:40]
+    fb_rows = ""
+    for s in fb:
+        name = (f'<a href="{html.escape(s["url"])}" target="_blank" rel="noopener">{html.escape(s["name"][:34])}</a>'
+                if s.get("url") else html.escape(s["name"][:34]))
+        fb_rows += (f"<tr><td>{name}</td><td>{html.escape(s.get('category',''))}</td>"
+                    f"<td>{html.escape(s.get('area','') or '—')}</td>"
+                    f"<td>{_SRC_LABEL.get(s.get('source'),'')}</td></tr>")
+    fb_rows = fb_rows or '<tr><td colspan="4">—</td></tr>'
+
+    cus_min = [
+        {"name": s["name"], "url": s.get("url", ""), "area": s.get("area", ""),
+         "category": s.get("category", ""), "source": _SRC_LABEL.get(s.get("source"), ""),
+         "address": s.get("address", "")}
+        for s in embed
+    ]
+    data_script = "<script>window.CUSTOMERS_DATA = " + json.dumps(cus_min, ensure_ascii=False) + ";</script>"
+
+    ref_card = f"""
+    <div class="ai" style="border-left:3px solid var(--accent)">
+      <h2>🎯 開發客戶的一方（{html.escape(profile['name'])}）</h2>
+      <div class="refgrid">
+        <div><span class="rk">本業</span>{html.escape(profile['business'])}</div>
+        <div><span class="rk">賣點</span>精密車削・ISO・神岡在地・可小量打樣快交期</div>
+      </div>
+      <div class="reftags">目標客戶：會用到精密金屬零件的產業（光學/醫療/半導體/工具機/自行車…）</div>
+    </div>"""
+
+    total = stats["total"]
+    shown = len(embed)
+    src_txt = "、".join(f"{_SRC_LABEL.get(k, k)} {v}" for k, v in stats.get("sources", {}).items())
+
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+{_HEAD}
+<title>九上科技 · 客戶開發雷達</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">{_nav("customers")}{_THEME_BTN}</div>
+    <div class="eyebrow">CUSTOMER RADAR · 104 公司 + 政府稅籍登記</div>
+    <h1>客戶開發雷達 · 九上科技</h1>
+    <div class="sub">找「會買精密金屬零件」的潛在客戶（全台）· 每月 1 號更新 · 僅供業務開發參考</div>
+
+    {ref_card}
+
+    <div class="cards">
+      <div class="card"><div class="k">潛在客戶</div><div class="v">{total}</div></div>
+      <div class="card"><div class="k">有官網連結</div><div class="v">{stats.get('with_url', 0)}</div><div class="k" style="margin-top:6px">好找聯絡窗口</div></div>
+      <div class="card"><div class="k">來源</div><div class="v" style="font-size:15px">{src_txt or '—'}</div></div>
+    </div>
+
+    <div class="ai">
+      <h2>🎯 {html.escape(summary.get('headline',''))}</h2>
+      <div class="row"><div class="lbl">🎯 優先鎖定</div><div class="txt">{html.escape(summary.get('target',''))}</div></div>
+      <div class="row"><div class="lbl">📨 如何切入</div><div class="txt">{html.escape(summary.get('approach',''))}</div></div>
+      <div class="row"><div class="lbl">💪 我方賣點</div><div class="txt">{html.escape(summary.get('pitch',''))}</div></div>
+      <div class="row"><div class="lbl">⚠️ 提醒</div><div class="txt">{html.escape(summary.get('risk',''))}</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel"><h3>🗂️ 目標產業分布</h3>{cat_bars}</div>
+      <div class="panel"><h3>📍 客戶所在地</h3>{area_bars}</div>
+    </div>
+
+    <div class="panel">
+      <h3>🔎 客戶名錄（顯示前 {shown} 家 · 共 {total} 家）</h3>
+      <div class="toolbar" style="padding:0 16px 12px">
+        <input id="custSearch" placeholder="搜尋公司 / 地區關鍵字…">
+        <select id="custCat"><option value="">全部產業</option></select>
+        <span class="count" id="custCount"></span>
+      </div>
+      <table>
+        <thead><tr>
+          <th class="sortable" data-key="name">公司 <span class="arrow"></span></th>
+          <th class="sortable" data-key="category">目標產業 <span class="arrow"></span></th>
+          <th class="sortable" data-key="area">地區 <span class="arrow"></span></th>
+          <th class="sortable" data-key="source">來源 <span class="arrow"></span></th>
+        </tr></thead>
+        <tbody id="custBody">{fb_rows}</tbody>
+      </table>
+    </div>
+    <div class="foot">來源：104 公司搜尋（Playwright）＋ 財政部營業稅籍登記開放資料（依目標產業篩選）· 完整名單見 data/customers.json · 名單為公開資料推估，實際採購需求請自行查證。</div>
   </div>
 {data_script}
   <script src="assets/app.js"></script>
