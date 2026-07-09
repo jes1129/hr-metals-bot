@@ -125,30 +125,54 @@ def _parse_area(text: str) -> str:
     return "其他/海外"
 
 
+def _parse_district(text: str) -> str:
+    """台中市底下的行政區（如「大雅區」）。抓不到回「其他」。"""
+    m = re.search(r"台中市([一-鿿]{1,3}區)", text)
+    return m.group(1) if m else "其他"
+
+
 def _is_relevant(card: dict) -> bool:
     blob = f"{card['title']} {card['company']} {card['text']}"
     return any(kw in blob for kw in config.JOB_RELEVANCE)
 
 
+def _match_info(job: dict):
+    """符合招募重點判定。回傳 (match_score, is_priority)。
+    is_priority = 職稱本身是品管職（role 命中「標題」）且 (量測設備 或 金屬加工產業) 命中。
+    role 只看標題，避免業務/助理職因描述提到品管而誤判。"""
+    title = job["title"].lower()
+    blob = (job["title"] + " " + job.get("desc", "") + " " + job["company"]).lower()
+    role = any(k in title for k in config.RECRUIT_MATCH["role"])       # 只看標題
+    equip = any(k in blob for k in config.RECRUIT_MATCH["equip"])
+    industry = any(k in blob for k in config.RECRUIT_MATCH["industry"])
+    district_hit = any(d in job.get("district", "") for d in config.RECRUIT_DISTRICTS)
+    score = (2 if role else 0) + (2 if equip else 0) + (1 if industry else 0) + (1 if district_hit else 0)
+    return score, bool(role and (equip or industry))
+
+
 def parse_and_filter(cards: list) -> list:
-    """把原始卡片解析成結構化職缺，並剔除不相關（置頂廣告）者。"""
+    """解析卡片 → 剔除不相關 → 只留指定縣市 → 標記行政區與招募符合度。"""
     jobs = []
     for c in cards:
         if not _is_relevant(c):
             continue
+        area = _parse_area(c["text"])
+        if config.JOB_AREA_FILTER and area != config.JOB_AREA_FILTER:
+            continue  # 只聚焦設定縣市（台中）
         low, high, kind = _parse_salary(c["text"])
-        jobs.append(
-            {
-                "title": c["title"],
-                "company": c["company"],
-                "url": c["url"],
-                "area": _parse_area(c["text"]),
-                "salary_low": low,
-                "salary_high": high,
-                "salary_kind": kind,
-                "desc": c["text"][:200],  # 供技能/分類挖掘（不嵌前端）
-            }
-        )
+        job = {
+            "title": c["title"],
+            "company": c["company"],
+            "url": c["url"],
+            "area": area,
+            "district": _parse_district(c["text"]),
+            "salary_low": low,
+            "salary_high": high,
+            "salary_kind": kind,
+            "desc": c["text"][:200],  # 供技能/分類/符合度挖掘（不嵌前端）
+        }
+        job["match_score"], job["is_priority"] = _match_info(job)
+        jobs.append(job)
     return jobs
 
 
@@ -169,11 +193,12 @@ def aggregate(jobs: list) -> dict:
 
     sal = [s for s in (_salary_mid(j) for j in jobs) if s]
     companies = Counter(j["company"] for j in jobs if j["company"])
-    areas = Counter(j["area"] for j in jobs)
+    districts = Counter(j["district"] for j in jobs)
     negotiable = sum(1 for j in jobs if j["salary_kind"] == "面議")
 
     stats = {
         "total": len(jobs),
+        "priority_count": sum(1 for j in jobs if j.get("is_priority")),
         "salary_count": len(sal),
         "salary_min": min(sal) if sal else None,
         "salary_median": round(statistics.median(sal)) if sal else None,
@@ -181,23 +206,23 @@ def aggregate(jobs: list) -> dict:
         "salary_avg": round(statistics.mean(sal)) if sal else None,
         "negotiable": negotiable,
         "top_companies": companies.most_common(5),
-        "top_areas": areas.most_common(6),
-        "area_salary": _area_salary(jobs),
+        "top_districts": districts.most_common(8),
+        "district_salary": _district_salary(jobs),
         "categories": _categorize(jobs),
         "skills": _skill_freq(jobs),
     }
     return stats
 
 
-def _area_salary(jobs: list) -> list:
-    """各地區月薪中位數（僅取有可解析薪資、且該地區樣本 >= 2 者）。回傳 [(area, median, n)]。"""
+def _district_salary(jobs: list) -> list:
+    """各行政區月薪中位數（有可解析薪資、且該區樣本 >= 2）。回傳 [(district, median, n)]。"""
     from collections import defaultdict
 
     bucket = defaultdict(list)
     for j in jobs:
         v = _salary_mid(j)
         if v:
-            bucket[j["area"]].append(v)
+            bucket[j["district"]].append(v)
     rows = [(a, round(statistics.median(vs)), len(vs)) for a, vs in bucket.items() if len(vs) >= 2]
     rows.sort(key=lambda x: x[1], reverse=True)
     return rows[:8]
@@ -291,13 +316,18 @@ _SUMMARY_FIELDS = ("headline", "salary", "demand", "skills", "advice")
 
 
 def _summary_system() -> str:
+    p = config.RECRUIT_PROFILE
     return (
-        "你是台灣製造業的人力資源與薪酬分析顧問，專精金屬加工產業。"
-        "根據提供的『104 公開職缺統計 + 樣本』，用繁體中文寫出簡潔、具體、可行動的市場行情分析。"
-        "數字要引用實際統計；不要空泛。每欄 2-3 句即可。\n"
-        "欄位：headline（一句話總結今日金屬加工人才市場）、"
-        "salary（薪資行情觀察）、demand（職缺熱度與需求趨勢）、"
-        "skills（雇主在找的技能/條件）、advice（給招募方的建議）。"
+        "你是台灣製造業的人資與薪酬顧問。以下是一個實際招募案，請針對它做分析：\n"
+        f"・職缺：{p['role']}\n・產業：{p['industry']}\n・地區：{p['region']}\n"
+        f"・設備技能：{p['equipment']}\n・經歷要求：{p['experience']}\n・現況：{p['context']}\n\n"
+        "根據提供的『104 台中公開職缺統計 + 樣本』，用繁體中文寫出針對此招募案、"
+        "具體可行動的分析。數字要引用實際統計；不要空泛。每欄 2-3 句即可。\n"
+        "欄位：headline（一句話總結台中金屬加工品管人才市場）、"
+        "salary（薪資行情與對標：這案品管職該開多少才有競爭力）、"
+        "demand（供給熱度：哪些行政區、多少同類職缺在搶人）、"
+        "skills（對症技能：2.5D 量測／品管相關，雇主普遍怎麼開條件）、"
+        "advice（給這個招募案的具體建議）。"
     )
 
 
@@ -389,9 +419,9 @@ def _fallback_summary(stats: dict) -> dict:
     med = f"{stats['salary_median']:,}" if stats["salary_median"] else "—"
     top = "、".join(c for c, _ in stats["top_companies"][:3]) or "—"
     return {
-        "headline": f"今日金屬加工相關公開職缺 {stats['total']} 筆",
+        "headline": f"台中金屬加工/品管相關公開職缺 {stats['total']} 筆，符合招募重點 {stats.get('priority_count', 0)} 筆",
         "salary": f"可解析月薪的職缺中位數約 NT${med}，面議 {stats['negotiable']} 筆。",
-        "demand": f"徵才熱區：{'、'.join(a for a, _ in stats['top_areas'][:3]) or '—'}。",
+        "demand": f"台中徵才熱區：{'、'.join(a for a, _ in stats['top_districts'][:3]) or '—'}。",
         "skills": "（未啟用 AI 分析，僅提供統計數據）",
         "advice": f"目前釋出較多職缺的公司：{top}。",
     }
@@ -419,10 +449,10 @@ def build_embeds(stats: dict, summary: dict, delta: dict, jobs: list) -> list:
         if stats["salary_min"] else "—"
     )
     companies = "\n".join(f"· {c}（{n} 筆）" for c, n in stats["top_companies"]) or "—"
-    areas = "、".join(f"{a} {n}" for a, n in stats["top_areas"]) or "—"
+    areas = "、".join(f"{a} {n}" for a, n in stats["top_districts"]) or "—"
 
     main = {
-        "title": f"🔧 金屬加工人才行情 · {summary['headline']}"[:256],
+        "title": f"🔧 台中品管招募雷達 · {summary['headline']}"[:256],
         "color": 0x2C7BE5,
         "fields": [
             {"name": "💰 薪資行情", "value": summary["salary"][:1024]},
@@ -435,16 +465,16 @@ def build_embeds(stats: dict, summary: dict, delta: dict, jobs: list) -> list:
         "title": "📊 今日數據",
         "color": 0x6C757D,
         "fields": [
-            {"name": "職缺總數",
+            {"name": "職缺總數（台中）",
              "value": f"{stats['total']} 筆{_fmt_delta(delta['total'])}", "inline": True},
+            {"name": "⭐ 符合招募重點", "value": f"{stats.get('priority_count', 0)} 筆", "inline": True},
             {"name": "面議", "value": f"{stats['negotiable']} 筆", "inline": True},
             {"name": "月薪中位數",
              "value": f"{med}{_fmt_delta(delta['salary_median'])}", "inline": True},
             {"name": "月薪平均", "value": avg, "inline": True},
             {"name": "月薪區間", "value": rng, "inline": True},
-            {"name": "​", "value": "​", "inline": True},
             {"name": "🏢 徵才較多的公司", "value": companies[:1024]},
-            {"name": "📍 徵才熱區", "value": areas[:1024]},
+            {"name": "📍 台中徵才熱區", "value": areas[:1024]},
         ],
     }
     return [main, data]
@@ -474,7 +504,7 @@ async def run() -> dict:
         f.write(dashboard.render_jobs_html(stats, summary, jobs, history, delta))
     print("[market] 已更新 docs/jobs.html")
 
-    content = f"**🔧 金屬加工人才 · 每日行情**（{datetime.date.today():%Y/%m/%d}）"
+    content = f"**🔧 台中・金屬加工・品管招募雷達**（{datetime.date.today():%Y/%m/%d}）"
     notify.send_embeds(build_embeds(stats, summary, delta, jobs), content=content)
     print(f"[market] 已推送：職缺 {stats['total']} 筆")
     return {"jobs": jobs, "stats": stats, "summary": summary}

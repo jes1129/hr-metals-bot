@@ -8,3 +8,8 @@ dashboard_preview.html
 
 # 內部指南 PDF 不進 repo（公開時避免外流）
 *.pdf
+
+# 使用者貼進來的截圖等圖片，不進 repo
+*.jpg
+*.jpeg
+*.png

@@ -260,12 +260,13 @@
 
   function initJobs(JOBS) {
     var searchEl = document.getElementById("jobSearch"), areaEl = document.getElementById("jobArea");
+    var priEl = document.getElementById("jobPriority");
     var countEl = document.getElementById("jobCount"), tbody = document.getElementById("jobBody");
     var sort = { key: "salary", dir: -1 };
 
     if (areaEl) {
       var areas = {};
-      JOBS.forEach(function (j) { areas[j.area] = (areas[j.area] || 0) + 1; });
+      JOBS.forEach(function (j) { var d = j.district || "其他"; areas[d] = (areas[d] || 0) + 1; });
       Object.keys(areas).sort(function (a, b) { return areas[b] - areas[a]; }).forEach(function (a) {
         var o = document.createElement("option"); o.value = a; o.textContent = a + "（" + areas[a] + "）"; areaEl.appendChild(o);
       });
@@ -278,8 +279,10 @@
     function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
     function render() {
       var q = (searchEl && searchEl.value.trim().toLowerCase()) || "", area = (areaEl && areaEl.value) || "";
+      var priOnly = priEl && priEl.checked;
       var rows = JOBS.filter(function (j) {
-        if (area && j.area !== area) return false;
+        if (priOnly && !j.is_priority) return false;
+        if (area && (j.district || "其他") !== area) return false;
         if (q && (j.title + " " + j.company).toLowerCase().indexOf(q) < 0) return false;
         return true;
       });
@@ -289,12 +292,14 @@
       });
       if (countEl) countEl.textContent = rows.length + " / " + JOBS.length + " 筆";
       tbody.innerHTML = rows.map(function (j) {
-        return '<tr><td><a href="' + esc(j.url) + '" target="_blank" rel="noopener">' + esc(j.title.slice(0, 40)) +
-          "</a></td><td>" + esc(j.company.slice(0, 22)) + "</td><td>" + esc(j.area) + '</td><td class="num">' + salTxt(j) + "</td></tr>";
+        var star = j.is_priority ? '<span class="star">⭐</span> ' : "";
+        return '<tr><td>' + star + '<a href="' + esc(j.url) + '" target="_blank" rel="noopener">' + esc(j.title.slice(0, 40)) +
+          "</a></td><td>" + esc(j.company.slice(0, 22)) + "</td><td>" + esc(j.district || "其他") + '</td><td class="num">' + salTxt(j) + "</td></tr>";
       }).join("") || '<tr><td colspan="4" style="color:var(--muted)">找不到符合的職缺</td></tr>';
     }
     if (searchEl) searchEl.addEventListener("input", render);
     if (areaEl) areaEl.addEventListener("change", render);
+    if (priEl) priEl.addEventListener("change", render);
     document.querySelectorAll("th.sortable").forEach(function (th) {
       th.addEventListener("click", function () {
         var k = th.getAttribute("data-key");

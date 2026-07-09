@@ -129,6 +129,20 @@ th .arrow { opacity: .5; font-size: 10px; }
 .hist .bn { font-size: 15px; font-weight: 700; }
 .hist .bl { font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.2; }
 
+/* 招募重點參考卡 */
+.refgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin: 4px 0 10px; }
+.refgrid > div { font-size: 13.5px; color: var(--text); line-height: 1.5; }
+.refgrid .rk { display: inline-block; min-width: 62px; color: var(--muted); font-size: 12px; margin-right: 6px; }
+.reftags { font-size: 12.5px; color: var(--muted); }
+.reftags .rtag { display: inline-block; background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent); padding: 2px 9px; border-radius: 999px; margin: 0 4px 4px 0; font-weight: 600; }
+.reftags .rnote { color: var(--muted2); margin-left: 4px; }
+
+/* 只看符合 checkbox + ⭐ 徽章 */
+.prionly { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.prionly input { accent-color: var(--accent); }
+.star { font-size: 12px; }
+
 .foot { color: var(--muted2); font-size: 12px; margin-top: 14px; }
 @media (max-width: 640px) {
   .cards, .cards.four { grid-template-columns: 1fr 1fr; }

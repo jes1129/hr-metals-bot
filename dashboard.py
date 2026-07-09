@@ -280,30 +280,58 @@ def render_jobs_html(stats: dict, summary: dict, jobs: list,
         f"<tr><td>{html.escape(c)}</td><td class='num'>{n}</td></tr>"
         for c, n in stats["top_companies"]
     ) or "<tr><td>—</td><td></td></tr>"
-    area_rows = "".join(
+    dist_rows = "".join(
         f"<tr><td>{html.escape(a)}</td><td class='num'>{n}</td></tr>"
-        for a, n in stats["top_areas"]
+        for a, n in stats["top_districts"]
     ) or "<tr><td>—</td><td></td></tr>"
 
     # 三張靜態長條圖
-    area_sal_bars = _hbars([(a, m, f"NT${m:,}") for a, m, _n in stats.get("area_salary", [])])
+    dist_sal_bars = _hbars([(a, m, f"NT${m:,}") for a, m, _n in stats.get("district_salary", [])])
     cat_bars = _hbars([(lbl, n, str(n)) for lbl, n in stats.get("categories", [])])
     skill_bars = _hbars([(s, n, str(n)) for s, n in stats.get("skills", [])])
 
-    # 值得注意職缺（後備）
+    # ⭐ 符合招募重點職缺（品管職 + 量測/金屬），依 match_score 排序
+    pri = sorted([j for j in jobs if j.get("is_priority")],
+                 key=lambda x: x.get("match_score", 0), reverse=True)
+    pri_rows = "".join(
+        f"""<tr><td><a href="{html.escape(j['url'])}" target="_blank" rel="noopener">{html.escape(j['title'][:40])}</a></td>
+        <td>{html.escape(j['company'][:22])}</td><td>{html.escape(j.get('district','—'))}</td>
+        <td class="num">{_salary_disp(j)}</td></tr>""" for j in pri[:20]
+    ) or '<tr><td colspan="4" style="color:var(--muted)">今日無完全符合招募重點的職缺（品管＋量測/金屬）。可看下方完整清單。</td></tr>'
+
+    # 完整清單後備（依薪資高→低）
     def _mid(j):
         lo, hi = j.get("salary_low"), j.get("salary_high")
         return (lo + hi) / 2 if (lo and hi) else (lo or 0)
     fb = sorted(jobs, key=_mid, reverse=True)[:30]
     fb_rows = "".join(
-        f"""<tr><td><a href="{html.escape(j['url'])}" target="_blank" rel="noopener">{html.escape(j['title'][:40])}</a></td>
-        <td>{html.escape(j['company'][:22])}</td><td>{html.escape(j['area'])}</td>
+        f"""<tr><td>{'⭐ ' if j.get('is_priority') else ''}<a href="{html.escape(j['url'])}" target="_blank" rel="noopener">{html.escape(j['title'][:40])}</a></td>
+        <td>{html.escape(j['company'][:22])}</td><td>{html.escape(j.get('district','—'))}</td>
         <td class="num">{_salary_disp(j)}</td></tr>""" for j in fb
     ) or '<tr><td colspan="4">—</td></tr>'
 
+    # 招募重點參考卡
+    rp = config.RECRUIT_PROFILE
+    ref_card = f"""
+    <div class="ai" style="border-left:3px solid var(--accent)">
+      <h2>🎯 招募重點（{html.escape(rp['title'])}）</h2>
+      <div class="refgrid">
+        <div><span class="rk">職缺</span>{html.escape(rp['role'])}</div>
+        <div><span class="rk">產業</span>{html.escape(rp['industry'])}</div>
+        <div><span class="rk">地區</span>{html.escape(rp['region'])}</div>
+        <div><span class="rk">設備技能</span>{html.escape(rp['equipment'])}</div>
+        <div><span class="rk">經歷要求</span>{html.escape(rp['experience'])}</div>
+        <div><span class="rk">現況</span>{html.escape(rp['context'])}</div>
+      </div>
+      <div class="reftags">錄取關鍵字：{' '.join('<span class="rtag">'+html.escape(k)+'</span>' for k in rp['keywords'])}
+        <span class="rnote">※ 2.5D＝2.5 次元影像量測儀</span></div>
+    </div>"""
+
     jobs_min = [
         {"title": j["title"], "company": j["company"], "url": j["url"], "area": j["area"],
-         "salary_low": j["salary_low"], "salary_high": j["salary_high"], "salary_kind": j["salary_kind"]}
+         "district": j.get("district", "其他"), "salary_low": j["salary_low"],
+         "salary_high": j["salary_high"], "salary_kind": j["salary_kind"],
+         "is_priority": bool(j.get("is_priority")), "match_score": j.get("match_score", 0)}
         for j in jobs
     ]
     hist_min = [
@@ -319,41 +347,51 @@ def render_jobs_html(stats: dict, summary: dict, jobs: list,
 <html lang="zh-TW">
 <head>
 {_HEAD}
-<title>金屬加工人才行情儀表板</title>
+<title>台中・金屬加工・品管招募雷達</title>
 </head>
 <body>
   <div class="wrap">
     <div class="topbar">{_nav("jobs")}{_THEME_BTN}</div>
-    <div class="eyebrow">TALENT MARKET · 104 公開職缺</div>
-    <h1>金屬加工人才行情</h1>
-    <div class="sub">104 公開職缺每日彙整 · 每日 08:00（台灣時間）更新 · 資料來源為公開徵才頁，僅供招募行情參考</div>
+    <div class="eyebrow">TALENT RADAR · 104 公開職缺 · 聚焦台中</div>
+    <h1>台中・金屬加工・品管招募雷達</h1>
+    <div class="sub">聚焦台中（潭雅神清水）金屬加工品管職 · 104 公開職缺每日 08:00 彙整 · ⭐＝符合招募重點（品管＋量測/金屬）· 僅供招募參考</div>
+
+    {ref_card}
 
     <div class="cards four">
-      <div class="card"><div class="k">職缺總數</div><div class="v">{stats['total']} {_delta_span(delta.get('total'))}</div><div class="spk">{spark_total}</div></div>
+      <div class="card"><div class="k">台中職缺數</div><div class="v">{stats['total']} {_delta_span(delta.get('total'))}</div><div class="spk">{spark_total}</div></div>
+      <div class="card"><div class="k">⭐ 符合招募重點</div><div class="v">{stats.get('priority_count', 0)}</div><div class="k" style="margin-top:6px">品管＋量測/金屬</div></div>
       <div class="card"><div class="k">月薪中位數</div><div class="v">{med} {_delta_span(delta.get('salary_median'))}</div><div class="spk">{spark_med}</div></div>
       <div class="card"><div class="k">月薪平均</div><div class="v">{avg}</div><div class="k" style="margin-top:6px">區間 {rng}</div></div>
-      <div class="card"><div class="k">面議職缺</div><div class="v">{stats['negotiable']}</div><div class="k" style="margin-top:6px">未列薪資</div></div>
     </div>
 
     <div class="ai">
       <h2>🔧 {html.escape(summary.get('headline',''))}</h2>
       <div class="row"><div class="lbl">💰 薪資行情</div><div class="txt">{html.escape(summary.get('salary',''))}</div></div>
-      <div class="row"><div class="lbl">📈 需求趨勢</div><div class="txt">{html.escape(summary.get('demand',''))}</div></div>
-      <div class="row"><div class="lbl">🛠️ 雇主要的技能</div><div class="txt">{html.escape(summary.get('skills',''))}</div></div>
+      <div class="row"><div class="lbl">📈 供給熱度</div><div class="txt">{html.escape(summary.get('demand',''))}</div></div>
+      <div class="row"><div class="lbl">🛠️ 對症技能</div><div class="txt">{html.escape(summary.get('skills',''))}</div></div>
       <div class="row"><div class="lbl">💡 招募建議</div><div class="txt">{html.escape(summary.get('advice',''))}</div></div>
     </div>
 
+    <div class="panel" style="margin-bottom:16px">
+      <h3>⭐ 符合招募重點的職缺（品管＋量測/金屬）</h3>
+      <table>
+        <thead><tr><th>職缺</th><th>公司</th><th>行政區</th><th class="num">月薪</th></tr></thead>
+        <tbody>{pri_rows}</tbody>
+      </table>
+    </div>
+
     <div class="grid2">
-      <section class="mpanel"><div class="mhead"><div><span class="mname">職缺數</span><span class="men">趨勢</span></div></div><div class="chart sm" data-chart="jobsTotal"></div></section>
+      <section class="mpanel"><div class="mhead"><div><span class="mname">台中職缺數</span><span class="men">趨勢</span></div></div><div class="chart sm" data-chart="jobsTotal"></div></section>
       <section class="mpanel"><div class="mhead"><div><span class="mname">月薪中位數</span><span class="men">趨勢</span></div></div><div class="chart sm" data-chart="jobsMed"></div></section>
     </div>
 
     <div class="grid2">
       <div class="panel"><h3>🏢 徵才較多的公司</h3><table><tbody>{comp_rows}</tbody></table></div>
-      <div class="panel"><h3>📍 徵才熱區</h3><table><tbody>{area_rows}</tbody></table></div>
+      <div class="panel"><h3>📍 台中徵才熱區（行政區）</h3><table><tbody>{dist_rows}</tbody></table></div>
     </div>
 
-    <div class="panel" style="margin-bottom:16px"><h3>💵 各地區月薪中位數</h3>{area_sal_bars}</div>
+    <div class="panel" style="margin-bottom:16px"><h3>💵 各行政區月薪中位數</h3>{dist_sal_bars}</div>
 
     <div class="grid2">
       <div class="panel"><h3>🗂️ 職務類別分布</h3>{cat_bars}</div>
@@ -369,20 +407,21 @@ def render_jobs_html(stats: dict, summary: dict, jobs: list,
       <h3>🔎 職缺清單</h3>
       <div class="toolbar" style="padding:0 16px 12px">
         <input id="jobSearch" placeholder="搜尋職缺 / 公司關鍵字…">
-        <select id="jobArea"><option value="">全部地區</option></select>
+        <select id="jobArea"><option value="">全部行政區</option></select>
+        <label class="prionly"><input type="checkbox" id="jobPriority"> 只看 ⭐ 符合招募重點</label>
         <span class="count" id="jobCount"></span>
       </div>
       <table>
         <thead><tr>
           <th class="sortable" data-key="title">職缺 <span class="arrow"></span></th>
           <th class="sortable" data-key="company">公司 <span class="arrow"></span></th>
-          <th class="sortable" data-key="area">地區 <span class="arrow"></span></th>
+          <th class="sortable" data-key="district">行政區 <span class="arrow"></span></th>
           <th class="sortable num" data-key="salary">月薪 <span class="arrow"></span></th>
         </tr></thead>
         <tbody id="jobBody">{fb_rows}</tbody>
       </table>
     </div>
-    <div class="foot">資料來源：104 人力銀行公開職缺 · 最後更新 {last_update} · 僅供內部招募行情參考，非即時、不含企業人才庫。</div>
+    <div class="foot">資料來源：104 人力銀行公開職缺（聚焦台中）· 最後更新 {last_update} · ⭐＝品管職且命中量測/金屬關鍵字 · 僅供內部招募參考，非即時、不含企業人才庫。</div>
   </div>
 {data_script}
   <script src="assets/app.js"></script>
