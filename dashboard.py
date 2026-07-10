@@ -66,6 +66,7 @@ def _nav(active: str) -> str:
         f'<a{a if active == "suppliers" else ""} href="suppliers.html">🏭 供應商</a>'
         f'<a{a if active == "customers" else ""} href="customers.html">🎯 客戶</a>'
         f'<a{a if active == "quote" else ""} href="quote.html">🧮 報價</a>'
+        f'<a{a if active == "help" else ""} href="help.html">📖 說明</a>'
         "</div>"
     )
 
@@ -184,6 +185,125 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
     <div class="foot">原料價／招募／供應商每日自動更新；報價用最新原料行情試算。全部免費、關機也會自己跑。</div>
   </div>
   <script>(function(){{var u=(window.APP_CONFIG||{{}}).SHEET_URL||"";var c=document.getElementById("dbCard");if(c&&u){{c.href=u;c.style.display="";}}}})();</script>
+  <script src="assets/app.js?v={_VER}"></script>
+</body>
+</html>"""
+
+
+# ===========================================================================
+# 說明頁（📖 白話使用教學；給非科技用戶）
+# ===========================================================================
+def render_help_html() -> str:
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+{_HEAD}
+<title>九上科技 · 使用說明</title>
+<style>
+  .help {{ max-width: 860px; }}
+  .help .q {{ background: var(--card, #fff); border: 1px solid var(--line, #e5e7eb);
+    border-radius: 14px; padding: 18px 20px; margin: 14px 0; }}
+  .help h2 {{ font-size: 1.15rem; margin: 26px 0 6px; }}
+  .help h3 {{ font-size: 1.02rem; margin: 16px 0 4px; }}
+  .help p, .help li {{ line-height: 1.75; color: var(--ink, #222); }}
+  .help ul {{ margin: 6px 0 6px 4px; padding-left: 20px; }}
+  .help .tag {{ display: inline-block; background: var(--accent-soft, #eef2ff);
+    color: var(--accent, #3b5bdb); border-radius: 8px; padding: 1px 9px;
+    font-size: .86rem; margin-right: 6px; white-space: nowrap; }}
+  .help .tip {{ background: var(--accent-soft, #eef6ff); border-left: 4px solid var(--accent, #3b5bdb);
+    border-radius: 8px; padding: 12px 16px; margin: 10px 0; }}
+  .help .steps {{ counter-reset: s; list-style: none; padding-left: 0; }}
+  .help .steps li {{ counter-increment: s; position: relative; padding: 4px 0 4px 34px; }}
+  .help .steps li::before {{ content: counter(s); position: absolute; left: 0; top: 4px;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--accent, #3b5bdb);
+    color: #fff; text-align: center; line-height: 24px; font-size: .82rem; }}
+</style>
+</head>
+<body>
+  <div class="wrap help">
+    <div class="topbar">{_nav("help")}{_THEME_BTN}</div>
+    <div class="eyebrow">九上科技 · 智慧儀表板</div>
+    <h1>📖 使用說明</h1>
+    <div class="sub">一頁看懂整個網站怎麼用 · 白話版 · 更新於 {now}</div>
+
+    <div class="q">
+      <h2>這是什麼？</h2>
+      <p>這是一套幫九上科技「自動盯行情、找人、找供應商、開發客戶、算報價」的免費網站。資料每天自動更新，
+      不用開電腦、不用付費、不用維護。上面一排是七個分頁，點一下就切換：</p>
+      <p>
+        <span class="tag">🏠 首頁</span><span class="tag">🔩 原料</span><span class="tag">🔧 招募</span>
+        <span class="tag">🏭 供應商</span><span class="tag">🎯 客戶</span><span class="tag">🧮 報價</span>
+        <span class="tag">📖 說明</span>
+      </p>
+    </div>
+
+    <div class="q">
+      <h2>七個分頁各自怎麼用</h2>
+
+      <h3>🏠 首頁</h3>
+      <p>每天的重點總覽。每張大卡片是一個功能，點下去就進去。也有一張「🗂️ 九上資料庫」卡片，直接打開公司的 Google 試算表。</p>
+
+      <h3>🔩 原料</h3>
+      <p>看銅、鋁、鎳、鋼的國際價格走勢（換算成台幣）。買方視角：<b>漲</b>代表進料成本變高要注意，<b>跌／區間內</b>就還好。
+      可切換單位（每公噸／每磅）、切換期間（近 7 天／30 天等），看漲跌幅。</p>
+
+      <h3>🔧 招募</h3>
+      <p>自動追蹤台中金屬加工、品管（QC）相關的公開職缺行情。可搜尋、排序、只看收藏，還有薪資分布圖，幫忙抓招募的市場行情。</p>
+
+      <h3>🏭 供應商</h3>
+      <p>幫忙找金屬加工的供應商（CNC、表面處理、材料、螺絲沖壓⋯）。可依類別篩選、勾「只看神岡周邊」看附近的、切到地圖看位置。</p>
+
+      <h3>🎯 客戶</h3>
+      <p>找可能會買精密金屬零件的潛在客戶（光學、醫療、半導體、自行車⋯）。可依產業篩選、搜尋公司名。</p>
+
+      <h3>🧮 報價</h3>
+      <p>快速估報價：選材質（會自動帶入最新原料價）、填重量（或填長寬高自動算重量），就算出建議報價。
+      按「存這筆」會記進報價歷史，登入後同步到試算表。</p>
+    </div>
+
+    <div class="q">
+      <h2>🔐 資料庫怎麼用（重點）</h2>
+      <p>「資料庫」就是把你在網站上做的收藏、標記、報價，統統存進公司自己的 <b>Google 試算表</b>，
+      這樣換手機、換電腦都看得到同一份，不會不見。</p>
+
+      <h3>第一步：用 Google 登入</h3>
+      <ul class="steps">
+        <li>點右上角的「使用 Google 登入」按鈕。</li>
+        <li>選公司的 Google 帳號登入。</li>
+        <li>登入後右上角會顯示 👤 名字，就成功了。</li>
+      </ul>
+      <div class="tip">💡 登入之後<b>切換分頁不會登出</b>，大約一小時後才需要再登入一次（這是 Google 的安全設計，正常）。</div>
+
+      <h3>登入後能做什麼</h3>
+      <ul>
+        <li><b>⭐ 收藏</b>：點名單上的星星，收藏起來；勾「只看收藏」就只顯示收藏的。</li>
+        <li><b>狀態</b>：每一列可以標「已聯絡／合作中／不合適」。</li>
+        <li><b>📝 備註</b>：想記什麼就打在備註欄。</li>
+        <li><b>📅 排提醒</b>：一鍵開 Google 日曆，預填好「拜訪某公司」的事件。</li>
+        <li><b>✉️ 寄信</b>：一鍵開 Gmail，預填好主旨內文。</li>
+        <li><b>🧮 報價歷史</b>：報價頁按「存這筆」，紀錄會存進試算表。</li>
+      </ul>
+      <p>這些全部會同步到公司的 Google 試算表。想看完整資料、或直接編輯，點首頁的「🗂️ 九上資料庫」卡片打開試算表即可。</p>
+    </div>
+
+    <div class="q">
+      <h2>❓ 常見問題</h2>
+      <h3>登出了怎麼辦？</h3>
+      <p>再點一次右上角「使用 Google 登入」就好。收藏／備註都還在（存在試算表裡，不會不見）。</p>
+
+      <h3>看不到最新資料？</h3>
+      <p>按鍵盤 <b>Ctrl + F5</b>（Mac 是 Cmd + Shift + R）強制重新整理一次即可。原料價一天更新兩次，其他名單每天更新。</p>
+
+      <h3>名單好像只顯示一部分？</h3>
+      <p>頁面上為了速度只放最相關的前 600 筆（已按「離神岡近／有分類」排序）。<b>完整名單</b>在 Google 試算表裡，點首頁「🗂️ 九上資料庫」就能看全部。</p>
+
+      <h3>要錢嗎？</h3>
+      <p>不用。整套都跑在免費服務上（GitHub + Google），關機也會自己在雲端更新。</p>
+    </div>
+
+    <div class="foot">有任何看不懂的地方，回到這頁再看一次就好。全部免費、自動更新。</div>
+  </div>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
@@ -546,7 +666,7 @@ _SRC_LABEL = {"104": "104", "gov": "政府", "both": "政府+104"}
 
 
 def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: list) -> str:
-    EMBED_CAP = 1200  # 前端內嵌上限（已依 score 排序，取前段）
+    EMBED_CAP = 600  # 前端內嵌上限（已依 score 排序，取前段；完整名單在 data/*.json 與試算表）
     embed = suppliers[:EMBED_CAP]
 
     cat_bars = _hbars([(c, n, str(n)) for c, n in stats.get("categories", [])])
@@ -589,7 +709,7 @@ def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: 
     <div class="ai" style="border-left:3px solid var(--accent)">
       <h2>🎯 找供應商的客戶（{html.escape(profile['name'])}）</h2>
       <div class="refgrid">
-        <div><span class="rk">地址</span>{html.escape(profile['address'])}（{html.escape(profile['phone'])}）</div>
+        <div><span class="rk">地區</span>{html.escape(profile['address'])}</div>
         <div><span class="rk">本業</span>{html.escape(profile['business'])}</div>
       </div>
       <div class="reftags">要找的供應商能力：{needs}
@@ -752,7 +872,7 @@ def render_quote_html(history: dict) -> str:
 # 功能 D — 客戶開發雷達
 # ===========================================================================
 def render_customers_html(profile: dict, stats: dict, summary: dict, customers: list) -> str:
-    EMBED_CAP = 1200
+    EMBED_CAP = 600  # 前端內嵌上限（完整名單在 data/*.json 與試算表）
     embed = customers[:EMBED_CAP]
     cat_bars = _hbars([(c, n, str(n)) for c, n in stats.get("categories", [])])
     area_bars = _hbars([(a, n, str(n)) for a, n in stats.get("top_areas", [])])

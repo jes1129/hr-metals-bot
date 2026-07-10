@@ -14,7 +14,7 @@
 
 // ★★ 填這裡 ★★
 var CLIENT_ID = "填你的-OAuth-用戶端-ID.apps.googleusercontent.com";
-var ALLOWED_EMAILS = ["champ5889@gmail.com"];  // 允許登入存取的 email（可多個）
+var ALLOWED_EMAILS = ["your-email@gmail.com"];  // 允許登入存取的 email（可多個；填你自己的 Google 帳號）
 
 // ---- 入口 ----
 function doPost(e) {

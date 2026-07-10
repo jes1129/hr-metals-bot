@@ -36,6 +36,9 @@ def main():
     # 報價試算頁（用最新原料現價）
     with open(os.path.join("docs", "quote.html"), "w", encoding="utf-8") as f:
         f.write(dashboard.render_quote_html(history))
+    # 說明頁（純靜態教學，隨每次部署更新）
+    with open(os.path.join("docs", "help.html"), "w", encoding="utf-8") as f:
+        f.write(dashboard.render_help_html())
 
     # 首頁總覽數字（跨 data 檔，可能落後數小時，可接受）
     jobs = _read(os.path.join(DATA_DIR, "jobs.json"), [])

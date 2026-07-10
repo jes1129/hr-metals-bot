@@ -74,22 +74,37 @@
   function quoteDel(ts) { Quotes = Quotes.filter(function (x) { return x.ts !== ts; }); lsSet("quotes", Quotes); dbCall("quoteDel", { ts: ts }); }
 
   // ---------- Google 登入（Identity Services；只用身分，不要敏感權限） ----------
-  var authReady = false;
+  var authReady = false, pulledOnce = false;
   function initAuth() {
-    if (authReady) return;
     var box = document.getElementById("gAuth"); if (!box) return;
     if (!CLIENT_ID) { box.innerHTML = '<span class="gnote" title="見 README Google 設定">未設定 Google</span>'; return; }
-    if (typeof google === "undefined" || !google.accounts || !google.accounts.id) return; // GIS 尚未載入
+    // 先還原本機登入（即使 GIS 尚未載入，也能立刻顯示已登入、不會閃成登出）
+    var restored = restoreAuth();
+    if (restored) { paintAuth(); if (!pulledOnce) { pulledOnce = true; cloudPull(); } }
+    if (typeof google === "undefined" || !google.accounts || !google.accounts.id) return; // GIS 尚未載入，稍後 onGoogleLibraryLoad 再進來
+    if (authReady) return;
     authReady = true;
     google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCred, auto_select: true });
     paintAuth();
   }
   function onCred(resp) {
     idToken = resp.credential;
-    try { var p = JSON.parse(decodeURIComponent(escape(atob(idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))))); gUser = { email: p.email, name: p.name }; } catch (e) { gUser = null; }
+    var exp = 0;
+    try { var p = JSON.parse(decodeURIComponent(escape(atob(idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))))); gUser = { email: p.email, name: p.name }; exp = p.exp || 0; } catch (e) { gUser = null; }
+    // 持久化登入：存 token 與到期時間，換頁重載時還原（token 效期約 1 小時）
+    lsSet("gtoken", { t: idToken, e: exp, u: gUser });
     paintAuth(); cloudPull();
   }
-  function signOut() { idToken = null; gUser = null; try { google.accounts.id.disableAutoSelect(); } catch (e) {} paintAuth(); }
+  // 換頁重載時，若本機存有未過期的登入，先還原，避免「切換頁面就自動登出」
+  function restoreAuth() {
+    var g = lsGet("gtoken", null);
+    if (g && g.t && g.e && g.e > (Date.now() / 1000 + 60)) {
+      idToken = g.t; gUser = g.u || null; return true;
+    }
+    if (g) lsSet("gtoken", null);   // 已過期 → 清掉
+    return false;
+  }
+  function signOut() { idToken = null; gUser = null; lsSet("gtoken", null); try { google.accounts.id.disableAutoSelect(); } catch (e) {} paintAuth(); }
   function paintAuth() {
     var box = document.getElementById("gAuth"); if (!box) return;
     if (gUser) {
