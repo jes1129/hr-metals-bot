@@ -119,6 +119,7 @@
     // 登入狀態一改變就刷新資料庫操作中心 / 訂單頁（顯示/隱藏「未登入」橫幅、載入雲端資料）
     if (window.__refreshConsole) window.__refreshConsole();
     if (window.__refreshOrders) window.__refreshOrders();
+    if (window.__refreshMrp) window.__refreshMrp();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
@@ -731,10 +732,45 @@
         { k: "due", label: "交期", type: "date" },
         { k: "note", label: "備註", wide: true }
       ]
+    },
+    items: {
+      title: "料號 / 庫存", icon: "🧱", table: "items", canAdd: true, canEdit: true, canDelete: true,
+      cols: [
+        { k: "code", label: "料號", filter: true },
+        { k: "name", label: "品名", wide: true },
+        { k: "category", label: "分類", filter: true },
+        { k: "unit", label: "單位" },
+        { k: "stock", label: "庫存", type: "num" },
+        { k: "safety", label: "安全庫存", type: "num" },
+        { k: "on_order", label: "在途", type: "num" },
+        { k: "cost", label: "單價", type: "num" },
+        { k: "note", label: "備註", wide: true }
+      ],
+      sample: [
+        { code: "SUS304-8", name: "不鏽鋼棒 8mm", category: "材料", unit: "支", stock: 120, safety: 200, on_order: 0, cost: 90, note: "" },
+        { code: "CU-8", name: "銅棒 8mm", category: "材料", unit: "支", stock: 500, safety: 100, on_order: 0, cost: 320, note: "" },
+        { code: "SCREW-M4", name: "四線牙螺絲 M4", category: "零件", unit: "顆", stock: 3000, safety: 5000, on_order: 1000, cost: 2, note: "" }
+      ]
+    },
+    bom: {
+      title: "產品用料 (BOM)", icon: "🧩", table: "bom", canAdd: true, canEdit: true, canDelete: true,
+      cols: [
+        { k: "product", label: "產品", filter: true },
+        { k: "item_code", label: "料號", filter: true },
+        { k: "per", label: "每件用量", type: "num" },
+        { k: "note", label: "備註", wide: true }
+      ],
+      sample: [
+        { product: "316螺絲", item_code: "SUS304-8", per: 1, note: "" },
+        { product: "316螺絲", item_code: "SCREW-M4", per: 4, note: "" },
+        { product: "銅接頭", item_code: "CU-8", per: 1, note: "" }
+      ]
     }
   };
   // 訂單狀態流程（看板欄位順序；取消單獨處理）
   var ORDER_FLOW = ["報價", "接單", "生產", "出貨", "結案"];
+  // MRP 需求採計的訂單狀態（已接的單才算真實需求；報價未成單不算）
+  var MRP_DEMAND_STATUS = ["接單", "生產"];
 
   function initDbConsole() {
     var mount = document.getElementById("dbConsole");
@@ -1140,6 +1176,160 @@
     load();
   }
 
+  // ===========================================================================
+  // 庫存 · 料號 · BOM · MRP 缺料建議（mrp.html）
+  //   需求 = Σ(已接訂單數量 × 該產品 BOM 每件用量)；缺口 = 需求 + 安全庫存 − 庫存 − 在途。
+  //   後端沿用通用 CRUD（items / bom 兩張表），不需改 Apps Script。
+  // ===========================================================================
+  function initMrp() {
+    var mount = document.getElementById("mrpView");
+    if (!mount) return;
+    var items = [], bom = [], orders = [];
+    function num(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
+    function ntfmt(n) { return "NT$ " + Math.round(n).toLocaleString(); }
+
+    function pull(t, set) { return dbCall("tList", { table: t }).then(function (d) { if (d && d.rows) { set(d.rows); lsSet("console_" + t, d.rows); } }); }
+    function load() {
+      items = lsGet("console_items", []) || []; bom = lsGet("console_bom", []) || []; orders = lsGet("console_orders", []) || [];
+      render();
+      if (!idToken) return;
+      Promise.all([
+        pull("items", function (r) { items = r; }),
+        pull("bom", function (r) { bom = r; }),
+        pull("orders", function (r) { orders = r; })
+      ]).then(render);
+    }
+    window.__refreshMrp = load;
+
+    function compute() {
+      var demand = {};  // item_code -> 需求量
+      orders.forEach(function (o) {
+        if (MRP_DEMAND_STATUS.indexOf(o.status) < 0) return;
+        bom.forEach(function (b) {
+          if (String(b.product) !== String(o.product)) return;
+          demand[b.item_code] = (demand[b.item_code] || 0) + num(o.qty) * num(b.per);
+        });
+      });
+      return items.map(function (it) {
+        var dem = demand[it.code] || 0;
+        var need = dem + num(it.safety) - num(it.stock) - num(it.on_order);
+        var short = Math.max(0, need);
+        return {
+          id: it.id, code: it.code, name: it.name, unit: it.unit || "",
+          stock: num(it.stock), safety: num(it.safety), on_order: num(it.on_order), cost: num(it.cost),
+          demand: dem, shortage: short, amount: short * num(it.cost),
+          low: num(it.stock) < num(it.safety)
+        };
+      }).sort(function (a, b) { return b.shortage - a.shortage || b.amount - a.amount; });
+    }
+
+    function render() {
+      var list = compute();
+      var lowN = list.filter(function (x) { return x.low; }).length;
+      var shortList = list.filter(function (x) { return x.shortage > 0; });
+      var buyAmt = shortList.reduce(function (a, x) { return a + x.amount; }, 0);
+
+      var kpi = '<div class="okpis">'
+        + kcard("🧱 料號數", list.length + " 項", "")
+        + kcard("⚠️ 低於安全庫存", lowN + " 項", lowN ? "warn" : "")
+        + kcard("🧯 缺料項目", shortList.length + " 項", shortList.length ? "warn" : "")
+        + kcard("🛒 建議採購金額", ntfmt(buyAmt), "accent")
+        + '</div>';
+
+      // 缺料長條圖
+      var chart = "";
+      if (shortList.length) {
+        var mx = 1; shortList.forEach(function (x) { mx = Math.max(mx, x.shortage); });
+        chart = '<div class="ocard"><div class="octitle">缺料量（需補）</div><div class="obars">'
+          + shortList.slice(0, 8).map(function (x) {
+            return '<div class="obar-row"><div class="obar-label">' + escAttr(x.code) + '</div>'
+              + '<div class="obar-track"><div class="obar-fill" style="width:' + Math.round(x.shortage / mx * 100) + '%;background:var(--up)"></div></div>'
+              + '<div class="obar-val">' + x.shortage.toLocaleString() + ' ' + escAttr(x.unit) + '</div></div>';
+          }).join("") + '</div></div>';
+      } else {
+        chart = '<div class="ocard"><div class="octitle">缺料量</div><div class="mrpok">✅ 目前沒有缺料（或尚未有「接單/生產」的訂單與 BOM 可算）。</div></div>';
+      }
+
+      var tools = '<div class="otools">'
+        + '<button class="dbbtn primary" id="mAddItem">＋ 新增料號</button>'
+        + '<button class="dbbtn" id="mAddBom">＋ 新增 BOM</button>'
+        + '<button class="dbbtn" id="mReload">↻ 重算</button>'
+        + (list.length ? "" : '<button class="dbbtn" id="mSample">載入範例資料</button>')
+        + '<a class="dbbtn" href="db.html">🗂️ 在資料庫管理料號/BOM</a>'
+        + '</div>';
+
+      var rowsHTML = list.map(function (x) {
+        return '<tr class="' + (x.shortage > 0 ? "mrpshort" : "") + '" data-edit="' + escAttr(x.id) + '">'
+          + '<td data-label="料號">' + escAttr(x.code) + '</td>'
+          + '<td data-label="品名" class="wide">' + escAttr(x.name || "") + '</td>'
+          + '<td data-label="需求">' + x.demand.toLocaleString() + '</td>'
+          + '<td data-label="庫存"' + (x.low ? ' style="color:var(--up)"' : '') + '>' + x.stock.toLocaleString() + '</td>'
+          + '<td data-label="在途">' + x.on_order.toLocaleString() + '</td>'
+          + '<td data-label="安全庫存">' + x.safety.toLocaleString() + '</td>'
+          + '<td data-label="缺口"><b' + (x.shortage > 0 ? ' style="color:var(--up)"' : '') + '>' + x.shortage.toLocaleString() + '</b></td>'
+          + '<td data-label="建議採購金額">' + (x.shortage > 0 ? ntfmt(x.amount) : "—") + '</td>'
+          + '</tr>';
+      }).join("");
+      var table = '<div class="ocard"><div class="octitle">缺料建議（點一列可編輯庫存；紅色＝需補料）</div>'
+        + '<div class="dbtablewrap"><table class="dbtable"><thead><tr>'
+        + '<th>料號</th><th>品名</th><th>需求</th><th>庫存</th><th>在途</th><th>安全庫存</th><th>缺口</th><th>建議採購</th>'
+        + '</tr></thead><tbody>' + (rowsHTML || '<tr><td colspan="8" style="text-align:center;color:var(--muted)">尚無料號。按「載入範例資料」或「＋ 新增料號」開始。</td></tr>') + '</tbody></table></div></div>';
+
+      mount.innerHTML = (!idToken ? '<div class="dbbanner">🔒 尚未登入：目前顯示本機快取。登入後可編輯並同步到公司試算表。</div>' : "")
+        + kpi + '<div class="ocharts"><div style="grid-column:1 / -1">' + chart + '</div></div>' + tools + table
+        + '<div class="dbfoot">需求＝已接訂單（接單/生產）數量 × 產品 BOM 用量；缺口＝需求＋安全庫存−庫存−在途。資料與訂單同一份公司試算表。</div>';
+      wire(list);
+    }
+    function kcard(label, val, cls) { return '<div class="okpi ' + cls + '"><div class="okpi-l">' + label + '</div><div class="okpi-v">' + escAttr(val) + '</div></div>'; }
+    function wire(list) {
+      var a = document.getElementById("mAddItem"); if (a) a.onclick = function () { if (auth()) openForm2(SCHEMAS.items, null); };
+      var bb = document.getElementById("mAddBom"); if (bb) bb.onclick = function () { if (auth()) openForm2(SCHEMAS.bom, null); };
+      var rl = document.getElementById("mReload"); if (rl) rl.onclick = load;
+      var sp = document.getElementById("mSample"); if (sp) sp.onclick = loadSample;
+      Array.prototype.forEach.call(mount.querySelectorAll(".dbtable tbody tr[data-edit]"), function (tr) {
+        tr.style.cursor = "pointer";
+        tr.onclick = function () { if (!auth()) return; var it = items.filter(function (x) { return String(x.id) === String(tr.getAttribute("data-edit")); })[0]; if (it) openForm2(SCHEMAS.items, it); };
+      });
+    }
+    function auth() { if (!idToken) { alert(CLIENT_ID ? "請先用右上角「使用 Google 帳戶登入」再操作。" : "尚未設定 Google（見說明頁）。"); return false; } return true; }
+    function loadSample() {
+      if (!auth()) return;
+      Promise.all([
+        dbCall("tImport", { table: "items", rows: SCHEMAS.items.sample, header: SCHEMAS.items.cols.map(function (c) { return c.k; }) }),
+        dbCall("tImport", { table: "bom", rows: SCHEMAS.bom.sample, header: SCHEMAS.bom.cols.map(function (c) { return c.k; }) })
+      ]).then(load);
+    }
+    function openForm2(schema, row) {
+      var editing = !!(row && row.id); row = row || {};
+      var fields = schema.cols.map(function (c) {
+        var v = row[c.k] !== undefined ? row[c.k] : "";
+        var input;
+        if (c.type === "num") input = '<input type="number" step="any" data-f="' + c.k + '" value="' + escAttr(v) + '">';
+        else input = '<input data-f="' + c.k + '" value="' + escAttr(v) + '">';
+        return '<label class="dbfield"><span>' + escAttr(c.label) + "</span>" + input + "</label>";
+      }).join("");
+      var ov = document.createElement("div"); ov.className = "dbmodal";
+      ov.innerHTML = '<div class="dbdialog"><h3>' + (editing ? "編輯" : "新增") + " · " + schema.icon + escAttr(schema.title) + "</h3>"
+        + '<div class="dbform">' + fields + "</div>"
+        + '<div class="dbdlgbtns">'
+        + (editing ? '<button class="dbbtn" data-del style="margin-right:auto;color:var(--up)">🗑️ 刪除</button>' : "")
+        + '<button class="dbbtn" data-x>取消</button><button class="dbbtn primary" data-ok>儲存</button></div></div>';
+      document.body.appendChild(ov);
+      function close() { document.body.removeChild(ov); }
+      ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
+      ov.querySelector("[data-x]").onclick = close;
+      var del = ov.querySelector("[data-del]");
+      if (del) del.onclick = function () { if (confirm("確定刪除？")) { dbCall("tRemove", { table: schema.table, id: row.id }).then(load); close(); } };
+      ov.querySelector("[data-ok]").onclick = function () {
+        var out = {}; if (editing) out.id = row.id;
+        Array.prototype.forEach.call(ov.querySelectorAll("[data-f]"), function (el) { out[el.getAttribute("data-f")] = el.value; });
+        dbCall("tUpsert", { table: schema.table, row: out, header: schema.cols.map(function (c) { return c.k; }) }).then(load);
+        close();
+      };
+    }
+    load();
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     if (window.METALS_DATA) initMetals(window.METALS_DATA);
@@ -1149,6 +1339,7 @@
     if (window.CUSTOMERS_DATA) initCustomers(window.CUSTOMERS_DATA);
     if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
     if (document.getElementById("ordersView")) initOrders();     // 訂單 + 老闆儀表板
+    if (document.getElementById("mrpView")) initMrp();            // 庫存 / BOM / MRP
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
   });
 })();

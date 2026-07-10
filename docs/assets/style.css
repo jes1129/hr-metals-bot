@@ -321,3 +321,8 @@ th .arrow { opacity: .5; font-size: 10px; }
   .ocharts { grid-template-columns: 1fr; }
   .okcol { min-width: 150px; }
 }
+
+/* ===== MRP 缺料 ===== */
+.mrpview .dbtable tbody tr.mrpshort td { background: color-mix(in srgb, var(--up) 12%, transparent); }
+.mrpview .dbtable tbody tr.mrpshort:hover td { background: color-mix(in srgb, var(--up) 20%, transparent); }
+.mrpok { color: var(--down); padding: 8px 2px; font-size: 14px; }

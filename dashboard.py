@@ -67,6 +67,7 @@ def _nav(active: str) -> str:
         f'<a{a if active == "customers" else ""} href="customers.html">🎯 客戶</a>'
         f'<a{a if active == "quote" else ""} href="quote.html">🧮 報價</a>'
         f'<a{a if active == "orders" else ""} href="orders.html">📦 訂單</a>'
+        f'<a{a if active == "mrp" else ""} href="mrp.html">📊 庫存·MRP</a>'
         f'<a{a if active == "db" else ""} href="db.html">🗂️ 資料庫</a>'
         f'<a{a if active == "help" else ""} href="help.html">📖 說明</a>'
         "</div>"
@@ -246,6 +247,33 @@ def render_orders_html() -> str:
 
 
 # ===========================================================================
+# 庫存 · 料號 · BOM · MRP 缺料建議（📊 由訂單×BOM 算要補的料）
+# ===========================================================================
+def render_mrp_html() -> str:
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+{_HEAD}
+<title>九上科技 · 庫存與 MRP 缺料建議</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">{_nav("mrp")}{_THEME_BTN}</div>
+    <div class="eyebrow">九上科技 · 智慧儀表板</div>
+    <h1>📊 庫存 · MRP 缺料建議</h1>
+    <div class="sub">由「已接訂單 × 產品用料(BOM)」自動算出要補哪些料、補多少 · 更新於 {now}</div>
+    <div id="mrpView" class="mrpview">
+      <div class="dbloading">載入中…（若一直沒出現，請先用右上角「使用 Google 帳戶登入」）</div>
+    </div>
+    <div class="foot">料號/庫存/BOM 存在公司自己的 Google 試算表（與資料庫操作中心同一份、免費）。</div>
+  </div>
+  <script src="assets/app.js?v={_VER}"></script>
+</body>
+</html>"""
+
+
+# ===========================================================================
 # 說明頁（📖 白話使用教學；給非科技用戶）
 # ===========================================================================
 def render_help_html() -> str:
@@ -325,7 +353,7 @@ def render_help_html() -> str:
       <div class="jump">
         <a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
         <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a>
-        <a href="#f-orders">📦 訂單</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
+        <a href="#f-orders">📦 訂單</a><a href="#f-mrp">📊 庫存·MRP</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
       </div>
     </div>
 
@@ -425,6 +453,26 @@ def render_help_html() -> str:
           </ul>
           <p class="muted">訂單和資料庫是同一份試算表；要批次整理可到「🗂️ 資料庫」的「訂單」分頁。</p>
           <a class="gobtn" href="orders.html">前往訂單儀表板 →</a>
+        </div>
+      </details>
+
+      <details class="acc" id="f-mrp">
+        <summary>📊 庫存 · MRP <span class="sm">— 自動算要補什麼料</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p>先建好兩份基本資料，系統就會自動幫你算「要補哪些料、補多少」：</p>
+          <ol>
+            <li><b>料號 / 庫存</b>：每種材料/零件的料號、品名、<b>庫存量</b>、<b>安全庫存</b>、在途、單價。</li>
+            <li><b>產品用料（BOM）</b>：每個產品要用到哪些料號、<b>每件用量</b>多少。</li>
+          </ol>
+          <p>接著系統用公式自動算：<br>
+          <b>需求</b> ＝ 已接訂單（接單/生產）數量 × 該產品 BOM 用量；<br>
+          <b>缺口</b> ＝ 需求 ＋ 安全庫存 − 庫存 − 在途 → <b>缺口 &gt; 0 就是要補的料</b>。</p>
+          <ul>
+            <li>上方 KPI：料號數、低於安全庫存、缺料項目、<b>建議採購總金額</b>。</li>
+            <li><b>缺料建議表</b>：紅色列＝要補；顯示缺多少、建議採購金額。點一列可改庫存。</li>
+            <li>第一次用可按 <b>「載入範例資料」</b> 看效果（要有「接單/生產」的訂單才算得出缺料）。</li>
+          </ul>
+          <a class="gobtn" href="mrp.html">前往庫存 · MRP →</a>
         </div>
       </details>
     </div>
