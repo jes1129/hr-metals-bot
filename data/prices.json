@@ -151,6 +151,14 @@
       "rate": 32.097,
       "change": null,
       "change_pct": null
+    },
+    {
+      "ts": "2026-07-10T19:09:06.041418+00:00",
+      "price": 13356.5,
+      "price_twd": 428770,
+      "rate": 32.102,
+      "change": 0.0,
+      "change_pct": 0.0
     }
   ],
   "aluminum": [
@@ -305,6 +313,14 @@
       "rate": 32.097,
       "change": null,
       "change_pct": null
+    },
+    {
+      "ts": "2026-07-10T19:09:06.041418+00:00",
+      "price": 3164.0,
+      "price_twd": 101571,
+      "rate": 32.102,
+      "change": 0.0,
+      "change_pct": 0.0
     }
   ],
   "nickel": [
@@ -459,6 +475,14 @@
       "rate": 32.097,
       "change": null,
       "change_pct": null
+    },
+    {
+      "ts": "2026-07-10T19:09:06.041418+00:00",
+      "price": 16355.0,
+      "price_twd": 525028,
+      "rate": 32.102,
+      "change": 0.0,
+      "change_pct": 0.0
     }
   ],
   "steel": [
@@ -611,6 +635,14 @@
       "price": 1295.21,
       "price_twd": 41572,
       "rate": 32.097,
+      "change": 0.0,
+      "change_pct": 0.0
+    },
+    {
+      "ts": "2026-07-10T19:09:06.041418+00:00",
+      "price": 1295.21,
+      "price_twd": 41579,
+      "rate": 32.102,
       "change": 0.0,
       "change_pct": 0.0
     }
