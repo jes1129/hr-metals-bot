@@ -40,17 +40,16 @@ function erpAlertCounts_() {
   return { shortN: shortN, buy: buy, lowN: lowN, overdue: overdue };
 }
 
-// 原料現況（讀網站 signals.json）
+// 原料現況（讀網站 signals.json）— 現價＋今日漲跌%（不做上下線告警）
 function metalsSignalText_() {
   try {
     var r = UrlFetchApp.fetch(EMAIL_SIGNALS_URL, { muteHttpExceptions: true });
     var d = JSON.parse(r.getContentText());
     var lines = ["【原料行情】更新 " + (d.updated || "")];
     (d.metals || []).forEach(function (m) {
-      var mark = m.status === "break_high" ? "🔴漲破上線" : (m.status === "break_low" ? "🟢跌破下線" : "🟢區間內");
-      lines.push("- " + m.name + "：" + (m.price_twd != null ? ("NT$ " + comma_(m.price_twd) + "/噸") : "—") + " " + mark);
+      var arrow = (m.pct == null) ? "" : ((m.pct >= 0 ? " ▲" : " ▼") + Math.abs(m.pct).toFixed(1) + "%");
+      lines.push("- " + m.name + "：" + (m.price_twd != null ? ("NT$ " + comma_(m.price_twd) + "/噸") : "—") + arrow);
     });
-    if ((d.alerts || []).length) lines.push("⚠️ 突破告警：" + d.alerts.join("；"));
     return lines.join("\n");
   } catch (e) { return "【原料行情】暫時取不到。"; }
 }

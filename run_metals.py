@@ -19,23 +19,18 @@ DATA_DIR = os.environ.get("METALS_DATA_DIR", "/data")
 
 
 def _build_signals(history):
-    """原料現況/突破訊號 → 給 email 早報讀取（docs/signals.json，Pages 會 serve）。"""
-    metals_list, alerts = [], []
+    """原料現況（現價＋漲跌%）→ 給 email 早報讀取（docs/signals.json，Pages 會 serve）。"""
+    metals_list = []
     for key, cfg in config.METALS.items():
         series = history.get(key, []) or []
         latest = series[-1] if series else {}
-        status = metals.check_status(key, latest.get("price"))
         metals_list.append({
             "key": key, "name": cfg.get("name", key),
             "price_twd": latest.get("price_twd"), "pct": latest.get("change_pct"),
-            "status": status, "note": cfg.get("note", ""),
+            "note": cfg.get("note", ""),
         })
-        if status == "break_high":
-            alerts.append(cfg.get("name", key) + " 漲破上線（原料變貴，注意成本）")
-        elif status == "break_low":
-            alerts.append(cfg.get("name", key) + " 跌破下線（變便宜，可考慮進貨）")
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
-    return {"updated": now, "metals": metals_list, "alerts": alerts}
+    return {"updated": now, "metals": metals_list}
 
 
 def _read(path, default):
@@ -88,10 +83,6 @@ def main():
     with open(os.path.join("docs", "index.html"), "w", encoding="utf-8") as f:
         f.write(dashboard.render_home(history, jobs_total, sup_total, sup_near, cust_total))
     print("[run_metals] 已更新 docs/metals.html 與 docs/index.html（首頁）")
-
-    if result["alerts"]:
-        import notify
-        notify.send_embeds(result["alerts"], content="**⚠️ 銅鋁突破告警**")
 
 
 if __name__ == "__main__":

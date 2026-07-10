@@ -213,7 +213,7 @@ SCORING_RUBRIC = (
 # =============================================================================
 # 功能 B — 銅鋁監控（LME 倫敦官方價，以台幣顯示）
 # 資料源：Westmetall 公布的 LME 官方結算價（USD/公噸，免金鑰、免瀏覽器）。
-# 台幣：以 Yahoo 的 USDTWD 即時匯率換算。watch 區間為 USD/公噸，請依實際想盯價位調整。
+# 台幣：以 Yahoo 的 USDTWD 即時匯率換算。只顯示現價與漲跌，不做上下線告警（由使用者自行判斷）。
 # =============================================================================
 LME_URL = "https://www.westmetall.com/en/markdaten.php"
 FX_URL = "https://query1.finance.yahoo.com/v8/finance/chart/USDTWD=X"  # USD→TWD 匯率
@@ -225,8 +225,6 @@ METALS = {
         "field": "LME_Cu_cash",  # Westmetall 欄位代碼（現金結算）
         "yh": "HG=F",            # Yahoo 日線回補（COMEX 銅，USD/磅）
         "yh_unit": "lb",         # 需 ×LB_PER_TONNE 換成 USD/公噸
-        "watch_low": 12000,      # 跌破下線 → 告警（USD/公噸）
-        "watch_high": 14000,     # 突破上線 → 告警（USD/公噸）
     },
     "aluminum": {
         "name": "鋁",
@@ -234,15 +232,11 @@ METALS = {
         "field": "LME_Al_cash",
         "yh": "ALI=F",           # Yahoo 日線回補（LME 鋁，USD/公噸）
         "yh_unit": "t",
-        "watch_low": 2900,
-        "watch_high": 3400,
     },
     "nickel": {
         "name": "鎳",
         "en": "NICKEL · LME（不鏽鋼指標）",
-        "field": "LME_Ni_cash",  # 現價/告警用 Westmetall；無 Yahoo 日線→走勢圖靠快照累積
-        "watch_low": 14000,
-        "watch_high": 18000,
+        "field": "LME_Ni_cash",  # 現價用 Westmetall；無 Yahoo 日線→走勢圖靠快照累積
         "note": "不鏽鋼無單一市場價，以鎳為主要成本指標",
     },
     "steel": {
@@ -250,8 +244,6 @@ METALS = {
         "en": "STEEL · HRC（美國熱軋）",
         "yh": "HRC=F",           # 無 Westmetall；現價與日線皆用 Yahoo（美國 HRC 期貨）
         "yh_unit": "short_ton",  # USD/short ton → ×1.10231 換 USD/公噸
-        "watch_low": 1100,
-        "watch_high": 1500,
         "note": "美國熱軋鋼捲基準，與台灣鋼價有差，僅供趨勢參考",
     },
 }

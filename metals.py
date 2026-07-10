@@ -199,58 +199,10 @@ def save_history(history: dict):
 
 
 # ---------------------------------------------------------------------------
-# 突破區間判斷（對應指南第 11、14 頁狀態燈）
-# ---------------------------------------------------------------------------
-def check_status(key: str, price) -> str:
-    """回傳 'break_high' / 'break_low' / 'in_range' / 'unknown'。"""
-    if price is None:
-        return "unknown"
-    cfg = config.METALS[key]
-    if price > cfg["watch_high"]:
-        return "break_high"
-    if price < cfg["watch_low"]:
-        return "break_low"
-    return "in_range"
-
-
-STATUS_LABEL = {
-    "break_high": "突破上線",
-    "break_low": "跌破下線",
-    "in_range": "區間內",
-    "unknown": "無資料",
-}
-
-
-def build_alerts(prices: dict) -> list:
-    """回傳需要 Discord 告警的 embed 卡片（僅突破/跌破時，漲紅跌綠）。"""
-    alerts = []
-    for key, p in prices.items():
-        status = check_status(key, p.get("price"))
-        if status in ("break_high", "break_low"):
-            cfg = config.METALS[key]
-            if status == "break_high":
-                line, color = cfg["watch_high"], 0xC0392B   # 突破上線 → 紅
-            else:
-                line, color = cfg["watch_low"], 0x1E8449    # 跌破下線 → 綠
-            twd = f"（約 NT${p['price_twd']:,}/t）" if p.get("price_twd") else ""
-            alerts.append(
-                {
-                    "title": f"⚠️ {cfg['name']}（{cfg['en']}）{STATUS_LABEL[status]}",
-                    "color": color,
-                    "description": (
-                        f"現價 **US${p['price']:,.0f}/t**{twd}"
-                        f"（關注線 US${line:,}）"
-                    ),
-                }
-            )
-    return alerts
-
-
-# ---------------------------------------------------------------------------
-# 主流程（供 main 呼叫）
+# 只取價/算漲跌，不做上下線告警（由使用者自行判斷）
 # ---------------------------------------------------------------------------
 async def run() -> dict:
-    """取價 → 算漲跌 → 存歷史 → 回傳 {'prices':..., 'alerts':[...]}。"""
+    """取價 → 算漲跌 → 存歷史 → 回傳 {'prices':..., 'history':...}。"""
     prices = await scrape_prices()
     history = load_history()
     # 依歷史最後一筆計算漲跌（USD）
@@ -264,6 +216,5 @@ async def run() -> dict:
             p["change_pct"] = None
     append_history(history, prices)
     save_history(history)
-    alerts = build_alerts(prices)
-    print(f"[metals] 抓到：{prices}；告警 {len(alerts)} 則")
-    return {"prices": prices, "alerts": alerts, "history": history}
+    print(f"[metals] 抓到：{prices}")
+    return {"prices": prices, "history": history}

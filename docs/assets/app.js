@@ -272,8 +272,8 @@
       var last = lastValidPoint(s, "usd");
       var rate = last ? last.rate : null;
 
-      // 現價/漲跌/關注區間
-      var priceEl = panel.querySelector(".price"), chgEl = panel.querySelector(".chg"), watchEl = panel.querySelector(".watch");
+      // 現價/漲跌
+      var priceEl = panel.querySelector(".price"), chgEl = panel.querySelector(".chg");
       if (last && priceEl) priceEl.textContent = unitFmt(convVal(last.usd, rate, uk), uk);
       if (chgEl) {
         var c1 = null;
@@ -288,7 +288,6 @@
           chgEl.style.color = d >= 0 ? cssVar("--up") : cssVar("--down");
         } else chgEl.textContent = "—";
       }
-      if (watchEl) watchEl.textContent = unitFmt(convVal(m.watch_low, rate, uk), uk) + " ~ " + unitFmt(convVal(m.watch_high, rate, uk), uk);
 
       // 期間統計
       setPct(panel.querySelector(".c7"), pctChange(s, 7, uk));
@@ -298,13 +297,6 @@
       var phi = panel.querySelector(".phi"), plo = panel.querySelector(".plo");
       if (phi) phi.textContent = win.length ? unitFmt(Math.max.apply(null, win), uk) : "—";
       if (plo) plo.textContent = win.length ? unitFmt(Math.min.apply(null, win), uk) : "—";
-      // 距關注線（美元基準，單位無關）
-      var dhi = panel.querySelector(".dhi"), dlo = panel.querySelector(".dlo");
-      if (last) {
-        var u = last.usd;
-        if (dhi) { var a = (m.watch_high - u) / u * 100; dhi.textContent = (a >= 0 ? "+" : "") + a.toFixed(1) + "%"; }
-        if (dlo) { var b = (u - m.watch_low) / u * 100; dlo.textContent = (b >= 0 ? "+" : "") + b.toFixed(1) + "%"; }
-      }
 
       // 走勢圖
       var cont = panel.querySelector('.chart[data-chart="' + key + '"]');
@@ -313,10 +305,7 @@
       });
       drawSeries(cont, pts, {
         ma: MA_N,
-        hlines: [
-          { val: convVal(m.watch_high, rate, uk), color: cssVar("--up") },
-          { val: convVal(m.watch_low, rate, uk), color: cssVar("--down") }
-        ],
+        hlines: [],
         fmt: function (v) { return unitFmt(v, uk); }
       });
     }

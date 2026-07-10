@@ -99,11 +99,6 @@ def _hbars(items) -> str:
     return '<div class="hbars">' + "".join(rows) + "</div>"
 
 
-_STATUS_LABEL = {
-    "break_high": "突破上線", "break_low": "跌破下線",
-    "in_range": "區間內", "unknown": "無資料",
-}
-
 
 # ===========================================================================
 # 首頁總覽（簡單、白話、大卡片；給非科技用戶）
@@ -120,22 +115,13 @@ def _hcard(href: str, emoji: str, title: str, lines: str, cta: str) -> str:
 
 
 def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None) -> str:
-    # 原料卡：每個金屬一行白話（買方視角：漲=成本高要注意、跌/區間=OK）
+    # 原料卡：每個金屬一行（現價＋今日漲跌%；不做上下線判斷，由使用者自行判斷）
     metal_lines = []
     for key, cfg in config.METALS.items():
         series = history.get(key, [])
         latest = series[-1] if series else {}
         price_twd = latest.get("price_twd")
         pct = latest.get("change_pct")
-        status = metals_mod.check_status(key, latest.get("price"))
-        if status == "break_high":
-            light, note = "🔴", "漲破上線，原料變貴注意成本"
-        elif status == "break_low":
-            light, note = "🟢", "跌破下線，變便宜可考慮進貨"
-        elif status == "in_range":
-            light, note = "🟢", "區間內，正常不用擔心"
-        else:
-            light, note = "⚪", "尚無資料"
         price_s = f"NT${price_twd:,}/噸" if price_twd else "—"
         if pct is not None:
             arrow = "▲" if pct >= 0 else "▼"
@@ -143,8 +129,7 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
         else:
             pct_s = ""
         metal_lines.append(
-            f'<div class="mrow">{light} <b>{html.escape(cfg["name"])}</b> {price_s} {pct_s}'
-            f'<div class="mnote">{note}</div></div>'
+            f'<div class="mrow"><b>{html.escape(cfg["name"])}</b> {price_s} {pct_s}</div>'
         )
     metals_card = _hcard("metals.html", "🔩", "原料行情", "".join(metal_lines), "看銅鋁鎳鋼走勢")
 
@@ -751,7 +736,6 @@ def render_html(history: dict, daily: dict = None) -> str:
     daily = daily or {}
     metals_data = {}
     panels = []
-    alert_count = 0
     last_update = "—"
 
     for key, cfg in config.METALS.items():
@@ -764,7 +748,6 @@ def render_html(history: dict, daily: dict = None) -> str:
             ]
         metals_data[key] = {
             "name": cfg["name"], "en": cfg["en"],
-            "watch_low": cfg["watch_low"], "watch_high": cfg["watch_high"],
             "series": dseries,
         }
 
@@ -775,9 +758,6 @@ def render_html(history: dict, daily: dict = None) -> str:
         price_twd = latest.get("price_twd")
         rate = latest.get("rate")
         change = latest.get("change")
-        status = metals_mod.check_status(key, price)
-        if status in ("break_high", "break_low"):
-            alert_count += 1
 
         if latest.get("ts"):
             try:
@@ -794,10 +774,6 @@ def render_html(history: dict, daily: dict = None) -> str:
             chg_txt = f'{"+" if nt_chg >= 0 else "−"}NT${abs(nt_chg):,}/t'
         else:
             chg_txt = "—"
-        if rate:
-            watch_txt = f"NT${round(cfg['watch_low']*rate):,}/t ~ NT${round(cfg['watch_high']*rate):,}/t"
-        else:
-            watch_txt = f"US${cfg['watch_low']:,}/t ~ US${cfg['watch_high']:,}/t"
 
         fb = _sparkline([d.get("usd") for d in dseries[-30:]], up=(change or 0) >= 0, w=600, h=200)
 
@@ -806,12 +782,10 @@ def render_html(history: dict, daily: dict = None) -> str:
     <section class="mpanel" data-key="{key}">
       <div class="mhead">
         <div><span class="mname">{html.escape(cfg['name'])}</span><span class="men">{html.escape(cfg['en'])}</span></div>
-        <span class="badge {status}">{_STATUS_LABEL[status]}</span>
       </div>
       <div class="mfigs">
         <div class="fig"><div class="flabel">現價（LME 官方）</div><div class="fval price">{price_txt}</div></div>
         <div class="fig"><div class="flabel">漲跌</div><div class="fval chg">{chg_txt}</div></div>
-        <div class="fig"><div class="flabel">關注區間</div><div class="fval watch">{watch_txt}</div></div>
       </div>
       <div class="mstats">
         <span class="chip">7日 <b class="c7">—</b></span>
@@ -819,11 +793,9 @@ def render_html(history: dict, daily: dict = None) -> str:
         <span class="chip">90日 <b class="c90">—</b></span>
         <span class="chip">期間高 <b class="phi">—</b></span>
         <span class="chip">期間低 <b class="plo">—</b></span>
-        <span class="chip">距上線 <b class="dhi">—</b></span>
-        <span class="chip">距下線 <b class="dlo">—</b></span>
       </div>
       <div class="chart" data-chart="{key}">{fb}</div>
-      <div class="legend"><span class="lg-line"></span>每日收盤（Yahoo）　<span class="lg-ma"></span>MA{config.MA_WINDOW} 均線　<span class="lg-watch"></span>關注線</div>
+      <div class="legend"><span class="lg-line"></span>每日收盤（Yahoo）　<span class="lg-ma"></span>MA{config.MA_WINDOW} 均線</div>
     </section>"""
         )
 
@@ -864,11 +836,10 @@ def render_html(history: dict, daily: dict = None) -> str:
     <div class="topbar">{_nav("metals")}{_THEME_BTN}</div>
     <div class="eyebrow">METALS TRACKER · LME 倫敦金屬交易所</div>
     <h1>銅鋁價格追蹤儀表板</h1>
-    <div class="sub">現價與告警＝LME 官方結算價（Westmetall）· 走勢圖＝每日收盤（Yahoo）· 台幣依匯率換算 · 每日 10:00 與 22:00（台灣時間）更新</div>
+    <div class="sub">現價＝LME 官方結算價（Westmetall）· 走勢圖＝每日收盤（Yahoo）· 台幣依匯率換算 · 每日 10:00 與 22:00（台灣時間）更新</div>
 
     <div class="cards">
       <div class="card"><div class="k">追蹤金屬</div><div class="v">{len(config.METALS)} <span style="font-size:13px;color:var(--muted)">{names}</span></div></div>
-      <div class="card"><div class="k">告警中</div><div class="v">{alert_count} <span style="font-size:13px;color:var(--muted)">項突破區間</span></div></div>
       <div class="card"><div class="k">最後更新</div><div class="v" style="font-size:18px">{last_update}</div></div>
     </div>
 
