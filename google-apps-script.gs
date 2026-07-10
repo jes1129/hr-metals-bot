@@ -210,7 +210,7 @@ function ai_(question, context) {
   if (!key) return { error: "未設定 GEMINI_API_KEY", need_setup: true };
   var sys = "你是九上科技（精密金屬零件加工廠）的 ERP 助手。請用繁體中文、精簡、條列、盡量引用下列資料中的數字回答；"
     + "若資料不足就說明還缺什麼。以下為目前系統資料摘要（JSON）：\n" + JSON.stringify(context || {});
-  var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(key);
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + encodeURIComponent(key);
   var payload = { contents: [{ parts: [{ text: sys + "\n\n使用者問題：" + String(question || "") }] }] };
   try {
     var r = UrlFetchApp.fetch(url, { method: "post", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true });
