@@ -1402,14 +1402,66 @@
         if (!l.length) return "目前沒有低於安全庫存的品項 ✅。";
         return "低於安全庫存的品項：\n" + l.map(function (x) { return "・" + x.code + " " + (x.name || "") + "：庫存 " + num(x.stock) + " / 安全 " + num(x.safety); }).join("\n");
       }
+      if (type === "howto") return OVERVIEW;
       return "";
     }
+
+    // 教學小腦袋（本地，免 Gemini 也能答網站怎麼用）
+    var OVERVIEW = "這個網站是一套免費小型 ERP，最簡單的用法：\n"
+      + "1) 右上角用 Google 登入。\n"
+      + "2) 平常開「🏠 首頁」看重點；情報類（原料/招募/供應商/客戶）在「📈 情報」下拉裡。\n"
+      + "3) 客人詢價 →「🧮 報價」算一算 → 存起來。\n"
+      + "4) 接到單 →「📦 訂單」按＋新增或「從報價轉單」，用看板追進度。\n"
+      + "5) 建好「料號/庫存」和「BOM」後，「📊 庫存·MRP」會自動算要補什麼料。\n"
+      + "6) 任何細節直接打字問我，例如：報價怎麼用、怎麼建訂單、缺料、匯出。\n"
+      + "想更詳細請看「📖 說明」的「🚀 新手上路」。";
+    var HELP_KB = [
+      { k: ["登入", "login", "登陸", "登錄"], a: "登入：點右上角「使用 Google 帳戶登入」→ 選公司帳號。登入後資料才會存進公司試算表、換裝置也看得到；約一小時後要再登一次是正常的。" },
+      { k: ["報價", "估價", "算價"], a: "報價：上面「🧮 報價」→ 選材質(自動帶入最新原料價)→ 填重量(或填長寬高按「計算」)→ 看建議報價 → 按「存這筆」記錄。" },
+      { k: ["轉單", "轉訂單", "報價轉"], a: "報價轉訂單：到「📦 訂單」按「🧮 從報價轉單」，會把最新一筆報價帶成新訂單，可再修改。" },
+      { k: ["訂單", "建單", "接單", "下單", "開單"], a: "訂單：「📦 訂單」按「＋新增訂單」填客戶/品名/數量/單價/交期(金額留空會自動＝數量×單價)。看板每張卡下拉可改狀態(報價→接單→生產→出貨→結案)，點卡片可編輯或刪除。" },
+      { k: ["看板", "狀態", "進度"], a: "狀態看板在「📦 訂單」：欄位是 報價→接單→生產→出貨→結案。改某張訂單卡的下拉，就會移到對應欄位；逾期會標紅。" },
+      { k: ["料號", "庫存", "入庫", "存貨", "料件"], a: "料號/庫存：「📊 庫存·MRP」按「＋新增料號」，或「🗂️ 資料庫」的「料號/庫存」分頁，建每種材料的料號、庫存量、安全庫存、在途、單價。" },
+      { k: ["bom", "用料", "配方", "物料清單"], a: "BOM(產品用料)：「🗂️ 資料庫」的「產品用料(BOM)」分頁，填每個產品用哪些料號、每件用量多少。這是算缺料的依據。" },
+      { k: ["缺料", "mrp", "補什麼", "要補", "補貨", "採購建議"], a: "缺料/MRP：「📊 庫存·MRP」自動算——需求＝已接訂單(接單/生產)數量×BOM用量；缺口＝需求＋安全庫存−庫存−在途。紅色列就是要補的料，還會估建議採購金額。第一次可按「載入範例資料」看效果。" },
+      { k: ["資料庫", "試算表", "增刪改", "編輯資料", "新增資料"], a: "資料庫操作中心「🗂️ 資料庫」：不用開 Google 試算表，站內就能新增/編輯/刪除/搜尋/篩選/匯出 CSV。分頁有：我的名單、收藏標記、報價歷史、訂單、料號、BOM。" },
+      { k: ["收藏", "標記", "備註", "星星"], a: "在供應商/客戶/職缺名單，點星星⭐收藏、選狀態、打備註；勾「只看收藏」只顯示收藏的。會存進試算表。" },
+      { k: ["匯出", "csv", "excel", "下載", "報表"], a: "匯出：資料庫或訂單頁的「⬇ 匯出 CSV」，下載成 Excel 可開的檔案。" },
+      { k: ["深色", "淺色", "主題", "暗", "亮"], a: "右上角 🌙/☀️ 切深色/淺色，設定會記住。" },
+      { k: ["更新", "看不到", "重新整理", "舊的", "沒變", "刷新"], a: "看不到新資料：按 Ctrl+F5 強制重新整理(Mac 是 Cmd+Shift+R)。原料價一天更新兩次，其他名單每天更新。" },
+      { k: ["供應商"], a: "「🏭 供應商」(在 📈情報 下拉裡)：找金屬加工供應商，可依類別篩、勾只看神岡周邊、切地圖看位置。" },
+      { k: ["客戶", "開發"], a: "「🎯 客戶」(在 📈情報 下拉裡)：找可能買精密金屬零件的潛在客戶，可依產業篩、搜尋公司名。" },
+      { k: ["招募", "職缺", "徵才", "薪水", "薪資"], a: "「🔧 招募」(在 📈情報 下拉裡)：追蹤台中金屬加工/品管職缺行情，可搜尋、排序、看薪資分布。" },
+      { k: ["原料", "行情", "價格", "銅價", "鋁價"], a: "「🔩 原料」(在 📈情報 下拉裡)：看銅/鋁/鎳/鋼國際價(換算台幣)走勢，可切單位與期間。漲＝進料成本高要注意。" },
+      { k: ["免費", "要錢", "收費", "費用"], a: "整套免費——跑在 GitHub + Google 的免費額度上，關機也會自己在雲端更新。" },
+      { k: ["手機", "平板"], a: "手機可用：表格會自動變成一張張卡片，好點好讀。" },
+      { k: ["情報", "下拉", "分頁", "選單", "找不到", "在哪"], a: "上面導覽列：🏠首頁、📈情報(點開有 原料/招募/供應商/客戶)、🧮報價、📦訂單、📊庫存·MRP、🤖助手、🗂️資料庫、📖說明。" }
+    ];
+    function matchData(q) {
+      q = String(q || "").toLowerCase();
+      if (/缺料|要補|補料|補貨|採購建議|不夠料/.test(q)) return "short";
+      if (/逾期|過期|延誤|遲交|來不及/.test(q)) return "overdue";
+      if (/營收|業績|收入|營業額|賺多少|這個?月.*(如何|怎樣|多少|概況)/.test(q)) return "kpi";
+      if (/待出貨|要出貨|出貨清單|還沒出/.test(q)) return "ship";
+      if (/低庫存|安全庫存|庫存.*(低|不足|過低|不夠)/.test(q)) return "low";
+      return "";
+    }
+    function matchHelp(q) {
+      var s = String(q || "").toLowerCase();
+      for (var i = 0; i < HELP_KB.length; i++) {
+        if (HELP_KB[i].k.some(function (w) { return s.indexOf(w.toLowerCase()) >= 0; })) return HELP_KB[i].a;
+      }
+      if (/怎麼用|怎用|教我|教學|不會用|不懂|使用方式|操作|入門|上手|new|help|介紹|功能/.test(s)) return OVERVIEW;
+      return "";
+    }
+
     function buildContext() {
       var k = kpi();
       return { 月份: today().slice(0, 7), 本月營收: k.rev, 本月訂單數: k.cnt, 待出貨: k.ship,
         逾期訂單: overdueList().map(function (o) { return { 客戶: o.customer, 品名: o.product, 交期: o.due, 狀態: o.status }; }),
         缺料清單: shortages().map(function (x) { return { 料號: x.code, 品名: x.name, 缺: x.shortage, 建議採購金額: x.amount }; }),
-        低庫存: lowStock().map(function (i) { return { 料號: i.code, 庫存: i.stock, 安全: i.safety }; }) };
+        低庫存: lowStock().map(function (i) { return { 料號: i.code, 庫存: i.stock, 安全: i.safety }; }),
+        網站功能說明: "這是九上科技的免費小型 ERP。分頁：首頁(每日總覽)、情報(原料行情/招募/供應商/客戶)、報價(選材質+重量算報價並存檔)、訂單(建單/報價轉單/狀態看板 報價→接單→生產→出貨→結案/老闆KPI)、庫存·MRP(料號庫存+BOM，自動算缺料採購建議)、資料庫(站內增刪改查所有資料表、匯出CSV)、助手(你)。右上角 Google 登入才會存資料。看不到新資料按 Ctrl+F5。全部免費。回答使用問題時請用這份說明、給具體步驟。" };
     }
 
     function msg(role, text) {
@@ -1417,20 +1469,31 @@
       var b = document.createElement("div"); b.className = "aimsg " + role; b.textContent = text;
       log.appendChild(b); log.scrollTop = log.scrollHeight; return b;
     }
-    function askAI(q) {
+    function askText(q) {
       msg("user", q);
+      var dt = matchData(q);
+      if (dt) { msg("ai", ans(dt)); return; }          // 資料問題 → 本地精準計算（最快最準）
       var wait = msg("ai", "🤖 思考中…");
       dbCall("ai", { question: q, context: buildContext() }).then(function (d) {
-        if (d && d.ok && d.text) { wait.textContent = d.text; return; }
-        if (d && d.need_setup) { wait.textContent = "🤖 自由提問需要一次性啟用 Gemini（把免費金鑰加到 Apps Script 的「指令碼屬性」GEMINI_API_KEY，見說明頁）。\n在此之前，上面的快速問答已可即時使用（免設定）。"; return; }
-        if (d && d.error) { wait.textContent = "⚠️ AI 回覆失敗：" + d.error; return; }
-        wait.textContent = "⚠️ 目前無法連到 AI（可能未登入或未設定）。可先用上方快速問答。";
+        if (d && d.ok && d.text) { wait.textContent = d.text; return; }   // Gemini 已啟用 → 什麼都能答
+        var local = matchHelp(q);                        // 沒 Gemini → 本地教學小腦袋
+        if (local) {
+          wait.textContent = local + "\n\n💡 想讓我像 ChatGPT 一樣什麼都能聊？在「📖 說明→🤖 AI 助手」照步驟啟用免費 Gemini（一次就好）。";
+          return;
+        }
+        if (d && d.need_setup) {
+          wait.textContent = "這題要啟用 Gemini 我才能自由回答～設定很簡單(一次就好)，「📖 說明→🤖 AI 助手」有圖解。\n或先問我：報價怎麼用 / 怎麼建訂單 / 缺料 / 這個網站怎麼用。";
+          return;
+        }
+        if (d && d.error) { wait.textContent = "⚠️ AI 失敗：" + d.error + "\n先試試：報價怎麼用 / 缺料 / 逾期。"; return; }
+        wait.textContent = "這題我暫時答不了(可能未登入或未設定 Gemini)。試試問：報價怎麼用 / 怎麼建訂單 / 缺料 / 這個網站怎麼用。";
       });
     }
 
     mount.innerHTML =
       (!idToken ? '<div class="dbbanner">🔒 尚未登入：登入後我才能讀公司資料回答你。</div>' : "")
       + '<div class="aichips">'
+      + '<button class="dbbtn" data-q="howto">📖 教我用這個網站</button>'
       + '<button class="dbbtn" data-q="short">🧯 本月要補哪些料？</button>'
       + '<button class="dbbtn" data-q="overdue">⏰ 哪些訂單逾期？</button>'
       + '<button class="dbbtn" data-q="kpi">💰 本月營收概況</button>'
@@ -1438,15 +1501,15 @@
       + '<button class="dbbtn" data-q="low">⚠️ 庫存過低品項</button>'
       + '</div>'
       + '<div class="ailog" id="aiLog"></div>'
-      + '<div class="airow"><input id="aiInput" class="dbsearch" placeholder="用一句話問我：訂單、庫存、營收、要補什麼料…"><button class="dbbtn primary" id="aiSend">送出</button></div>'
-      + '<div class="dbfoot">快速問答＝即時本地計算（免設定、免費）。自由提問＝用免費 Gemini（需在 Apps Script 加金鑰，見說明頁）。</div>';
+      + '<div class="airow"><input id="aiInput" class="dbsearch" placeholder="什麼都能問：報價怎麼用？怎麼建訂單？這個月缺什麼料？"><button class="dbbtn primary" id="aiSend">送出</button></div>'
+      + '<div class="dbfoot">打字問我「網站怎麼用、報價/訂單/庫存怎麼操作、缺料/逾期/營收」都行。啟用免費 Gemini 後(見說明)可像 ChatGPT 一樣自由聊。</div>';
 
-    msg("ai", "嗨！我是九上 ERP 助手 🤖\n點上面的按鈕可立刻查「缺料 / 逾期 / 營收 / 待出貨 / 低庫存」；或直接打字問我。");
+    msg("ai", "嗨！我是九上 ERP 助手 🤖\n・想學怎麼用？點「📖 教我用這個網站」，或直接問我「報價怎麼用」「怎麼建訂單」——再小的問題都可以。\n・想查資料？點按鈕或問「這個月缺什麼料 / 哪些逾期 / 營收多少」。");
     Array.prototype.forEach.call(mount.querySelectorAll(".aichips [data-q]"), function (b) {
       b.onclick = function () { var t = b.getAttribute("data-q"); msg("user", b.textContent.replace(/^\S+\s/, "")); msg("ai", ans(t)); };
     });
     var input = document.getElementById("aiInput"), send = document.getElementById("aiSend");
-    function go() { var v = (input.value || "").trim(); if (!v) return; input.value = ""; if (!idToken) { msg("user", v); msg("ai", "請先用右上角 Google 登入，我才能讀資料回答你。"); return; } askAI(v); }
+    function go() { var v = (input.value || "").trim(); if (!v) return; input.value = ""; if (!idToken) { msg("user", v); var lh = matchHelp(v); msg("ai", lh || "先用右上角 Google 登入，我才能查你的資料；不過網站用法我現在就能教，例如問「報價怎麼用」。"); return; } askText(v); }
     send.onclick = go;
     input.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
     pullAll();
