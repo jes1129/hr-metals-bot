@@ -7,9 +7,9 @@
  */
 window.APP_CONFIG = {
   // ① Google 登入用的 OAuth Web 用戶端 ID（Google Cloud → 憑證 → OAuth 用戶端）
-  GOOGLE_CLIENT_ID: "",
+  GOOGLE_CLIENT_ID: "509401161611-606pnfvcp974le4q0mbdjnjb3g6sq7m4.apps.googleusercontent.com",
   // ② Apps Script Web App 部署網址（讀寫試算表/Drive 的後端）
   APPS_SCRIPT_URL: "",
   // ③（選填）擁有試算表的 Google 帳號 email（顯示用）
-  OWNER_EMAIL: ""
+  OWNER_EMAIL: "champ.ma999@gmail.com"
 };
