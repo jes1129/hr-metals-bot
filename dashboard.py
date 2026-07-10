@@ -23,9 +23,13 @@ _VER = datetime.datetime.utcnow().strftime("%Y%m%d%H%M")
 _HEAD = (
     '<meta charset="utf-8">\n'
     '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-    f'<link rel="stylesheet" href="assets/style.css?v={_VER}">'
+    f'<link rel="stylesheet" href="assets/style.css?v={_VER}">\n'
+    f'<script src="config.js?v={_VER}"></script>\n'
+    '<script src="https://accounts.google.com/gsi/client" async defer></script>'
 )
-_THEME_BTN = '<button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button>'
+# topbar 右側：Google 登入狀態 + 深淺色切換
+_THEME_BTN = ('<span id="gAuth" class="gauth"></span>'
+              '<button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button>')
 
 
 def _fmt(v, nd=1):
@@ -505,6 +509,7 @@ def render_jobs_html(stats: dict, summary: dict, jobs: list,
         <input id="jobSearch" placeholder="搜尋職缺 / 公司關鍵字…">
         <select id="jobArea"><option value="">全部行政區</option></select>
         <label class="prionly"><input type="checkbox" id="jobPriority"> 只看 ⭐ 符合招募重點</label>
+        <label class="prionly"><input type="checkbox" id="jobFav"> 只看我收藏的</label>
         <span class="count" id="jobCount"></span>
       </div>
       <table>
@@ -513,6 +518,7 @@ def render_jobs_html(stats: dict, summary: dict, jobs: list,
           <th class="sortable" data-key="company">公司 <span class="arrow"></span></th>
           <th class="sortable" data-key="district">行政區 <span class="arrow"></span></th>
           <th class="sortable num" data-key="salary">月薪 <span class="arrow"></span></th>
+          <th>追蹤（狀態/備註）</th>
         </tr></thead>
         <tbody id="jobBody">{fb_rows}</tbody>
       </table>
@@ -556,9 +562,9 @@ def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: 
         fb_rows += (
             f"<tr><td>{star}{name_cell}</td><td>{html.escape(s.get('category',''))}</td>"
             f"<td>{html.escape(s.get('area','') or '—')}</td><td>{html.escape(_size(s))}</td>"
-            f"<td>{_SRC_LABEL.get(s.get('source'),'')}</td></tr>"
+            f"<td>{_SRC_LABEL.get(s.get('source'),'')}</td><td></td></tr>"
         )
-    fb_rows = fb_rows or '<tr><td colspan="5">—</td></tr>'
+    fb_rows = fb_rows or '<tr><td colspan="6">—</td></tr>'
 
     sup_min = [
         {"name": s["name"], "url": s.get("url", ""), "area": s.get("area", ""),
@@ -629,6 +635,7 @@ def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: 
         <input id="supSearch" placeholder="搜尋公司 / 地區關鍵字…">
         <select id="supCat"><option value="">全部能力類別</option></select>
         <label class="prionly"><input type="checkbox" id="supNear"> 只看 ⭐ 神岡周邊</label>
+        <label class="prionly"><input type="checkbox" id="supFav"> 只看我收藏的</label>
         <div class="btnbar viewbar"><button data-view="list" class="on">📋 清單</button><button data-view="map">🗺️ 地圖</button></div>
         <span class="count" id="supCount"></span>
       </div>
@@ -640,6 +647,7 @@ def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: 
           <th class="sortable" data-key="area">地區 <span class="arrow"></span></th>
           <th>規模</th>
           <th class="sortable" data-key="source">來源 <span class="arrow"></span></th>
+          <th>追蹤（狀態/備註）</th>
         </tr></thead>
         <tbody id="supBody">{fb_rows}</tbody>
       </table>
@@ -718,7 +726,13 @@ def render_quote_html(history: dict) -> str:
       <div class="qr"><div class="qk">總成本（料＋工）</div><div class="qv" id="qTotal">—</div></div>
       <div class="qr big"><div class="qk">建議報價</div><div class="qv" id="qQuote">—</div></div>
     </div>
-    <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。</div>
+    <div style="text-align:center;margin:14px 0 18px"><button id="qSave" class="gbtn" style="font-size:14px;padding:9px 18px">💾 存這筆報價</button></div>
+
+    <div class="panel">
+      <h3>🧾 報價歷史</h3>
+      <div id="qHistory" style="padding:8px 16px 14px"></div>
+    </div>
+    <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。報價歷史存在瀏覽器（設定 Google 後改存公司試算表、可同步）。</div>
   </div>
 {data_script}
   <script src="assets/app.js?v={_VER}"></script>
@@ -742,8 +756,8 @@ def render_customers_html(profile: dict, stats: dict, summary: dict, customers: 
                 if s.get("url") else html.escape(s["name"][:34]))
         fb_rows += (f"<tr><td>{name}</td><td>{html.escape(s.get('category',''))}</td>"
                     f"<td>{html.escape(s.get('area','') or '—')}</td>"
-                    f"<td>{_SRC_LABEL.get(s.get('source'),'')}</td></tr>")
-    fb_rows = fb_rows or '<tr><td colspan="4">—</td></tr>'
+                    f"<td>{_SRC_LABEL.get(s.get('source'),'')}</td><td></td></tr>")
+    fb_rows = fb_rows or '<tr><td colspan="5">—</td></tr>'
 
     cus_min = [
         {"name": s["name"], "url": s.get("url", ""), "area": s.get("area", ""),
@@ -806,6 +820,7 @@ def render_customers_html(profile: dict, stats: dict, summary: dict, customers: 
       <div class="toolbar" style="padding:0 16px 12px">
         <input id="custSearch" placeholder="搜尋公司 / 地區關鍵字…">
         <select id="custCat"><option value="">全部產業</option></select>
+        <label class="prionly"><input type="checkbox" id="custFav"> 只看我收藏的</label>
         <span class="count" id="custCount"></span>
       </div>
       <table>
@@ -814,6 +829,7 @@ def render_customers_html(profile: dict, stats: dict, summary: dict, customers: 
           <th class="sortable" data-key="category">目標產業 <span class="arrow"></span></th>
           <th class="sortable" data-key="area">地區 <span class="arrow"></span></th>
           <th class="sortable" data-key="source">來源 <span class="arrow"></span></th>
+          <th>追蹤（狀態/備註）</th>
         </tr></thead>
         <tbody id="custBody">{fb_rows}</tbody>
       </table>

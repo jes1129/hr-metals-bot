@@ -41,6 +41,100 @@
     return out;
   }
 
+  // ---------- 資料庫層（Google 登入 + Apps Script 試算表；未設定/未登入則存本機瀏覽器） ----------
+  var CFG = window.APP_CONFIG || {};
+  var CLIENT_ID = CFG.GOOGLE_CLIENT_ID || "";
+  var API = CFG.APPS_SCRIPT_URL || "";
+  var idToken = null, gUser = null;   // 登入後的 Google ID token 與使用者
+  function lsGet(k, def) { try { var v = JSON.parse(localStorage.getItem("db_" + k)); return v == null ? def : v; } catch (e) { return def; } }
+  function lsSet(k, v) { try { localStorage.setItem("db_" + k, JSON.stringify(v)); } catch (e) {} }
+  var Marks = lsGet("marks", {});     // { id: {status, note, fav} }
+  var Quotes = lsGet("quotes", []);   // [ {ts, material, weight, price, proc, margin, quote} ]
+
+  // 呼叫 Apps Script 後端（帶 Google ID token；未設定/未登入則略過、只用本機快取）
+  function dbCall(action, payload) {
+    if (!API || !idToken) return Promise.resolve(null);
+    return fetch(API, {
+      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: action, token: idToken, payload: payload || {} })
+    }).then(function (r) { return r.json(); }).catch(function () { return null; });
+  }
+  function cloudPull() {   // 登入後從試算表拉最新，覆蓋本機並刷新畫面
+    dbCall("load", {}).then(function (d) {
+      if (!d || d.error) return;
+      if (d.marks) { Marks = d.marks; lsSet("marks", Marks); }
+      if (d.quotes) { Quotes = d.quotes; lsSet("quotes", Quotes); }
+      if (window.__refreshMarks) window.__refreshMarks();
+      if (window.__refreshQuotes) window.__refreshQuotes();
+    });
+  }
+  function markGet(id) { return Marks[id] || { status: "", note: "", fav: false }; }
+  function markSet(id, m) { Marks[id] = m; lsSet("marks", Marks); dbCall("markSet", { id: id, value: m }); }
+  function quoteAdd(q) { Quotes.unshift(q); lsSet("quotes", Quotes); dbCall("quoteAdd", { value: q }); }
+  function quoteDel(ts) { Quotes = Quotes.filter(function (x) { return x.ts !== ts; }); lsSet("quotes", Quotes); dbCall("quoteDel", { ts: ts }); }
+
+  // ---------- Google 登入（Identity Services；只用身分，不要敏感權限） ----------
+  var authReady = false;
+  function initAuth() {
+    if (authReady) return;
+    var box = document.getElementById("gAuth"); if (!box) return;
+    if (!CLIENT_ID) { box.innerHTML = '<span class="gnote" title="見 README Google 設定">未設定 Google</span>'; return; }
+    if (typeof google === "undefined" || !google.accounts || !google.accounts.id) return; // GIS 尚未載入
+    authReady = true;
+    google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCred, auto_select: true });
+    paintAuth();
+  }
+  function onCred(resp) {
+    idToken = resp.credential;
+    try { var p = JSON.parse(decodeURIComponent(escape(atob(idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))))); gUser = { email: p.email, name: p.name }; } catch (e) { gUser = null; }
+    paintAuth(); cloudPull();
+  }
+  function signOut() { idToken = null; gUser = null; try { google.accounts.id.disableAutoSelect(); } catch (e) {} paintAuth(); }
+  function paintAuth() {
+    var box = document.getElementById("gAuth"); if (!box) return;
+    if (gUser) {
+      box.innerHTML = '<span class="guser" title="' + escAttr(gUser.email) + '">👤 ' + escAttr(gUser.name || gUser.email) + '</span><button id="gOut" class="gbtn">登出</button>';
+      var o = document.getElementById("gOut"); if (o) o.onclick = signOut;
+    } else {
+      box.innerHTML = '<div id="gBtn"></div>';
+      try { google.accounts.id.renderButton(document.getElementById("gBtn"), { type: "standard", size: "medium", text: "signin_with", shape: "pill" }); google.accounts.id.prompt(); } catch (e) {}
+    }
+  }
+  window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
+  function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
+
+  var STATUS = ["", "已聯絡", "合作中", "不合適"];
+  function escAttr(s) { return String(s || "").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+  function favSpan(id) { return '<span class="mkfav' + (markGet(id).fav ? " on" : "") + '" data-id="' + escAttr(id) + '" title="收藏">' + (markGet(id).fav ? "⭐" : "☆") + "</span> "; }
+  // Google 日曆 / Gmail 預填深連結（免 OAuth、免敏感權限）
+  function calLink(title) { return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(title); }
+  function gmailLink(su, body) { return "https://mail.google.com/mail/?view=cm&fs=1&su=" + encodeURIComponent(su) + "&body=" + encodeURIComponent(body || ""); }
+  function markCell(id, name) {
+    var m = markGet(id); name = name || "";
+    var opts = STATUS.map(function (o) { return '<option value="' + o + '"' + (m.status === o ? " selected" : "") + ">" + (o || "—狀態—") + "</option>"; }).join("");
+    var acts = '<a class="mkact" target="_blank" rel="noopener" href="' + calLink("追蹤／拜訪 " + name) + '" title="加到 Google 日曆提醒">📅</a>' +
+      '<a class="mkact" target="_blank" rel="noopener" href="' + gmailLink("關於合作 — " + name, "您好，我是九上科技，想與貴公司洽談合作…") + '" title="用 Gmail 寄開發信">✉️</a>';
+    return '<td class="mkcell"><select class="mkstat" data-id="' + escAttr(id) + '">' + opts + "</select>" +
+      '<input class="mknote" data-id="' + escAttr(id) + '" value="' + escAttr(m.note) + '" placeholder="備註…">' +
+      '<div class="mkacts">' + acts + "</div></td>";
+  }
+  // 於名錄 tbody 綁定「收藏/狀態/備註」事件（委派），idOf(row元素)->id
+  function attachMarks(tbody) {
+    tbody.addEventListener("change", function (e) {
+      var el = e.target, id = el.getAttribute && el.getAttribute("data-id"); if (!id) return;
+      var m = markGet(id);
+      if (el.classList.contains("mkstat")) m.status = el.value;
+      else if (el.classList.contains("mknote")) m.note = el.value;
+      else return;
+      markSet(id, m);
+    });
+    tbody.addEventListener("click", function (e) {
+      var el = e.target; if (!el.classList || !el.classList.contains("mkfav")) return;
+      var id = el.getAttribute("data-id"); var m = markGet(id); m.fav = !m.fav; markSet(id, m);
+      el.textContent = m.fav ? "⭐" : "☆"; el.classList.toggle("on", m.fav);
+    });
+  }
+
   // ---------- 通用時序圖：pts=[{ts,val}] ----------
   function drawSeries(container, pts, opts) {
     opts = opts || {};
@@ -260,7 +354,7 @@
 
   function initJobs(JOBS) {
     var searchEl = document.getElementById("jobSearch"), areaEl = document.getElementById("jobArea");
-    var priEl = document.getElementById("jobPriority");
+    var priEl = document.getElementById("jobPriority"), favEl = document.getElementById("jobFav");
     var countEl = document.getElementById("jobCount"), tbody = document.getElementById("jobBody");
     var sort = { key: "salary", dir: -1 };
 
@@ -279,9 +373,10 @@
     function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
     function render() {
       var q = (searchEl && searchEl.value.trim().toLowerCase()) || "", area = (areaEl && areaEl.value) || "";
-      var priOnly = priEl && priEl.checked;
+      var priOnly = priEl && priEl.checked, favOnly = favEl && favEl.checked;
       var rows = JOBS.filter(function (j) {
         if (priOnly && !j.is_priority) return false;
+        if (favOnly && !markGet(j.url || j.title).fav) return false;
         if (area && (j.district || "其他") !== area) return false;
         if (q && (j.title + " " + j.company).toLowerCase().indexOf(q) < 0) return false;
         return true;
@@ -292,14 +387,18 @@
       });
       if (countEl) countEl.textContent = rows.length + " / " + JOBS.length + " 筆";
       tbody.innerHTML = rows.map(function (j) {
+        var id = j.url || j.title;
         var star = j.is_priority ? '<span class="star">⭐</span> ' : "";
-        return '<tr><td>' + star + '<a href="' + esc(j.url) + '" target="_blank" rel="noopener">' + esc(j.title.slice(0, 40)) +
-          "</a></td><td>" + esc(j.company.slice(0, 22)) + "</td><td>" + esc(j.district || "其他") + '</td><td class="num">' + salTxt(j) + "</td></tr>";
-      }).join("") || '<tr><td colspan="4" style="color:var(--muted)">找不到符合的職缺</td></tr>';
+        return '<tr><td>' + favSpan(id) + star + '<a href="' + esc(j.url) + '" target="_blank" rel="noopener">' + esc(j.title.slice(0, 40)) +
+          "</a></td><td>" + esc(j.company.slice(0, 22)) + "</td><td>" + esc(j.district || "其他") + '</td><td class="num">' + salTxt(j) + "</td>" + markCell(id, j.company || j.title) + "</tr>";
+      }).join("") || '<tr><td colspan="5" style="color:var(--muted)">找不到符合的職缺</td></tr>';
     }
+    window.__refreshMarks = render;
+    attachMarks(tbody);
     if (searchEl) searchEl.addEventListener("input", render);
     if (areaEl) areaEl.addEventListener("change", render);
     if (priEl) priEl.addEventListener("change", render);
+    if (favEl) favEl.addEventListener("change", render);
     document.querySelectorAll("th.sortable").forEach(function (th) {
       th.addEventListener("click", function () {
         var k = th.getAttribute("data-key");
@@ -327,6 +426,7 @@
   function initSuppliers(SUP) {
     var searchEl = document.getElementById("supSearch"), catEl = document.getElementById("supCat");
     var nearEl = document.getElementById("supNear"), countEl = document.getElementById("supCount");
+    var favEl = document.getElementById("supFav");
     var tbody = document.getElementById("supBody");
     var sort = { key: "name", dir: 1 };
     function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
@@ -340,9 +440,10 @@
     }
     function render() {
       var q = (searchEl && searchEl.value.trim().toLowerCase()) || "";
-      var cat = (catEl && catEl.value) || "", nearOnly = nearEl && nearEl.checked;
+      var cat = (catEl && catEl.value) || "", nearOnly = nearEl && nearEl.checked, favOnly = favEl && favEl.checked;
       var rows = SUP.filter(function (s) {
         if (nearOnly && !s.is_near) return false;
+        if (favOnly && !markGet(s.url || s.name).fav) return false;
         if (cat && s.category !== cat) return false;
         if (q && (s.name + " " + s.area + " " + (s.address || "")).toLowerCase().indexOf(q) < 0) return false;
         return true;
@@ -353,15 +454,19 @@
       });
       if (countEl) countEl.textContent = rows.length + " / " + SUP.length + " 家";
       tbody.innerHTML = rows.map(function (s) {
-        var star = s.is_near ? '<span class="star">⭐</span> ' : "";
+        var id = s.url || s.name;
+        var near = s.is_near ? '<span class="star">⭐</span> ' : "";
         var name = s.url ? '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.name.slice(0, 34)) + "</a>" : esc(s.name.slice(0, 34));
-        return "<tr><td>" + star + name + "</td><td>" + esc(s.category) + "</td><td>" +
-          esc(s.area || s.address || "—") + "</td><td>" + esc(s.size || "—") + "</td><td>" + esc(s.source) + "</td></tr>";
-      }).join("") || '<tr><td colspan="5" style="color:var(--muted)">找不到符合的供應商</td></tr>';
+        return "<tr><td>" + favSpan(id) + near + name + "</td><td>" + esc(s.category) + "</td><td>" +
+          esc(s.area || s.address || "—") + "</td><td>" + esc(s.size || "—") + "</td><td>" + esc(s.source) + "</td>" + markCell(id, s.name) + "</tr>";
+      }).join("") || '<tr><td colspan="6" style="color:var(--muted)">找不到符合的供應商</td></tr>';
     }
+    window.__refreshMarks = render;
+    attachMarks(tbody);
     if (searchEl) searchEl.addEventListener("input", render);
     if (catEl) catEl.addEventListener("change", render);
     if (nearEl) nearEl.addEventListener("change", render);
+    if (favEl) favEl.addEventListener("change", render);
     document.querySelectorAll("th.sortable").forEach(function (th) {
       th.addEventListener("click", function () {
         var k = th.getAttribute("data-key");
@@ -432,6 +537,7 @@
   // ============================================================ 客戶開發雷達
   function initCustomers(CUS) {
     var searchEl = document.getElementById("custSearch"), catEl = document.getElementById("custCat");
+    var favEl = document.getElementById("custFav");
     var countEl = document.getElementById("custCount"), tbody = document.getElementById("custBody");
     var sort = { key: "name", dir: 1 };
     function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
@@ -443,8 +549,9 @@
       });
     }
     function render() {
-      var q = (searchEl && searchEl.value.trim().toLowerCase()) || "", cat = (catEl && catEl.value) || "";
+      var q = (searchEl && searchEl.value.trim().toLowerCase()) || "", cat = (catEl && catEl.value) || "", favOnly = favEl && favEl.checked;
       var rows = CUS.filter(function (s) {
+        if (favOnly && !markGet(s.url || s.name).fav) return false;
         if (cat && s.category !== cat) return false;
         if (q && (s.name + " " + s.area + " " + (s.address || "")).toLowerCase().indexOf(q) < 0) return false;
         return true;
@@ -455,12 +562,16 @@
       });
       if (countEl) countEl.textContent = rows.length + " / " + CUS.length + " 家";
       tbody.innerHTML = rows.map(function (s) {
+        var id = s.url || s.name;
         var name = s.url ? '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.name.slice(0, 34)) + "</a>" : esc(s.name.slice(0, 34));
-        return "<tr><td>" + name + "</td><td>" + esc(s.category) + "</td><td>" + esc(s.area || "—") + "</td><td>" + esc(s.source) + "</td></tr>";
-      }).join("") || '<tr><td colspan="4" style="color:var(--muted)">找不到符合的客戶</td></tr>';
+        return "<tr><td>" + favSpan(id) + name + "</td><td>" + esc(s.category) + "</td><td>" + esc(s.area || "—") + "</td><td>" + esc(s.source) + "</td>" + markCell(id, s.name) + "</tr>";
+      }).join("") || '<tr><td colspan="5" style="color:var(--muted)">找不到符合的客戶</td></tr>';
     }
+    window.__refreshMarks = render;
+    attachMarks(tbody);
     if (searchEl) searchEl.addEventListener("input", render);
     if (catEl) catEl.addEventListener("change", render);
+    if (favEl) favEl.addEventListener("change", render);
     document.querySelectorAll("th.sortable").forEach(function (th) {
       th.addEventListener("click", function () {
         var k = th.getAttribute("data-key");
@@ -508,7 +619,30 @@
     matEl.addEventListener("change", onMat);
     [wEl, pEl, procEl, mgEl].forEach(function (e) { e.addEventListener("input", calc); });
     document.getElementById("qCalc").addEventListener("click", calcWeight);
-    onMat();
+
+    // 報價歷史（存/列/刪）
+    var histEl = document.getElementById("qHistory"), saveBtn = document.getElementById("qSave");
+    function renderHist() {
+      if (!histEl) return;
+      histEl.innerHTML = Quotes.length ? Quotes.map(function (q) {
+        var d = new Date(q.ts); var ds = (d.getMonth() + 1) + "/" + d.getDate() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+        return '<div class="qh"><div><b>' + escAttr(q.material) + "</b>　" + q.weight + "kg × NT$" + q.price +
+          (q.proc ? "　+工 " + q.proc : "") + "　利 " + q.margin + "% → <b style='color:var(--accent)'>" + ntd(q.quote) + "</b>" +
+          '<div class="mnote">' + ds + "</div></div><button class=\"qdel\" data-ts=\"" + q.ts + "\">刪除</button></div>";
+      }).join("") : '<div class="mnote" style="padding:10px 4px">尚無報價紀錄（算好後按「💾 存這筆」）</div>';
+    }
+    window.__refreshQuotes = renderHist;
+    if (saveBtn) saveBtn.addEventListener("click", function () {
+      var w = parseFloat(wEl.value) || 0, p = parseFloat(pEl.value) || 0;
+      if (!(w && p)) { alert("請先填重量與料價"); return; }
+      var proc = parseFloat(procEl.value) || 0, mg = parseFloat(mgEl.value) || 0;
+      quoteAdd({ ts: Date.now(), material: cur().name, weight: w, price: p, proc: proc, margin: mg, quote: Math.round((w * p + proc) * (1 + mg / 100)) });
+      renderHist();
+    });
+    if (histEl) histEl.addEventListener("click", function (e) {
+      if (e.target.classList.contains("qdel")) { quoteDel(parseInt(e.target.getAttribute("data-ts"), 10)); renderHist(); }
+    });
+    onMat(); renderHist();
   }
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -518,5 +652,6 @@
     if (window.SUPPLIERS_DATA) { initSuppliers(window.SUPPLIERS_DATA); initSupplierMap(window.SUPPLIERS_DATA); }
     if (window.QUOTE_MATERIALS) initQuote(window.QUOTE_MATERIALS);
     if (window.CUSTOMERS_DATA) initCustomers(window.CUSTOMERS_DATA);
+    initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
   });
 })();

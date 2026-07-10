@@ -3,12 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="assets/style.css?v=202607092251">
+<link rel="stylesheet" href="assets/style.css?v=202607100320">
+<script src="config.js?v=202607100320"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <title>報價試算器 · 九上科技</title>
 </head>
 <body>
   <div class="wrap">
-    <div class="topbar"><div class="nav"><a href="index.html">🏠 首頁</a><a href="metals.html">🔩 原料</a><a href="jobs.html">🔧 招募</a><a href="suppliers.html">🏭 供應商</a><a href="customers.html">🎯 客戶</a><a class="on" href="quote.html">🧮 報價</a></div><button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button></div>
+    <div class="topbar"><div class="nav"><a href="index.html">🏠 首頁</a><a href="metals.html">🔩 原料</a><a href="jobs.html">🔧 招募</a><a href="suppliers.html">🏭 供應商</a><a href="customers.html">🎯 客戶</a><a class="on" href="quote.html">🧮 報價</a></div><span id="gAuth" class="gauth"></span><button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button></div>
     <div class="eyebrow">QUOTE · 原料成本 / 報價試算</div>
     <h1>報價試算器</h1>
     <div class="sub">選材質、填重量，用<b>當前原料行情</b>幫你算料錢＋建議報價 · 料價已帶入最新價、可自行修改</div>
@@ -41,9 +43,15 @@
       <div class="qr"><div class="qk">總成本（料＋工）</div><div class="qv" id="qTotal">—</div></div>
       <div class="qr big"><div class="qk">建議報價</div><div class="qv" id="qQuote">—</div></div>
     </div>
-    <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。</div>
+    <div style="text-align:center;margin:14px 0 18px"><button id="qSave" class="gbtn" style="font-size:14px;padding:9px 18px">💾 存這筆報價</button></div>
+
+    <div class="panel">
+      <h3>🧾 報價歷史</h3>
+      <div id="qHistory" style="padding:8px 16px 14px"></div>
+    </div>
+    <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。報價歷史存在瀏覽器（設定 Google 後改存公司試算表、可同步）。</div>
   </div>
-<script>window.QUOTE_MATERIALS = [{"key": "copper", "name": "銅", "nt": 420.2, "density": 8.96, "live": true}, {"key": "aluminum", "name": "鋁", "nt": 100.8, "density": 2.7, "live": true}, {"key": "stainless", "name": "不鏽鋼(304)", "nt": 90.0, "density": 7.93, "live": false, "note": "不鏽鋼無即時行情，預設為參考值，請填你的實際採購價"}, {"key": "steel", "name": "鋼(碳鋼)", "nt": 41.3, "density": 7.85, "live": true}];</script>
-  <script src="assets/app.js?v=202607092251"></script>
+<script>window.QUOTE_MATERIALS = [{"key": "copper", "name": "銅", "nt": 428.1, "density": 8.96, "live": true}, {"key": "aluminum", "name": "鋁", "nt": 101.4, "density": 2.7, "live": true}, {"key": "stainless", "name": "不鏽鋼(304)", "nt": 90.0, "density": 7.93, "live": false, "note": "不鏽鋼無即時行情，預設為參考值，請填你的實際採購價"}, {"key": "steel", "name": "鋼(碳鋼)", "nt": 41.3, "density": 7.85, "live": true}];</script>
+  <script src="assets/app.js?v=202607100320"></script>
 </body>
 </html>

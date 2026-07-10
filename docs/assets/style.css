@@ -184,6 +184,27 @@ th .arrow { opacity: .5; font-size: 10px; }
 .prionly input { accent-color: var(--accent); }
 .star { font-size: 12px; }
 
+/* Google 登入區（topbar 右側） */
+.topbar .tbright, .topbar { }
+.gauth { display: inline-flex; align-items: center; margin-right: 8px; vertical-align: middle; }
+.gauth .guser { font-size: 12.5px; color: var(--text); margin-right: 6px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gauth .gbtn { cursor: pointer; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--chip-border); background: var(--chip-bg); color: var(--muted); }
+.gauth .gnote { font-size: 11px; color: var(--muted2); }
+
+/* 追蹤欄（收藏/狀態/備註 + 日曆/Gmail） */
+.mkfav { cursor: pointer; font-size: 15px; }
+.mkfav.on { color: #f1c40f; }
+.mkcell { min-width: 180px; }
+.mkcell .mkstat { font-size: 12px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+.mkcell .mknote { font-size: 12px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); width: 96px; margin-left: 4px; }
+.mkcell .mkacts { margin-top: 4px; display: flex; gap: 8px; }
+.mkcell .mkact { text-decoration: none; font-size: 14px; }
+
+/* 報價歷史列 */
+.qh { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 2px; border-top: 1px solid var(--line2); font-size: 13.5px; }
+.qh:first-child { border-top: 0; }
+.qh .qdel { cursor: pointer; font-size: 12px; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--muted); }
+
 .foot { color: var(--muted2); font-size: 12px; margin-top: 14px; }
 @media (max-width: 640px) {
   .cards, .cards.four { grid-template-columns: 1fr 1fr; }
