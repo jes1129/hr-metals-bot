@@ -56,3 +56,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# deploy nudge: 觸發 Pages 部署以套用新 config.js
