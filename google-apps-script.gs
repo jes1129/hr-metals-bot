@@ -28,6 +28,7 @@ function doPost(e) {
       case "markSet":  markSet_(p.id, p.value, email); out = { ok: true }; break;
       case "quoteAdd": quoteAdd_(p.value, email); out = { ok: true }; break;
       case "quoteDel": quoteDel_(p.ts); out = { ok: true }; break;
+      case "driveSave": out = driveSave_(p.quotes, email); break;
       default:         out = { error: "unknown action" };
     }
     return json_(out);
@@ -91,6 +92,24 @@ function quoteDel_(ts) {
   var vals = sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), 1).getValues();
   for (var i = vals.length - 1; i >= 1; i--) if (Number(vals[i][0]) === Number(ts)) sh.deleteRow(i + 1);
 }
+// ---- 把報價歷史另存成一份 Google 試算表到 Drive（回傳連結）----
+var DRIVE_FOLDER_ID = "";  // 選填：報價單存放資料夾 ID（留空存 Drive 根目錄）
+function driveSave_(quotes, by) {
+  quotes = quotes || [];
+  var name = "九上報價單_" + Utilities.formatDate(new Date(), "Asia/Taipei", "yyyyMMdd_HHmm");
+  var ss = SpreadsheetApp.create(name);
+  var sh = ss.getSheets()[0];
+  sh.appendRow(["時間", "材質", "重量(kg)", "料價(NT$/kg)", "加工費", "利潤%", "建議報價", "建立者"]);
+  quotes.forEach(function (q) {
+    sh.appendRow([new Date(q.ts), q.material, q.weight, q.price, q.proc, q.margin, q.quote, by]);
+  });
+  var file = DriveApp.getFileById(ss.getId());
+  if (DRIVE_FOLDER_ID) {
+    try { DriveApp.getFolderById(DRIVE_FOLDER_ID).addFile(file); DriveApp.getRootFolder().removeFile(file); } catch (e) {}
+  }
+  return { ok: true, url: ss.getUrl(), name: name };
+}
+
 function json_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }

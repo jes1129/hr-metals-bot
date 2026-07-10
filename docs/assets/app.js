@@ -642,6 +642,18 @@
     if (histEl) histEl.addEventListener("click", function (e) {
       if (e.target.classList.contains("qdel")) { quoteDel(parseInt(e.target.getAttribute("data-ts"), 10)); renderHist(); }
     });
+    var driveBtn = document.getElementById("qDrive");
+    if (driveBtn) driveBtn.addEventListener("click", function () {
+      if (needLogin()) { alert("請先用右上角「Google 登入」，才能存到公司 Drive。"); return; }
+      if (!API || !idToken) { alert("尚未設定 Google（見說明），目前報價只存在本機。"); return; }
+      if (!Quotes.length) { alert("尚無報價紀錄，先算好並「存這筆」。"); return; }
+      driveBtn.textContent = "⏳ 存檔中…"; driveBtn.disabled = true;
+      dbCall("driveSave", { quotes: Quotes }).then(function (d) {
+        driveBtn.textContent = "📄 報價歷史另存到 Drive"; driveBtn.disabled = false;
+        if (d && d.url) { window.open(d.url, "_blank"); }
+        else alert("存檔失敗，請稍後再試。");
+      });
+    });
     onMat(); renderHist();
   }
 
