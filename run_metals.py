@@ -42,6 +42,9 @@ def main():
     # 資料庫操作中心（純靜態外殼，資料登入後由前端載入）
     with open(os.path.join("docs", "db.html"), "w", encoding="utf-8") as f:
         f.write(dashboard.render_db_html())
+    # 訂單 + 老闆儀表板（純靜態外殼，訂單登入後由前端載入）
+    with open(os.path.join("docs", "orders.html"), "w", encoding="utf-8") as f:
+        f.write(dashboard.render_orders_html())
 
     # 首頁總覽數字（跨 data 檔，可能落後數小時，可接受）
     jobs = _read(os.path.join(DATA_DIR, "jobs.json"), [])

@@ -283,3 +283,41 @@ th .arrow { opacity: .5; font-size: 10px; }
   .dbtable td.dbact { justify-content: flex-end; }
   .dbtable td.dbact::before { content: ""; }
 }
+
+/* ===== 訂單 + 老闆儀表板 ===== */
+.okpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 10px 0 16px; }
+.okpi { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
+.okpi-l { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.okpi-v { font-size: 1.5rem; font-weight: 700; color: var(--text); }
+.okpi.accent .okpi-v { color: var(--accent); }
+.okpi.warn { border-color: var(--up); }
+.okpi.warn .okpi-v { color: var(--up); }
+.ocharts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.ocard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.octitle { font-size: 13.5px; color: var(--muted); margin-bottom: 10px; }
+.obars .obar-row { display: flex; align-items: center; gap: 10px; margin: 5px 0; }
+.obar-label { width: 54px; font-size: 12.5px; color: var(--text); text-align: right; flex-shrink: 0; }
+.obar-track { flex: 1; background: var(--line2); border-radius: 6px; height: 14px; overflow: hidden; }
+.obar-fill { height: 100%; background: var(--accent); border-radius: 6px; }
+.obar-val { min-width: 84px; text-align: right; font-size: 12.5px; color: var(--text); }
+.otools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+.otools a.dbbtn { text-decoration: none; }
+.okanban { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.okcol { flex: 1; min-width: 176px; background: var(--line2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.okhead { font-weight: 600; color: var(--text); font-size: 14px; display: flex; justify-content: space-between; }
+.okhead span { background: var(--chip-bg); border: 1px solid var(--chip-border); border-radius: 999px; padding: 0 8px; font-size: 12px; color: var(--muted); }
+.oksum { font-size: 12px; color: var(--muted); margin: 2px 0 8px; }
+.ocardk { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 9px 10px; margin-bottom: 8px; cursor: pointer; }
+.ocardk:hover { border-color: var(--accent); }
+.ocardk.od { border-left-color: var(--up); }
+.ock-cust { font-weight: 600; color: var(--text); font-size: 13.5px; }
+.ock-prod { color: var(--muted); font-size: 12.5px; margin: 2px 0 6px; }
+.ock-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text); margin-bottom: 8px; gap: 8px; }
+.ock-meta .od { color: var(--up); }
+.ock-move { width: 100%; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--chip-border); background: var(--bg); color: var(--text); font-size: 12.5px; }
+.ock-empty { color: var(--muted2); text-align: center; padding: 10px 0; }
+@media (max-width: 720px) {
+  .okpis { grid-template-columns: 1fr 1fr; }
+  .ocharts { grid-template-columns: 1fr; }
+  .okcol { min-width: 150px; }
+}

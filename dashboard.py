@@ -66,6 +66,7 @@ def _nav(active: str) -> str:
         f'<a{a if active == "suppliers" else ""} href="suppliers.html">🏭 供應商</a>'
         f'<a{a if active == "customers" else ""} href="customers.html">🎯 客戶</a>'
         f'<a{a if active == "quote" else ""} href="quote.html">🧮 報價</a>'
+        f'<a{a if active == "orders" else ""} href="orders.html">📦 訂單</a>'
         f'<a{a if active == "db" else ""} href="db.html">🗂️ 資料庫</a>'
         f'<a{a if active == "help" else ""} href="help.html">📖 說明</a>'
         "</div>"
@@ -218,6 +219,33 @@ def render_db_html() -> str:
 
 
 # ===========================================================================
+# 訂單 + 老闆 KPI 儀表板（📦 建單/看板/營收圖；資料走 orders 資料表）
+# ===========================================================================
+def render_orders_html() -> str:
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+{_HEAD}
+<title>九上科技 · 訂單與老闆儀表板</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">{_nav("orders")}{_THEME_BTN}</div>
+    <div class="eyebrow">九上科技 · 智慧儀表板</div>
+    <h1>📦 訂單 · 老闆儀表板</h1>
+    <div class="sub">一眼看營收與待辦：本月營收、待出貨、逾期，加狀態看板 · 更新於 {now}</div>
+    <div id="ordersView" class="ordersview">
+      <div class="dbloading">載入中…（若一直沒出現，請先用右上角「使用 Google 帳戶登入」）</div>
+    </div>
+    <div class="foot">訂單存在公司自己的 Google 試算表（與資料庫操作中心同一份、免費、多裝置同步）。</div>
+  </div>
+  <script src="assets/app.js?v={_VER}"></script>
+</body>
+</html>"""
+
+
+# ===========================================================================
 # 說明頁（📖 白話使用教學；給非科技用戶）
 # ===========================================================================
 def render_help_html() -> str:
@@ -297,7 +325,7 @@ def render_help_html() -> str:
       <div class="jump">
         <a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
         <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a>
-        <a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
+        <a href="#f-orders">📦 訂單</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
       </div>
     </div>
 
@@ -381,6 +409,22 @@ def render_help_html() -> str:
           </ol>
           <p class="muted">👇 下面「試玩看看」可以直接體驗報價怎麼算。</p>
           <a class="gobtn" href="quote.html">前往報價 →</a>
+        </div>
+      </details>
+
+      <details class="acc" id="f-orders">
+        <summary>📦 訂單 · 老闆儀表板 <span class="sm">— 建單、看板、營收圖</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p>把接到的單記進來，老闆一眼看營收與進度。</p>
+          <ul>
+            <li><b>上方 KPI 卡</b>：本月營收、本月訂單數、待出貨、逾期未出（逾期會標紅）。</li>
+            <li><b>狀態看板</b>：報價 → 接單 → 生產 → 出貨 → 結案。每張訂單卡下方的下拉選單改狀態，就會移到對應欄位；點卡片可編輯或刪除。</li>
+            <li><b>營收圖</b>：近 6 個月營收長條圖、訂單狀態分佈。</li>
+            <li><b>＋ 新增訂單</b>：填客戶、品名、數量、單價（金額留空會自動＝數量×單價）、交期。</li>
+            <li><b>🧮 從報價轉單</b>：一鍵把最新一筆報價帶成新訂單。</li>
+          </ul>
+          <p class="muted">訂單和資料庫是同一份試算表；要批次整理可到「🗂️ 資料庫」的「訂單」分頁。</p>
+          <a class="gobtn" href="orders.html">前往訂單儀表板 →</a>
         </div>
       </details>
     </div>

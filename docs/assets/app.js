@@ -116,8 +116,9 @@
       // 只放「Sign in with Google」按鈕，不呼叫 One Tap prompt()（避免自動彈窗與未登入時的 console 噪音）
       try { google.accounts.id.renderButton(document.getElementById("gBtn"), { type: "standard", size: "medium", text: "signin_with", shape: "pill" }); } catch (e) {}
     }
-    // 登入狀態一改變就刷新資料庫操作中心（顯示/隱藏「未登入」橫幅、載入雲端資料）
+    // 登入狀態一改變就刷新資料庫操作中心 / 訂單頁（顯示/隱藏「未登入」橫幅、載入雲端資料）
     if (window.__refreshConsole) window.__refreshConsole();
+    if (window.__refreshOrders) window.__refreshOrders();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
@@ -716,8 +717,24 @@
         { k: "price", label: "料價", type: "num" },
         { k: "quote", label: "報價NT$", type: "num" }
       ]
+    },
+    orders: {
+      title: "訂單", icon: "📦", table: "orders", canAdd: true, canEdit: true, canDelete: true,
+      cols: [
+        { k: "customer", label: "客戶", filter: true },
+        { k: "product", label: "品名", wide: true },
+        { k: "qty", label: "數量", type: "num" },
+        { k: "price", label: "單價", type: "num" },
+        { k: "amount", label: "金額", type: "num" },
+        { k: "status", label: "狀態", type: "select", opts: ["報價", "接單", "生產", "出貨", "結案", "取消"], filter: true, stat: true },
+        { k: "order_date", label: "下單日", type: "date" },
+        { k: "due", label: "交期", type: "date" },
+        { k: "note", label: "備註", wide: true }
+      ]
     }
   };
+  // 訂單狀態流程（看板欄位順序；取消單獨處理）
+  var ORDER_FLOW = ["報價", "接單", "生產", "出貨", "結案"];
 
   function initDbConsole() {
     var mount = document.getElementById("dbConsole");
@@ -959,6 +976,170 @@
     load(state.cur);
   }
 
+  // ===========================================================================
+  // 訂單 + 老闆 KPI 儀表板（orders.html）— 讀 orders 資料表，做 KPI/看板/營收圖
+  //   後端沿用通用 CRUD（table="orders"），不需改 Apps Script。
+  // ===========================================================================
+  function initOrders() {
+    var mount = document.getElementById("ordersView");
+    if (!mount) return;
+    var ORD = SCHEMAS.orders;
+    var rows = [];
+    function ck() { return "console_orders"; }
+    function amt(o) { var a = Number(o.amount); if (!isNaN(a) && o.amount !== "" && o.amount != null) return a; var q = Number(o.qty) || 0, p = Number(o.price) || 0; return q * p; }
+    function todayStr() { var d = new Date(); return d.getFullYear() + "-" + z(d.getMonth() + 1) + "-" + z(d.getDate()); }
+    function z(n) { return (n < 10 ? "0" : "") + n; }
+    function ym(s) { s = String(s || ""); return s.length >= 7 ? s.slice(0, 7) : ""; }
+    function ntfmt(n) { return "NT$ " + Math.round(n).toLocaleString(); }
+    function overdue(o) { return o.due && String(o.due) < todayStr() && ORDER_FLOW.indexOf(o.status) >= 0 && o.status !== "出貨" && o.status !== "結案"; }
+
+    function load() {
+      rows = lsGet(ck(), []) || [];
+      render();
+      if (!idToken) return;
+      dbCall("tList", { table: "orders" }).then(function (d) {
+        if (!d || d.error || !d.rows) return;
+        rows = d.rows; lsSet(ck(), rows); render();
+      });
+    }
+    window.__refreshOrders = load;
+
+    function kpis() {
+      var tm = todayStr().slice(0, 7), rev = 0, cnt = 0, ship = 0, late = 0;
+      rows.forEach(function (o) {
+        if (o.status === "取消") return;
+        if (ym(o.order_date) === tm) { rev += amt(o); cnt++; }
+        if (o.status === "接單" || o.status === "生產") ship++;
+        if (overdue(o)) late++;
+      });
+      return { rev: rev, cnt: cnt, ship: ship, late: late };
+    }
+    function barsHTML(pairs, money) {
+      var mx = 1; pairs.forEach(function (p) { mx = Math.max(mx, p[1]); });
+      return '<div class="obars">' + pairs.map(function (p) {
+        return '<div class="obar-row"><div class="obar-label">' + escAttr(p[0]) + '</div>'
+          + '<div class="obar-track"><div class="obar-fill" style="width:' + Math.round(p[1] / mx * 100) + '%"></div></div>'
+          + '<div class="obar-val">' + (money ? ntfmt(p[1]) : p[1]) + '</div></div>';
+      }).join("") + '</div>';
+    }
+    function revenueByMonth() {
+      var out = [], d = new Date();
+      for (var i = 5; i >= 0; i--) { var m = new Date(d.getFullYear(), d.getMonth() - i, 1); out.push([m.getFullYear() + "-" + z(m.getMonth() + 1), 0]); }
+      var idx = {}; out.forEach(function (p, i) { idx[p[0]] = i; });
+      rows.forEach(function (o) { if (o.status === "取消") return; var k = ym(o.order_date); if (idx[k] != null) out[idx[k]][1] += amt(o); });
+      return out.map(function (p) { return [p[0].slice(2), p[1]]; });  // 顯示 YY-MM
+    }
+    function statusCounts() {
+      return ORDER_FLOW.map(function (s) { return [s, rows.filter(function (o) { return o.status === s; }).length]; });
+    }
+
+    function render() {
+      var k = kpis();
+      var kpiHTML = '<div class="okpis">'
+        + kcard("💰 本月營收", ntfmt(k.rev), "accent")
+        + kcard("🧾 本月訂單", k.cnt + " 筆", "")
+        + kcard("🚚 待出貨", k.ship + " 筆", "")
+        + kcard("⏰ 逾期未出", k.late + " 筆", k.late ? "warn" : "")
+        + '</div>';
+      var charts = '<div class="ocharts">'
+        + '<div class="ocard"><div class="octitle">近 6 個月營收</div>' + barsHTML(revenueByMonth(), true) + '</div>'
+        + '<div class="ocard"><div class="octitle">訂單狀態分佈</div>' + barsHTML(statusCounts(), false) + '</div>'
+        + '</div>';
+      var tools = '<div class="otools">'
+        + '<button class="dbbtn primary" id="oAdd">＋ 新增訂單</button>'
+        + '<button class="dbbtn" id="oConv">🧮 從報價轉單</button>'
+        + '<a class="dbbtn" href="db.html">🗂️ 在資料庫管理全部訂單</a>'
+        + '</div>';
+      // 看板
+      var board = '<div class="okanban">' + ORDER_FLOW.map(function (st) {
+        var cards = rows.filter(function (o) { return o.status === st; });
+        var sum = cards.reduce(function (a, o) { return a + amt(o); }, 0);
+        var body = cards.map(function (o) {
+          return '<div class="ocardk' + (overdue(o) ? " od" : "") + '" data-edit="' + escAttr(o.id) + '">'
+            + '<div class="ock-cust">' + escAttr(o.customer || "（未填客戶）") + '</div>'
+            + '<div class="ock-prod">' + escAttr(o.product || "") + '</div>'
+            + '<div class="ock-meta"><span>' + ntfmt(amt(o)) + '</span>'
+            + (o.due ? '<span class="' + (overdue(o) ? "od" : "") + '">📅 ' + escAttr(o.due) + '</span>' : '') + '</div>'
+            + '<select class="ock-move" data-id="' + escAttr(o.id) + '">'
+            + ORDER_FLOW.concat(["取消"]).map(function (s) { return '<option' + (s === st ? " selected" : "") + '>' + s + '</option>'; }).join("")
+            + '</select></div>';
+        }).join("") || '<div class="ock-empty">—</div>';
+        return '<div class="okcol"><div class="okhead">' + st + ' <span>' + cards.length + '</span></div>'
+          + '<div class="oksum">' + ntfmt(sum) + '</div>' + body + '</div>';
+      }).join("") + '</div>';
+
+      mount.innerHTML = (!idToken ? '<div class="dbbanner">🔒 尚未登入：目前顯示本機快取。登入後可新增/更新訂單並同步到公司試算表。</div>' : "")
+        + kpiHTML + charts + tools + board
+        + '<div class="dbfoot">訂單資料存在公司 Google 試算表（與資料庫操作中心同一份）。</div>';
+      wire();
+    }
+    function kcard(label, val, cls) {
+      return '<div class="okpi ' + cls + '"><div class="okpi-l">' + label + '</div><div class="okpi-v">' + escAttr(val) + '</div></div>';
+    }
+    function wire() {
+      var add = document.getElementById("oAdd"); if (add) add.onclick = function () { if (auth()) openOrderForm(null); };
+      var conv = document.getElementById("oConv"); if (conv) conv.onclick = fromQuote;
+      Array.prototype.forEach.call(mount.querySelectorAll(".ocardk"), function (c) {
+        c.onclick = function (e) { if (e.target.classList.contains("ock-move")) return; if (auth()) openOrderForm(findRow(c.getAttribute("data-edit"))); };
+      });
+      Array.prototype.forEach.call(mount.querySelectorAll(".ock-move"), function (sel) {
+        sel.onclick = function (e) { e.stopPropagation(); };
+        sel.onchange = function () { if (!auth()) { load(); return; } moveStatus(sel.getAttribute("data-id"), sel.value); };
+      });
+    }
+    function auth() { if (!idToken) { alert(CLIENT_ID ? "請先用右上角「使用 Google 帳戶登入」再操作。" : "尚未設定 Google（見說明頁）。"); return false; } return true; }
+    function findRow(id) { return rows.filter(function (o) { return String(o.id) === String(id); })[0] || null; }
+    function moveStatus(id, st) {
+      var o = findRow(id); if (o) o.status = st; lsSet(ck(), rows); render();
+      dbCall("tUpsert", { table: "orders", row: { id: id, status: st }, header: ORD.cols.map(function (c) { return c.k; }) }).then(function (d) { if (d && d.ok) load(); });
+    }
+    function save(row) {
+      if ((row.amount === "" || row.amount == null) && (row.qty || row.price)) row.amount = (Number(row.qty) || 0) * (Number(row.price) || 0);
+      if (row.id) { var f = findRow(row.id); if (f) for (var kk in row) f[kk] = row[kk]; }
+      else { row.id = "tmp" + Date.now(); rows.unshift(row); }
+      lsSet(ck(), rows); render();
+      dbCall("tUpsert", { table: "orders", row: row, header: ORD.cols.map(function (c) { return c.k; }) }).then(function (d) { if (d && d.ok) load(); });
+    }
+    function fromQuote() {
+      if (!auth()) return;
+      if (!Quotes || !Quotes.length) { alert("尚無報價紀錄。請先到「報價」頁算一筆並「存這筆」。"); return; }
+      var q = Quotes[0];
+      openOrderForm({ product: q.material || "", qty: 1, price: q.quote || 0, amount: q.quote || 0, status: "報價", order_date: todayStr() }, "已帶入最新一筆報價（" + (q.material || "") + " " + ntfmt(q.quote || 0) + "），可修改");
+    }
+    function openOrderForm(row, hint) {
+      var editing = !!(row && row.id); row = row || { status: "報價", order_date: todayStr() };
+      var fields = ORD.cols.map(function (c) {
+        var v = row[c.k] !== undefined ? row[c.k] : "";
+        var input;
+        if (c.type === "select") input = '<select data-f="' + c.k + '">' + c.opts.map(function (o) { return '<option' + (String(v) === o ? " selected" : "") + '>' + escAttr(o) + "</option>"; }).join("") + "</select>";
+        else if (c.type === "date") input = '<input type="date" data-f="' + c.k + '" value="' + escAttr(v) + '">';
+        else if (c.type === "num") input = '<input type="number" step="any" data-f="' + c.k + '" value="' + escAttr(v) + '"' + (c.k === "amount" ? ' placeholder="留空=數量×單價"' : '') + '>';
+        else input = '<input data-f="' + c.k + '" value="' + escAttr(v) + '">';
+        return '<label class="dbfield"><span>' + escAttr(c.label) + "</span>" + input + "</label>";
+      }).join("");
+      var ov = document.createElement("div");
+      ov.className = "dbmodal";
+      ov.innerHTML = '<div class="dbdialog"><h3>' + (editing ? "編輯訂單" : "新增訂單") + "</h3>"
+        + (hint ? '<div class="dbnote" style="margin-bottom:10px">💡 ' + escAttr(hint) + '</div>' : "")
+        + '<div class="dbform">' + fields + "</div>"
+        + '<div class="dbdlgbtns">'
+        + (editing ? '<button class="dbbtn" data-del style="margin-right:auto;color:var(--up)">🗑️ 刪除</button>' : "")
+        + '<button class="dbbtn" data-x>取消</button><button class="dbbtn primary" data-ok>儲存</button></div></div>';
+      document.body.appendChild(ov);
+      function close() { document.body.removeChild(ov); }
+      ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
+      ov.querySelector("[data-x]").onclick = close;
+      var del = ov.querySelector("[data-del]");
+      if (del) del.onclick = function () { if (confirm("確定刪除這筆訂單？")) { rows = rows.filter(function (o) { return String(o.id) !== String(row.id); }); lsSet(ck(), rows); render(); dbCall("tRemove", { table: "orders", id: row.id }); close(); } };
+      ov.querySelector("[data-ok]").onclick = function () {
+        var out = {}; if (editing) out.id = row.id;
+        Array.prototype.forEach.call(ov.querySelectorAll("[data-f]"), function (el) { out[el.getAttribute("data-f")] = el.value; });
+        save(out); close();
+      };
+    }
+    load();
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     if (window.METALS_DATA) initMetals(window.METALS_DATA);
@@ -967,6 +1148,7 @@
     if (window.QUOTE_MATERIALS) initQuote(window.QUOTE_MATERIALS);
     if (window.CUSTOMERS_DATA) initCustomers(window.CUSTOMERS_DATA);
     if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
+    if (document.getElementById("ordersView")) initOrders();     // 訂單 + 老闆儀表板
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
   });
 })();
