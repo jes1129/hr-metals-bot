@@ -190,6 +190,10 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
         '<div class="he">🗂️</div><div class="ht">九上資料庫</div>'
         '<div class="hl"><div class="mnote">站內直接管理：訂單/料號/BOM/名單/報價（免開試算表）</div></div>'
         '<div class="hcta">開啟資料庫 →</div></a>')
+    cards.append(_hcard(
+        "help.html", "📖", "使用說明",
+        '<div class="mnote">新手上路、每項功能怎麼用、常見問題（不會用先看這裡）</div>',
+        "看教學"))
 
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     return f"""<!doctype html>
