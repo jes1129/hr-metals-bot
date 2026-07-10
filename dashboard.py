@@ -191,6 +191,12 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
         '<div class="he">🗂️</div><div class="ht">九上資料庫</div>'
         '<div class="hl"><div class="mnote">站內直接管理：訂單/料號/BOM/名單/報價（免開試算表）</div></div>'
         '<div class="hcta">開啟資料庫 →</div></a>')
+    # NotebookLM 知識庫快捷卡（href 由 config.js 的 NOTEBOOK_URL 於前端設定，未填則連 notebooklm.google.com）
+    cards.append(
+        '<a class="hcard" id="nbCard" href="https://notebooklm.google.com" target="_blank" rel="noopener">'
+        '<div class="he">🧠</div><div class="ht">NotebookLM 知識庫</div>'
+        '<div class="hl"><div class="mnote">把 ERP 現況＋公司文件變 AI 知識庫：問答、生語音簡報</div></div>'
+        '<div class="hcta">開啟知識庫 →</div></a>')
     cards.append(_hcard(
         "help.html", "📖", "使用說明",
         '<div class="mnote">新手上路、每項功能怎麼用、常見問題（不會用先看這裡）</div>',
@@ -212,6 +218,7 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
     <div class="hcards">{''.join(cards)}</div>
     <div class="foot">原料價／招募／供應商每日自動更新；報價用最新原料行情試算。全部免費、關機也會自己跑。</div>
   </div>
+  <script>(function(){{var u=(window.APP_CONFIG||{{}}).NOTEBOOK_URL;var c=document.getElementById("nbCard");if(c&&u)c.href=u;}})();</script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
@@ -405,7 +412,7 @@ def render_help_html() -> str:
       <div class="jump">
         <a href="#start">🚀 新手上路</a><a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
         <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a>
-        <a href="#f-orders">📦 訂單</a><a href="#f-mrp">📊 庫存·MRP</a><a href="#f-ai">🤖 助手</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
+        <a href="#f-orders">📦 訂單</a><a href="#f-mrp">📊 庫存·MRP</a><a href="#f-ai">🤖 助手</a><a href="#f-notebook">🧠 NotebookLM</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
       </div>
     </div>
 
@@ -562,7 +569,23 @@ def render_help_html() -> str:
           <a class="gobtn" href="assistant.html">前往 AI 助手 →</a>
         </div>
       </details>
+
+      <details class="acc" id="f-notebook">
+        <summary>🧠 NotebookLM 知識庫 <span class="sm">— 進階／選用</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p><b>NotebookLM</b> 是 Google 的免費 AI 筆記工具。我們每天自動把公司的 ERP 現況（訂單、庫存、缺料、營收、往來重點）寫成一份 Google 文件；你把這份文件、加上公司自己的文件（SOP、報價政策、產品規格、合約…）放進 NotebookLM，它就變成一個<b>公司專屬 AI 知識庫</b>：</p>
+          <ul>
+            <li>🔎 <b>問答附出處</b>：問「這個月要補什麼料？」「跟大雅精密往來如何？」「我們報價怎麼抓？」。</li>
+            <li>🎧 <b>音檔導覽</b>：把資料變成兩人對談的 Podcast，巡廠/開車用聽的。</li>
+            <li>📋 <b>自動生成</b>：FAQ、教育訓練大綱、簡報、重點摘要。</li>
+          </ul>
+          <div class="tip">💡 重要：文件<b>不會自動</b>跑進 NotebookLM——<b>第一次要手動「加來源」一次</b>；之後系統改寫<b>同一份</b>文件，你在 NotebookLM 該來源按「同步」就更新，不必重加。</div>
+          <p class="muted">它負責「文件知識庫＋問答/音檔」，跟網站的「即時運算/儀表板」互補。設定步驟（貼 <code>notebooklm-export.gs</code>、開每日更新、加來源）由工程師協助一次即可。</p>
+          <a class="gobtn" id="nbGo" href="https://notebooklm.google.com" target="_blank" rel="noopener">開啟 NotebookLM →</a>
+        </div>
+      </details>
     </div>
+    <script>(function(){{var u=(window.APP_CONFIG||{{}}).NOTEBOOK_URL;var g=document.getElementById("nbGo");if(g&&u)g.href=u;}})();</script>
 
     <div class="q">
       <h2>🧮 試玩看看：報價怎麼算</h2>

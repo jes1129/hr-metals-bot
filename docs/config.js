@@ -13,5 +13,7 @@ window.APP_CONFIG = {
   // ③（選填）擁有試算表的 Google 帳號 email（顯示用）
   OWNER_EMAIL: "",
   // ④（選填）「九上資料庫」試算表的網址，填了首頁會出現一張「🗂️ 九上資料庫」快捷卡片
-  SHEET_URL: "https://docs.google.com/spreadsheets/d/1LphX_BytpNuieeh1md6AawQjT-B127tE8v81orySptU/edit"
+  SHEET_URL: "https://docs.google.com/spreadsheets/d/1LphX_BytpNuieeh1md6AawQjT-B127tE8v81orySptU/edit",
+  // ⑤（選填）NotebookLM 筆記本網址；填了首頁「🧠 NotebookLM」卡會直接連到它，未填則連 notebooklm.google.com
+  NOTEBOOK_URL: ""
 };
