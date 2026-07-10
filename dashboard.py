@@ -60,11 +60,12 @@ def _nav(active: str) -> str:
     a = ' class="on"'
     # 市場情報（原料/招募/供應商/客戶）收進一個下拉，讓上排不擁擠
     intel = active in ("metals", "jobs", "suppliers", "customers")
+    intel_on = a if intel else ""   # 避免在 f-string 內用反斜線（Python 3.11 不允許）
     return (
         '<div class="nav">'
         f'<a{a if active == "home" else ""} href="index.html">🏠 首頁</a>'
         '<details class="navdrop">'
-        f'<summary{" class=\"on\"" if intel else ""}>📈 情報 ▾</summary>'
+        f'<summary{intel_on}>📈 情報 ▾</summary>'
         '<div class="navmenu">'
         f'<a{a if active == "metals" else ""} href="metals.html">🔩 原料行情</a>'
         f'<a{a if active == "jobs" else ""} href="jobs.html">🔧 招募雷達</a>'

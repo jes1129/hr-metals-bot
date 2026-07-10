@@ -27,7 +27,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: 安裝依賴
         run: pip install httpx    # LME(Westmetall)+匯率皆用 httpx，不需瀏覽器
