@@ -1073,6 +1073,7 @@ def render_jobs_html(stats: dict, summary: dict, jobs: list,
         <select id="jobArea"><option value="">全部行政區</option></select>
         <label class="prionly"><input type="checkbox" id="jobPriority"> 只看 ⭐ 符合招募重點</label>
         <label class="prionly"><input type="checkbox" id="jobFav"> 只看我收藏的</label>
+        <select id="jobStatus"><option value="">狀態：全部</option><option>已聯絡</option><option>合作中</option><option>不合適</option></select>
         <span class="count" id="jobCount"></span>
       </div>
       <table>
@@ -1199,6 +1200,7 @@ def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: 
         <select id="supCat"><option value="">全部能力類別</option></select>
         <label class="prionly"><input type="checkbox" id="supNear"> 只看 ⭐ 神岡周邊</label>
         <label class="prionly"><input type="checkbox" id="supFav"> 只看我收藏的</label>
+        <select id="supStatus"><option value="">狀態：全部</option><option>已聯絡</option><option>合作中</option><option>不合適</option></select>
         <div class="btnbar viewbar"><button data-view="list" class="on">📋 清單</button><button data-view="map">🗺️ 地圖</button></div>
         <span class="count" id="supCount"></span>
       </div>
@@ -1384,6 +1386,7 @@ def render_customers_html(profile: dict, stats: dict, summary: dict, customers: 
         <input id="custSearch" placeholder="搜尋公司 / 地區關鍵字…">
         <select id="custCat"><option value="">全部產業</option></select>
         <label class="prionly"><input type="checkbox" id="custFav"> 只看我收藏的</label>
+        <select id="custStatus"><option value="">狀態：全部</option><option>已聯絡</option><option>合作中</option><option>不合適</option></select>
         <span class="count" id="custCount"></span>
       </div>
       <table>

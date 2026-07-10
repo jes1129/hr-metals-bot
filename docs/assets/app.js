@@ -375,6 +375,7 @@
   function initJobs(JOBS) {
     var searchEl = document.getElementById("jobSearch"), areaEl = document.getElementById("jobArea");
     var priEl = document.getElementById("jobPriority"), favEl = document.getElementById("jobFav");
+    var statusEl = document.getElementById("jobStatus");
     var countEl = document.getElementById("jobCount"), tbody = document.getElementById("jobBody");
     var sort = { key: "salary", dir: -1 };
 
@@ -397,6 +398,7 @@
       var rows = JOBS.filter(function (j) {
         if (priOnly && !j.is_priority) return false;
         if (favOnly && !markGet(j.url || j.title).fav) return false;
+        if (statusEl && statusEl.value && markGet(j.url || j.title).status !== statusEl.value) return false;
         if (area && (j.district || "其他") !== area) return false;
         if (q && (j.title + " " + j.company).toLowerCase().indexOf(q) < 0) return false;
         return true;
@@ -419,6 +421,7 @@
     if (areaEl) areaEl.addEventListener("change", render);
     if (priEl) priEl.addEventListener("change", render);
     if (favEl) favEl.addEventListener("change", render);
+    if (statusEl) statusEl.addEventListener("change", render);
     document.querySelectorAll("th.sortable").forEach(function (th) {
       th.addEventListener("click", function () {
         var k = th.getAttribute("data-key");
@@ -446,7 +449,7 @@
   function initSuppliers(SUP) {
     var searchEl = document.getElementById("supSearch"), catEl = document.getElementById("supCat");
     var nearEl = document.getElementById("supNear"), countEl = document.getElementById("supCount");
-    var favEl = document.getElementById("supFav");
+    var favEl = document.getElementById("supFav"), statusEl = document.getElementById("supStatus");
     var tbody = document.getElementById("supBody");
     var sort = { key: "name", dir: 1 };
     function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
@@ -464,6 +467,7 @@
       var rows = SUP.filter(function (s) {
         if (nearOnly && !s.is_near) return false;
         if (favOnly && !markGet(s.url || s.name).fav) return false;
+        if (statusEl && statusEl.value && markGet(s.url || s.name).status !== statusEl.value) return false;
         if (cat && s.category !== cat) return false;
         if (q && (s.name + " " + s.area + " " + (s.address || "")).toLowerCase().indexOf(q) < 0) return false;
         return true;
@@ -487,6 +491,7 @@
     if (catEl) catEl.addEventListener("change", render);
     if (nearEl) nearEl.addEventListener("change", render);
     if (favEl) favEl.addEventListener("change", render);
+    if (statusEl) statusEl.addEventListener("change", render);
     document.querySelectorAll("th.sortable").forEach(function (th) {
       th.addEventListener("click", function () {
         var k = th.getAttribute("data-key");
@@ -557,7 +562,7 @@
   // ============================================================ 客戶開發雷達
   function initCustomers(CUS) {
     var searchEl = document.getElementById("custSearch"), catEl = document.getElementById("custCat");
-    var favEl = document.getElementById("custFav");
+    var favEl = document.getElementById("custFav"), statusEl = document.getElementById("custStatus");
     var countEl = document.getElementById("custCount"), tbody = document.getElementById("custBody");
     var sort = { key: "name", dir: 1 };
     function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
@@ -572,6 +577,7 @@
       var q = (searchEl && searchEl.value.trim().toLowerCase()) || "", cat = (catEl && catEl.value) || "", favOnly = favEl && favEl.checked;
       var rows = CUS.filter(function (s) {
         if (favOnly && !markGet(s.url || s.name).fav) return false;
+        if (statusEl && statusEl.value && markGet(s.url || s.name).status !== statusEl.value) return false;
         if (cat && s.category !== cat) return false;
         if (q && (s.name + " " + s.area + " " + (s.address || "")).toLowerCase().indexOf(q) < 0) return false;
         return true;
@@ -592,6 +598,7 @@
     if (searchEl) searchEl.addEventListener("input", render);
     if (catEl) catEl.addEventListener("change", render);
     if (favEl) favEl.addEventListener("change", render);
+    if (statusEl) statusEl.addEventListener("change", render);
     document.querySelectorAll("th.sortable").forEach(function (th) {
       th.addEventListener("click", function () {
         var k = th.getAttribute("data-key");
