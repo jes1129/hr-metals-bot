@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="assets/style.css?v=202607101054">
-<script src="config.js?v=202607101054"></script>
+<link rel="stylesheet" href="assets/style.css?v=202607101130">
+<script src="config.js?v=202607101130"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <title>九上科技 · 使用說明</title>
 <style>
@@ -64,7 +64,7 @@
 </head>
 <body>
   <div class="wrap help">
-    <div class="topbar"><div class="nav"><a href="index.html">🏠 首頁</a><a href="metals.html">🔩 原料</a><a href="jobs.html">🔧 招募</a><a href="suppliers.html">🏭 供應商</a><a href="customers.html">🎯 客戶</a><a href="quote.html">🧮 報價</a><a class="on" href="help.html">📖 說明</a></div><span id="gAuth" class="gauth"></span><button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button></div>
+    <div class="topbar"><div class="nav"><a href="index.html">🏠 首頁</a><a href="metals.html">🔩 原料</a><a href="jobs.html">🔧 招募</a><a href="suppliers.html">🏭 供應商</a><a href="customers.html">🎯 客戶</a><a href="quote.html">🧮 報價</a><a href="db.html">🗂️ 資料庫</a><a class="on" href="help.html">📖 說明</a></div><span id="gAuth" class="gauth"></span><button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button></div>
     <div class="eyebrow">九上科技 · 智慧儀表板</div>
     <h1>📖 使用說明</h1>
     <div class="sub">一頁看懂整個網站怎麼用 · 可展開／可試玩 · 更新於 2026-07-10</div>
@@ -226,7 +226,20 @@
         <li><b>✉️ 寄信</b>：一鍵開 Gmail，預填好主旨內文。</li>
         <li><b>🧮 報價歷史</b>：報價頁按「存這筆」，紀錄會存進試算表。</li>
       </ul>
-      <p>以上全部會同步到公司的 Google 試算表。想看完整資料或直接編輯，點首頁的「🗂️ 九上資料庫」卡片打開試算表即可。</p>
+      <p>以上全部會同步到公司的 Google 試算表。</p>
+
+      <h3>🗂️ 資料庫操作中心（免開試算表）</h3>
+      <p>上方分頁的「🗂️ 資料庫」是<b>站內操作中心</b>——不必打開 Google 試算表，直接在網站上就能管理資料：</p>
+      <ul>
+        <li><b>三個資料表</b>：我的名單/待辦、收藏與標記、報價歷史，點分頁切換。</li>
+        <li><b>新增／編輯／刪除</b>：點「＋ 新增」或每列的 ✏️／🗑️，跳出小表單填一填就好。</li>
+        <li><b>搜尋／篩選／排序</b>：上方搜尋框打字即時過濾、點欄位標題排序、用下拉篩狀態。</li>
+        <li><b>⬇ 匯出 CSV</b>：一鍵下載成 Excel 可開的檔案。</li>
+        <li><b>可視化</b>：上方有筆數與各狀態統計、分佈長條圖。</li>
+        <li><b>新手</b>：第一次用可按「載入範例資料」看看長怎樣，之後再清掉。</li>
+      </ul>
+      <div class="tip">💡 手機上表格會自動變成一張張卡片，好點好讀。需要看原始試算表時，操作中心底部也有「開啟原始試算表」連結。</div>
+      <a class="gobtn" href="db.html">前往資料庫操作中心 →</a>
     </div>
 
     <div class="q" id="faq">
@@ -287,6 +300,6 @@
     });
   })();
   </script>
-  <script src="assets/app.js?v=202607101054"></script>
+  <script src="assets/app.js?v=202607101130"></script>
 </body>
 </html>

@@ -1,7 +1,9 @@
 /**
  * 九上科技儀表板 — 資料庫後端（Google Apps Script）
  *
- * 用途：讓網站把「收藏/標記/備註、報價歷史」存進這個試算表（團隊共用、多裝置同步）。
+ * 用途：讓網站把「收藏/標記/備註、報價歷史」＋「站內資料庫操作中心」的各張資料表
+ *       （我的名單/待辦…以及日後的訂單/庫存/料號）存進這個試算表（團隊共用、多裝置同步）。
+ *       各資料表分頁會在第一次寫入時自動建立，不必手動開；欄位由網站端 schema 決定。
  * 安全：只接受「你 OAuth 用戶端」發出的登入 token，且 email 在下方白名單內。
  *
  * 設定步驟（見 repo README「Google 設定」）：
@@ -29,6 +31,11 @@ function doPost(e) {
       case "quoteAdd": quoteAdd_(p.value, email); out = { ok: true }; break;
       case "quoteDel": quoteDel_(p.ts); out = { ok: true }; break;
       case "driveSave": out = driveSave_(p.quotes, email); break;
+      // ---- 通用資料表 CRUD（ERP 各模組共用：訂單/庫存/料號…只要換 table 名，不必改後端）----
+      case "tList":    out = tList_(p.table); break;
+      case "tUpsert":  out = tUpsert_(p.table, p.row, p.header, email); break;
+      case "tRemove":  out = tRemove_(p.table, p.id); break;
+      case "tImport":  out = tImport_(p.table, p.rows, p.header, email); break;
       default:         out = { error: "unknown action" };
     }
     return json_(out);
@@ -108,6 +115,88 @@ function driveSave_(quotes, by) {
     try { DriveApp.getFolderById(DRIVE_FOLDER_ID).addFile(file); DriveApp.getRootFolder().removeFile(file); } catch (e) {}
   }
   return { ok: true, url: ss.getUrl(), name: name };
+}
+
+// ===========================================================================
+// 通用資料表 CRUD（schema 驅動；每個 ERP 模組 = 一張分頁，欄位不綁死）
+//   - 第一欄固定為 id；稽核欄 by / ts 自動補。
+//   - 寫入一律用 LockService 鎖住，避免多人同時寫入撞列。
+//   - 分頁不存在時自動建立。
+// ===========================================================================
+function tSheet_(table) {
+  if (!/^[a-z_][a-z0-9_]*$/i.test(String(table || ""))) throw "非法資料表名：" + table;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(table);
+  if (!sh) { sh = ss.insertSheet(table); sh.appendRow(["id"]); }
+  return sh;
+}
+function tHeader_(sh) {
+  var lc = Math.max(sh.getLastColumn(), 1);
+  return sh.getRange(1, 1, 1, lc).getValues()[0];
+}
+function tList_(table) {
+  var sh = tSheet_(table);
+  var vals = sh.getDataRange().getValues();
+  if (vals.length < 1) return { header: [], rows: [] };
+  var header = vals[0], rows = [];
+  for (var i = 1; i < vals.length; i++) {
+    if (!vals[i][0] && vals[i].join("") === "") continue;
+    var o = {};
+    for (var c = 0; c < header.length; c++) o[header[c]] = vals[i][c];
+    if (!o.id && o.id !== 0) continue;
+    rows.push(o);
+  }
+  return { header: header, rows: rows };
+}
+function tUpsert_(table, row, wantHeader, by) {
+  row = row || {};
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = tSheet_(table);
+    var last = Math.max(sh.getLastRow(), 1);
+    var hdr = tHeader_(sh);
+    // 剛建立（只有 id）且前端給了欄位順序 → 一次鋪好乾淨的表頭
+    if (hdr.length === 1 && hdr[0] === "id" && wantHeader && wantHeader.length) {
+      hdr = ["id"].concat(wantHeader.filter(function (h) { return h !== "id" && h !== "by" && h !== "ts"; })).concat(["by", "ts"]);
+      sh.getRange(1, 1, 1, hdr.length).setValues([hdr]);
+    }
+    // 確保 row 的欄位與 by/ts 都在表頭（缺的就補欄）
+    var changed = false;
+    Object.keys(row).concat(["by", "ts"]).forEach(function (k) {
+      if (hdr.indexOf(k) < 0) { hdr.push(k); changed = true; }
+    });
+    if (changed) sh.getRange(1, 1, 1, hdr.length).setValues([hdr]);
+
+    if (!row.id && row.id !== 0) row.id = "r" + Date.now() + Math.floor(Math.random() * 1000);
+    row.by = by; row.ts = new Date();
+
+    var ids = sh.getRange(1, 1, last, 1).getValues();
+    var rownum = -1;
+    for (var i = 1; i < ids.length; i++) if (String(ids[i][0]) === String(row.id)) { rownum = i + 1; break; }
+
+    if (rownum > 0) {  // 更新：未提供的欄位保留原值
+      var cur = sh.getRange(rownum, 1, 1, hdr.length).getValues()[0];
+      var upd = hdr.map(function (h, idx) { return row[h] !== undefined ? row[h] : cur[idx]; });
+      sh.getRange(rownum, 1, 1, hdr.length).setValues([upd]);
+    } else {           // 新增
+      sh.appendRow(hdr.map(function (h) { return row[h] !== undefined ? row[h] : ""; }));
+    }
+    return { ok: true, id: row.id };
+  } finally { lock.releaseLock(); }
+}
+function tRemove_(table, id) {
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = tSheet_(table);
+    var last = Math.max(sh.getLastRow(), 1);
+    var ids = sh.getRange(1, 1, last, 1).getValues();
+    for (var i = ids.length - 1; i >= 1; i--) if (String(ids[i][0]) === String(id)) sh.deleteRow(i + 1);
+    return { ok: true };
+  } finally { lock.releaseLock(); }
+}
+function tImport_(table, rows, wantHeader, by) {
+  (rows || []).forEach(function (r) { tUpsert_(table, r, wantHeader, by); });
+  return { ok: true, n: (rows || []).length };
 }
 
 function json_(o) {

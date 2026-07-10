@@ -66,6 +66,7 @@
       if (d.quotes) { Quotes = d.quotes; lsSet("quotes", Quotes); }
       if (window.__refreshMarks) window.__refreshMarks();
       if (window.__refreshQuotes) window.__refreshQuotes();
+      if (window.__refreshConsole) window.__refreshConsole();
     });
   }
   function markGet(id) { return Marks[id] || { status: "", note: "", fav: false }; }
@@ -115,6 +116,8 @@
       // 只放「Sign in with Google」按鈕，不呼叫 One Tap prompt()（避免自動彈窗與未登入時的 console 噪音）
       try { google.accounts.id.renderButton(document.getElementById("gBtn"), { type: "standard", size: "medium", text: "signin_with", shape: "pill" }); } catch (e) {}
     }
+    // 登入狀態一改變就刷新資料庫操作中心（顯示/隱藏「未登入」橫幅、載入雲端資料）
+    if (window.__refreshConsole) window.__refreshConsole();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
@@ -673,6 +676,289 @@
     onMat(); renderHist();
   }
 
+  // ===========================================================================
+  // 資料庫操作中心（db.html）— schema 驅動的通用資料表：查/篩/排/增/改/刪/匯出
+  //   後端 = Apps Script 通用 CRUD（tList/tUpsert/tRemove）。日後加訂單/庫存只要加 schema。
+  // ===========================================================================
+  var SCHEMAS = {
+    mylist: {
+      title: "我的名單 / 待辦", icon: "📝", table: "mylist", canAdd: true, canEdit: true, canDelete: true,
+      cols: [
+        { k: "name", label: "名稱", wide: true },
+        { k: "category", label: "分類", filter: true },
+        { k: "status", label: "狀態", type: "select", opts: ["", "待處理", "進行中", "已完成", "擱置"], filter: true, stat: true },
+        { k: "owner", label: "負責人" },
+        { k: "due", label: "到期", type: "date" },
+        { k: "note", label: "備註", wide: true }
+      ],
+      sample: [
+        { name: "聯絡大雅精密報價", category: "報價", status: "進行中", owner: "我", due: "", note: "316 不鏽鋼件" },
+        { name: "追蹤神岡工業樣品", category: "供應商", status: "待處理", owner: "我", due: "", note: "" },
+        { name: "整理本月客戶開發名單", category: "客戶開發", status: "待處理", owner: "我", due: "", note: "" }
+      ]
+    },
+    marks: {
+      title: "收藏與標記", icon: "⭐", table: "marks", canAdd: false, canEdit: true, canDelete: true,
+      cols: [
+        { k: "id", label: "對象", wide: true, ro: true },
+        { k: "status", label: "狀態", type: "select", opts: ["", "已聯絡", "合作中", "不合適"], filter: true, stat: true },
+        { k: "note", label: "備註", wide: true },
+        { k: "fav", label: "收藏", type: "bool" }
+      ]
+    },
+    quotes: {
+      title: "報價歷史", icon: "🧮", table: "quotes", canAdd: false, canEdit: false, canDelete: true,
+      delKey: "ts", delAction: "quoteDel",
+      cols: [
+        { k: "ts", label: "時間", type: "time", ro: true },
+        { k: "material", label: "材質", filter: true, stat: true },
+        { k: "weight", label: "重量kg", type: "num" },
+        { k: "price", label: "料價", type: "num" },
+        { k: "quote", label: "報價NT$", type: "num" }
+      ]
+    }
+  };
+
+  function initDbConsole() {
+    var mount = document.getElementById("dbConsole");
+    if (!mount) return;
+    var state = { cur: "mylist", rows: [], sortK: "", sortDir: 1, q: "", filters: {} };
+    var cache = {};  // table -> rows（本機快取，離線也看得到）
+
+    function schema() { return SCHEMAS[state.cur]; }
+    function cacheKey(t) { return "console_" + t; }
+    function fmtCell(col, v) {
+      if (v === undefined || v === null || v === "") return "";
+      if (col.type === "time") { var d = new Date(Number(v) || v); return isNaN(d) ? String(v) : d.toLocaleString("zh-TW", { hour12: false }).replace(/:\d\d$/, ""); }
+      if (col.type === "bool") return (v === true || v === "TRUE" || v === "true") ? "⭐" : "";
+      if (col.type === "num") { var n = Number(v); return isNaN(n) ? String(v) : n.toLocaleString(); }
+      return String(v);
+    }
+    function isFav(v) { return v === true || v === "TRUE" || v === "true"; }
+
+    function load(t) {
+      state.rows = lsGet(cacheKey(t), []) || [];   // 先用快取畫
+      render();
+      if (!idToken) { render(); return; }           // 未登入：只看快取
+      dbCall("tList", { table: SCHEMAS[t].table }).then(function (d) {
+        if (!d || d.error || !d.rows) return;
+        cache[t] = d.rows; lsSet(cacheKey(t), d.rows);
+        if (state.cur === t) { state.rows = d.rows; render(); }
+      });
+    }
+    window.__refreshConsole = function () { load(state.cur); };
+
+    function filtered() {
+      var s = schema(), q = state.q.toLowerCase();
+      var rows = state.rows.filter(function (r) {
+        for (var fk in state.filters) { if (state.filters[fk] && String(r[fk] || "") !== state.filters[fk]) return false; }
+        if (!q) return true;
+        return s.cols.some(function (c) { return String(r[c.k] || "").toLowerCase().indexOf(q) >= 0; });
+      });
+      if (state.sortK) {
+        rows = rows.slice().sort(function (a, b) {
+          var x = a[state.sortK], y = b[state.sortK];
+          var nx = Number(x), ny = Number(y);
+          if (!isNaN(nx) && !isNaN(ny) && x !== "" && y !== "") return (nx - ny) * state.sortDir;
+          return String(x || "").localeCompare(String(y || ""), "zh-TW") * state.sortDir;
+        });
+      }
+      return rows;
+    }
+
+    function statBlock(rows) {
+      var s = schema();
+      var chips = '<span class="dbchip strong">共 ' + rows.length + ' 筆</span>';
+      var statCol = s.cols.filter(function (c) { return c.stat; })[0];
+      var bars = "";
+      if (statCol) {
+        var counts = {}, order = statCol.opts ? statCol.opts.slice() : [];
+        rows.forEach(function (r) { var v = String(r[statCol.k] || "（空）"); counts[v] = (counts[v] || 0) + 1; if (order.indexOf(v) < 0) order.push(v); });
+        var mx = 1; for (var k in counts) mx = Math.max(mx, counts[k]);
+        order.forEach(function (v) {
+          var label = v === "" ? "（未填）" : v, n = counts[v] || 0;
+          if (!n) return;
+          chips += '<span class="dbchip">' + escAttr(label) + ' ' + n + '</span>';
+          bars += '<div class="dbrow"><div class="dblabel">' + escAttr(label) + '</div>'
+            + '<div class="dbtrack"><div class="dbbar" style="width:' + Math.round(n / mx * 100) + '%"></div></div>'
+            + '<div class="dbval">' + n + '</div></div>';
+        });
+      }
+      return '<div class="dbchips">' + chips + '</div>' + (bars ? '<div class="dbbars">' + bars + '</div>' : "");
+    }
+
+    function render() {
+      var s = schema(), rows = filtered();
+      var tabs = Object.keys(SCHEMAS).map(function (k) {
+        return '<button class="dbtab' + (k === state.cur ? " on" : "") + '" data-tab="' + k + '">' + SCHEMAS[k].icon + " " + SCHEMAS[k].title + '</button>';
+      }).join("");
+
+      var filterCtrls = s.cols.filter(function (c) { return c.filter; }).map(function (c) {
+        var vals = {}; state.rows.forEach(function (r) { if (r[c.k]) vals[r[c.k]] = 1; });
+        var opts = ['<option value="">' + escAttr(c.label) + '：全部</option>'].concat(Object.keys(vals).sort().map(function (v) {
+          return '<option value="' + escAttr(v) + '"' + (state.filters[c.k] === v ? " selected" : "") + '>' + escAttr(v) + '</option>';
+        }));
+        return '<select class="dbfilter" data-k="' + c.k + '">' + opts.join("") + '</select>';
+      }).join("");
+
+      var toolbar = '<div class="dbtoolbar">'
+        + '<input id="dbSearch" class="dbsearch" placeholder="🔍 搜尋…" value="' + escAttr(state.q) + '">'
+        + filterCtrls
+        + (s.canAdd ? '<button class="dbbtn primary" id="dbAdd">＋ 新增</button>' : "")
+        + '<button class="dbbtn" id="dbExport">⬇ 匯出 CSV</button>'
+        + '<button class="dbbtn" id="dbReload">↻ 重新整理</button>'
+        + '</div>';
+
+      // 表頭
+      var ths = s.cols.map(function (c) {
+        var ar = state.sortK === c.k ? (state.sortDir > 0 ? " ▲" : " ▼") : "";
+        return '<th class="dbsort" data-k="' + c.k + '">' + escAttr(c.label) + '<span class="dbarrow">' + ar + "</span></th>";
+      }).join("") + (s.canEdit || s.canDelete ? "<th></th>" : "");
+
+      var body = rows.map(function (r) {
+        var tds = s.cols.map(function (c) {
+          var val = c.type === "bool" ? (isFav(r[c.k]) ? "⭐" : "") : fmtCell(c, r[c.k]);
+          return '<td data-label="' + escAttr(c.label) + '"' + (c.wide ? ' class="wide"' : "") + '>' + escAttr(val) + "</td>";
+        }).join("");
+        var act = "";
+        if (s.canEdit || s.canDelete) {
+          act = '<td class="dbact">'
+            + (s.canEdit ? '<button class="dbmini" data-edit="' + escAttr(r.id !== undefined ? r.id : r[s.delKey]) + '">✏️</button>' : "")
+            + (s.canDelete ? '<button class="dbmini" data-del="' + escAttr(r.id !== undefined && r.id !== "" ? r.id : r[s.delKey]) + '">🗑️</button>' : "")
+            + "</td>";
+        }
+        return "<tr>" + tds + act + "</tr>";
+      }).join("");
+
+      var emptyHint = "";
+      if (!rows.length) {
+        emptyHint = '<div class="dbempty">目前沒有資料。'
+          + (state.cur === "mylist" ? '<button class="dbbtn primary" id="dbSample">載入範例資料</button>' : "")
+          + (!idToken ? '<div class="dbnote">（請先用右上角「使用 Google 帳戶登入」，登入後才會同步公司試算表的資料）</div>' : "")
+          + '</div>';
+      }
+
+      mount.innerHTML =
+        '<div class="dbtabs">' + tabs + '</div>'
+        + (!idToken ? '<div class="dbbanner">🔒 尚未登入：目前顯示的是本機快取。登入後可新增/編輯並同步到公司試算表。</div>' : "")
+        + statBlock(rows)
+        + toolbar
+        + '<div class="dbtablewrap"><table class="dbtable"><thead><tr>' + ths + "</tr></thead><tbody>" + body + "</tbody></table></div>"
+        + emptyHint
+        + '<div class="dbfoot">資料存在公司 Google 試算表；也可 <a id="dbSheet" href="#" target="_blank" rel="noopener">開啟原始試算表</a>。</div>';
+
+      wire();
+    }
+
+    function wire() {
+      var s = schema();
+      Array.prototype.forEach.call(mount.querySelectorAll(".dbtab"), function (b) {
+        b.onclick = function () { state.cur = b.getAttribute("data-tab"); state.q = ""; state.filters = {}; state.sortK = ""; load(state.cur); };
+      });
+      var se = document.getElementById("dbSearch");
+      if (se) se.oninput = function () { state.q = se.value; renderKeepFocus(); };
+      Array.prototype.forEach.call(mount.querySelectorAll(".dbfilter"), function (f) {
+        f.onchange = function () { state.filters[f.getAttribute("data-k")] = f.value; render(); };
+      });
+      Array.prototype.forEach.call(mount.querySelectorAll(".dbsort"), function (h) {
+        h.onclick = function () { var k = h.getAttribute("data-k"); if (state.sortK === k) state.sortDir *= -1; else { state.sortK = k; state.sortDir = 1; } render(); };
+      });
+      var add = document.getElementById("dbAdd"); if (add) add.onclick = function () { if (requireAuth()) openForm(null); };
+      var exp = document.getElementById("dbExport"); if (exp) exp.onclick = exportCsv;
+      var rl = document.getElementById("dbReload"); if (rl) rl.onclick = function () { load(state.cur); };
+      var sp = document.getElementById("dbSample"); if (sp) sp.onclick = loadSample;
+      var sheet = document.getElementById("dbSheet");
+      if (sheet) { var u = (window.APP_CONFIG || {}).SHEET_URL || ""; if (u) sheet.href = u; else sheet.style.display = "none"; }
+      Array.prototype.forEach.call(mount.querySelectorAll("[data-edit]"), function (b) {
+        b.onclick = function () { if (!requireAuth()) return; var id = b.getAttribute("data-edit"); openForm(findRow(id)); };
+      });
+      Array.prototype.forEach.call(mount.querySelectorAll("[data-del]"), function (b) {
+        b.onclick = function () { if (!requireAuth()) return; delRow(b.getAttribute("data-del")); };
+      });
+    }
+    function renderKeepFocus() {
+      render();
+      var se = document.getElementById("dbSearch");
+      if (se) { se.focus(); se.setSelectionRange(se.value.length, se.value.length); }
+    }
+    function findRow(id) {
+      var s = schema();
+      return state.rows.filter(function (r) { return String(r.id !== undefined && r.id !== "" ? r.id : r[s.delKey]) === String(id); })[0] || null;
+    }
+    function requireAuth() {
+      if (!idToken) { alert(CLIENT_ID ? "請先用右上角「使用 Google 帳戶登入」再操作。" : "尚未設定 Google（見說明頁）。"); return false; }
+      return true;
+    }
+
+    // 新增 / 編輯 彈出表單
+    function openForm(row) {
+      var s = schema(), editing = !!row; row = row || {};
+      var fields = s.cols.filter(function (c) { return !(c.ro && !editing); }).map(function (c) {
+        var v = row[c.k] !== undefined ? row[c.k] : "";
+        var input;
+        if (c.ro) input = '<input disabled value="' + escAttr(fmtCell(c, v)) + '">';
+        else if (c.type === "select") input = '<select data-f="' + c.k + '">' + c.opts.map(function (o) { return '<option' + (String(v) === o ? " selected" : "") + '>' + escAttr(o) + "</option>"; }).join("") + "</select>";
+        else if (c.type === "bool") input = '<label class="dbcheck"><input type="checkbox" data-f="' + c.k + '"' + (isFav(v) ? " checked" : "") + '> 收藏</label>';
+        else if (c.type === "date") input = '<input type="date" data-f="' + c.k + '" value="' + escAttr(v) + '">';
+        else if (c.type === "num") input = '<input type="number" step="any" data-f="' + c.k + '" value="' + escAttr(v) + '">';
+        else input = '<input data-f="' + c.k + '" value="' + escAttr(v) + '">';
+        return '<label class="dbfield"><span>' + escAttr(c.label) + "</span>" + input + "</label>";
+      }).join("");
+      var ov = document.createElement("div");
+      ov.className = "dbmodal";
+      ov.innerHTML = '<div class="dbdialog"><h3>' + (editing ? "編輯" : "新增") + " · " + s.icon + escAttr(s.title) + "</h3>"
+        + '<div class="dbform">' + fields + "</div>"
+        + '<div class="dbdlgbtns"><button class="dbbtn" data-x>取消</button><button class="dbbtn primary" data-ok>儲存</button></div></div>';
+      document.body.appendChild(ov);
+      function close() { document.body.removeChild(ov); }
+      ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
+      ov.querySelector("[data-x]").onclick = close;
+      ov.querySelector("[data-ok]").onclick = function () {
+        var out = {};
+        if (editing && row.id !== undefined) out.id = row.id;
+        Array.prototype.forEach.call(ov.querySelectorAll("[data-f]"), function (el) {
+          out[el.getAttribute("data-f")] = el.type === "checkbox" ? el.checked : el.value;
+        });
+        save(out); close();
+      };
+    }
+    function save(row) {
+      var s = schema(), header = s.cols.map(function (c) { return c.k; });
+      // 樂觀更新畫面
+      if (row.id) { var f = findRow(row.id); if (f) for (var k in row) f[k] = row[k]; }
+      else { row.id = "tmp" + Date.now(); state.rows.unshift(row); }
+      lsSet(cacheKey(state.cur), state.rows); render();
+      dbCall("tUpsert", { table: s.table, row: row, header: header }).then(function (d) { if (d && d.ok) load(state.cur); });
+    }
+    function delRow(id) {
+      var s = schema(), r = findRow(id);
+      if (!confirm("確定刪除這筆？")) return;
+      state.rows = state.rows.filter(function (x) { return String(x.id !== undefined && x.id !== "" ? x.id : x[s.delKey]) !== String(id); });
+      lsSet(cacheKey(state.cur), state.rows); render();
+      if (s.delAction) dbCall(s.delAction, { ts: r ? r[s.delKey] : id });
+      else dbCall("tRemove", { table: s.table, id: id });
+    }
+    function loadSample() {
+      if (!requireAuth()) return;
+      var s = SCHEMAS.mylist, header = s.cols.map(function (c) { return c.k; });
+      dbCall("tImport", { table: s.table, rows: s.sample, header: header }).then(function () { load("mylist"); });
+    }
+    function exportCsv() {
+      var s = schema(), rows = filtered();
+      var head = s.cols.map(function (c) { return c.label; });
+      var lines = [head.map(csvCell).join(",")];
+      rows.forEach(function (r) { lines.push(s.cols.map(function (c) { return csvCell(fmtCell(c, r[c.k])); }).join(",")); });
+      var blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = s.table + "_" + new Date().toISOString().slice(0, 10) + ".csv";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    function csvCell(v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+
+    load(state.cur);
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     if (window.METALS_DATA) initMetals(window.METALS_DATA);
@@ -680,6 +966,7 @@
     if (window.SUPPLIERS_DATA) { initSuppliers(window.SUPPLIERS_DATA); initSupplierMap(window.SUPPLIERS_DATA); }
     if (window.QUOTE_MATERIALS) initQuote(window.QUOTE_MATERIALS);
     if (window.CUSTOMERS_DATA) initCustomers(window.CUSTOMERS_DATA);
+    if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
   });
 })();

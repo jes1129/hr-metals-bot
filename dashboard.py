@@ -66,6 +66,7 @@ def _nav(active: str) -> str:
         f'<a{a if active == "suppliers" else ""} href="suppliers.html">🏭 供應商</a>'
         f'<a{a if active == "customers" else ""} href="customers.html">🎯 客戶</a>'
         f'<a{a if active == "quote" else ""} href="quote.html">🧮 報價</a>'
+        f'<a{a if active == "db" else ""} href="db.html">🗂️ 資料庫</a>'
         f'<a{a if active == "help" else ""} href="help.html">📖 說明</a>'
         "</div>"
     )
@@ -161,12 +162,12 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
             f'<div class="big">{cust_total} <span>家</span></div>'
             '<div class="mnote">會買精密金屬零件的潛在客戶</div>',
             "找新客戶"))
-    # 九上資料庫快捷卡（連到公司 Google 試算表；href 由 config.js 的 SHEET_URL 於前端設定，未填則隱藏）
+    # 九上資料庫快捷卡（進站內「資料庫操作中心」db.html；免開試算表就能增刪改查）
     cards.append(
-        '<a class="hcard" id="dbCard" href="#" target="_blank" rel="noopener" style="display:none">'
+        '<a class="hcard" id="dbCard" href="db.html">'
         '<div class="he">🗂️</div><div class="ht">九上資料庫</div>'
-        '<div class="hl"><div class="mnote">打開公司 Google 試算表：收藏/標記/報價都存這裡</div></div>'
-        '<div class="hcta">開啟試算表 →</div></a>')
+        '<div class="hl"><div class="mnote">站內直接管理：我的名單/待辦、收藏標記、報價歷史（免開試算表）</div></div>'
+        '<div class="hcta">開啟資料庫 →</div></a>')
 
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     return f"""<!doctype html>
@@ -184,7 +185,33 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
     <div class="hcards">{''.join(cards)}</div>
     <div class="foot">原料價／招募／供應商每日自動更新；報價用最新原料行情試算。全部免費、關機也會自己跑。</div>
   </div>
-  <script>(function(){{var u=(window.APP_CONFIG||{{}}).SHEET_URL||"";var c=document.getElementById("dbCard");if(c&&u){{c.href=u;c.style.display="";}}}})();</script>
+  <script src="assets/app.js?v={_VER}"></script>
+</body>
+</html>"""
+
+
+# ===========================================================================
+# 資料庫操作中心（🗂️ 站內增刪改查，免開 Google 試算表；ERP 各模組地基）
+# ===========================================================================
+def render_db_html() -> str:
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+{_HEAD}
+<title>九上科技 · 資料庫操作中心</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">{_nav("db")}{_THEME_BTN}</div>
+    <div class="eyebrow">九上科技 · 智慧儀表板</div>
+    <h1>🗂️ 資料庫操作中心</h1>
+    <div class="sub">站內直接管理資料，免開 Google 試算表 · 手機也能用 · 更新於 {now}</div>
+    <div id="dbConsole" class="dbconsole">
+      <div class="dbloading">載入中…（若一直沒出現，請先用右上角「使用 Google 帳戶登入」）</div>
+    </div>
+    <div class="foot">所有資料存在公司自己的 Google 試算表（團隊共用、多裝置同步、免費）。不會用到你的個人帳號。</div>
+  </div>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
@@ -419,7 +446,20 @@ def render_help_html() -> str:
         <li><b>✉️ 寄信</b>：一鍵開 Gmail，預填好主旨內文。</li>
         <li><b>🧮 報價歷史</b>：報價頁按「存這筆」，紀錄會存進試算表。</li>
       </ul>
-      <p>以上全部會同步到公司的 Google 試算表。想看完整資料或直接編輯，點首頁的「🗂️ 九上資料庫」卡片打開試算表即可。</p>
+      <p>以上全部會同步到公司的 Google 試算表。</p>
+
+      <h3>🗂️ 資料庫操作中心（免開試算表）</h3>
+      <p>上方分頁的「🗂️ 資料庫」是<b>站內操作中心</b>——不必打開 Google 試算表，直接在網站上就能管理資料：</p>
+      <ul>
+        <li><b>三個資料表</b>：我的名單/待辦、收藏與標記、報價歷史，點分頁切換。</li>
+        <li><b>新增／編輯／刪除</b>：點「＋ 新增」或每列的 ✏️／🗑️，跳出小表單填一填就好。</li>
+        <li><b>搜尋／篩選／排序</b>：上方搜尋框打字即時過濾、點欄位標題排序、用下拉篩狀態。</li>
+        <li><b>⬇ 匯出 CSV</b>：一鍵下載成 Excel 可開的檔案。</li>
+        <li><b>可視化</b>：上方有筆數與各狀態統計、分佈長條圖。</li>
+        <li><b>新手</b>：第一次用可按「載入範例資料」看看長怎樣，之後再清掉。</li>
+      </ul>
+      <div class="tip">💡 手機上表格會自動變成一張張卡片，好點好讀。需要看原始試算表時，操作中心底部也有「開啟原始試算表」連結。</div>
+      <a class="gobtn" href="db.html">前往資料庫操作中心 →</a>
     </div>
 
     <div class="q" id="faq">

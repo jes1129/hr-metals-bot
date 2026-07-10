@@ -211,3 +211,75 @@ th .arrow { opacity: .5; font-size: 10px; }
   .grid2 { grid-template-columns: 1fr; }
   .mfigs { gap: 16px; }
 }
+
+/* ===== 資料庫操作中心 ===== */
+.dbconsole { margin: 8px 0 4px; }
+.dbloading { color: var(--muted); padding: 24px 4px; }
+.dbtabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.dbtab { cursor: pointer; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--chip-border);
+  background: var(--chip-bg); color: var(--text); font-size: 14px; }
+.dbtab.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.dbbanner { background: var(--line2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 14px; color: var(--text); font-size: 13.5px; margin-bottom: 12px; }
+.dbchips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+.dbchip { background: var(--chip-bg); border: 1px solid var(--chip-border); color: var(--text);
+  border-radius: 999px; padding: 3px 12px; font-size: 13px; }
+.dbchip.strong { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.dbbars { margin: 2px 0 14px; max-width: 520px; }
+.dbrow { display: flex; align-items: center; gap: 10px; margin: 3px 0; }
+.dbrow .dblabel { width: 76px; font-size: 12.5px; color: var(--muted); text-align: right; flex-shrink: 0; }
+.dbrow .dbtrack { flex: 1; background: var(--line2); border-radius: 6px; height: 12px; overflow: hidden; }
+.dbrow .dbbar { height: 100%; background: var(--accent); border-radius: 6px; }
+.dbrow .dbval { width: 34px; font-size: 12.5px; color: var(--text); }
+.dbtoolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.dbsearch { flex: 1; min-width: 160px; padding: 8px 12px; border-radius: 10px;
+  border: 1px solid var(--chip-border); background: var(--card); color: var(--text); font-size: 14px; }
+.dbfilter { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--chip-border);
+  background: var(--card); color: var(--text); font-size: 13.5px; }
+.dbbtn { cursor: pointer; padding: 8px 13px; border-radius: 10px; border: 1px solid var(--chip-border);
+  background: var(--card); color: var(--text); font-size: 13.5px; white-space: nowrap; }
+.dbbtn:hover { border-color: var(--accent); }
+.dbbtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.dbtablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+.dbtable { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.dbtable th, .dbtable td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line2); color: var(--text); }
+.dbtable th { background: var(--line2); position: sticky; top: 0; font-weight: 600; white-space: nowrap; }
+.dbtable th.dbsort { cursor: pointer; user-select: none; }
+.dbtable td.wide { min-width: 160px; }
+.dbtable tr:last-child td { border-bottom: 0; }
+.dbtable tbody tr:hover td { background: var(--line2); }
+.dbarrow { color: var(--accent); font-size: 11px; }
+.dbact { white-space: nowrap; text-align: right; }
+.dbmini { cursor: pointer; border: 1px solid var(--chip-border); background: var(--card);
+  border-radius: 8px; padding: 4px 8px; font-size: 13px; margin-left: 4px; }
+.dbmini:hover { border-color: var(--accent); }
+.dbempty { text-align: center; color: var(--muted); padding: 22px 8px; }
+.dbempty .dbbtn { margin-top: 10px; }
+.dbnote { font-size: 12.5px; margin-top: 8px; }
+.dbfoot { color: var(--muted2); font-size: 12px; margin-top: 10px; }
+.dbfoot a { color: var(--accent); }
+/* 彈出表單 */
+.dbmodal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex;
+  align-items: center; justify-content: center; z-index: 999; padding: 16px; }
+.dbdialog { background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  padding: 20px 22px; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+.dbdialog h3 { margin: 0 0 14px; color: var(--text); font-size: 1.1rem; }
+.dbform { display: flex; flex-direction: column; gap: 12px; }
+.dbfield { display: flex; flex-direction: column; gap: 5px; }
+.dbfield > span { font-size: 13px; color: var(--muted); }
+.dbfield input, .dbfield select { padding: 9px 11px; border-radius: 9px;
+  border: 1px solid var(--chip-border); background: var(--bg); color: var(--text); font-size: 14px; }
+.dbfield input:disabled { color: var(--muted); }
+.dbcheck { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 14px; }
+.dbdlgbtns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+/* 手機：表格改卡片式 */
+@media (max-width: 640px) {
+  .dbtable thead { display: none; }
+  .dbtable, .dbtable tbody, .dbtable tr, .dbtable td { display: block; width: 100%; }
+  .dbtable tr { border-bottom: 1px solid var(--line); padding: 6px 0; }
+  .dbtable td { border: 0; padding: 6px 12px; display: flex; justify-content: space-between; gap: 12px; }
+  .dbtable td::before { content: attr(data-label); color: var(--muted); font-size: 12px; flex-shrink: 0; }
+  .dbtable td.dbact { justify-content: flex-end; }
+  .dbtable td.dbact::before { content: ""; }
+}
