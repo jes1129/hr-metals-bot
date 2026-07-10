@@ -201,23 +201,58 @@ def render_help_html() -> str:
 {_HEAD}
 <title>九上科技 · 使用說明</title>
 <style>
-  .help {{ max-width: 860px; }}
-  .help .q {{ background: var(--card, #fff); border: 1px solid var(--line, #e5e7eb);
-    border-radius: 14px; padding: 18px 20px; margin: 14px 0; }}
-  .help h2 {{ font-size: 1.15rem; margin: 26px 0 6px; }}
-  .help h3 {{ font-size: 1.02rem; margin: 16px 0 4px; }}
-  .help p, .help li {{ line-height: 1.75; color: var(--ink, #222); }}
-  .help ul {{ margin: 6px 0 6px 4px; padding-left: 20px; }}
-  .help .tag {{ display: inline-block; background: var(--accent-soft, #eef2ff);
-    color: var(--accent, #3b5bdb); border-radius: 8px; padding: 1px 9px;
-    font-size: .86rem; margin-right: 6px; white-space: nowrap; }}
-  .help .tip {{ background: var(--accent-soft, #eef6ff); border-left: 4px solid var(--accent, #3b5bdb);
-    border-radius: 8px; padding: 12px 16px; margin: 10px 0; }}
-  .help .steps {{ counter-reset: s; list-style: none; padding-left: 0; }}
-  .help .steps li {{ counter-increment: s; position: relative; padding: 4px 0 4px 34px; }}
-  .help .steps li::before {{ content: counter(s); position: absolute; left: 0; top: 4px;
-    width: 24px; height: 24px; border-radius: 50%; background: var(--accent, #3b5bdb);
-    color: #fff; text-align: center; line-height: 24px; font-size: .82rem; }}
+  .help {{ max-width: 900px; }}
+  .help .q {{ background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 20px 22px; margin: 16px 0; box-shadow: var(--shadow); color: var(--text); }}
+  .help h2 {{ font-size: 1.18rem; margin: 4px 0 10px; color: var(--text); }}
+  .help h3 {{ font-size: 1.02rem; margin: 14px 0 4px; color: var(--text); }}
+  .help p, .help li {{ line-height: 1.85; color: var(--text); }}
+  .help .muted {{ color: var(--muted); }}
+  .help ul {{ margin: 6px 0 6px 2px; padding-left: 20px; }}
+  /* 快速跳轉 chips */
+  .help .jump {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 2px; }}
+  .help .jump a {{ text-decoration: none; font-size: .9rem; padding: 6px 12px; border-radius: 999px;
+    background: var(--chip-bg); border: 1px solid var(--chip-border); color: var(--text); transition: .15s; }}
+  .help .jump a:hover {{ border-color: var(--accent); color: var(--accent); }}
+  .help .tag {{ display: inline-block; background: var(--chip-bg); border: 1px solid var(--chip-border);
+    color: var(--text); border-radius: 999px; padding: 2px 11px; font-size: .86rem; margin: 2px 4px 2px 0; white-space: nowrap; }}
+  .help .tip {{ background: var(--line2); border-left: 4px solid var(--accent);
+    border-radius: 10px; padding: 12px 16px; margin: 12px 0; color: var(--text); }}
+  /* 可展開手風琴 */
+  .help details.acc {{ border: 1px solid var(--line); border-radius: 12px; margin: 10px 0; background: var(--card); overflow: hidden; }}
+  .help details.acc > summary {{ cursor: pointer; padding: 14px 16px; font-weight: 600; color: var(--text);
+    display: flex; align-items: center; gap: 8px; list-style: none; user-select: none; }}
+  .help details.acc > summary::-webkit-details-marker {{ display: none; }}
+  .help details.acc > summary:hover {{ background: var(--line2); }}
+  .help details.acc > summary .chev {{ margin-left: auto; transition: transform .2s; color: var(--muted); }}
+  .help details.acc[open] > summary .chev {{ transform: rotate(180deg); }}
+  .help details.acc > summary .sm {{ font-weight: 400; color: var(--muted); font-size: .9rem; }}
+  .help .acc-body {{ padding: 2px 18px 16px; }}
+  .help .gobtn {{ display: inline-block; margin-top: 8px; text-decoration: none; font-size: .92rem;
+    padding: 8px 16px; border-radius: 10px; background: var(--accent); color: #fff; }}
+  .help .gobtn:hover {{ filter: brightness(1.08); }}
+  /* 編號步驟 */
+  .help .steps {{ counter-reset: s; list-style: none; padding-left: 0; margin: 8px 0; }}
+  .help .steps li {{ counter-increment: s; position: relative; padding: 6px 0 6px 38px; }}
+  .help .steps li::before {{ content: counter(s); position: absolute; left: 0; top: 5px;
+    width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff;
+    text-align: center; line-height: 26px; font-size: .85rem; font-weight: 600; }}
+  /* 互動示範元件 */
+  .help .demo {{ border: 1px dashed var(--chip-border); border-radius: 12px; padding: 16px; margin: 12px 0; background: var(--line2); }}
+  .help .demo .row {{ display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 12px; }}
+  .help .demo label {{ font-size: .9rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }}
+  .help .demo select, .help .demo input[type=number] {{ padding: 7px 10px; border-radius: 8px;
+    border: 1px solid var(--chip-border); background: var(--card); color: var(--text); font-size: .95rem; }}
+  .help .demo input[type=range] {{ accent-color: var(--accent); width: 160px; }}
+  .help .demo .out {{ font-size: 1.05rem; color: var(--text); }}
+  .help .demo .out b {{ color: var(--accent); font-size: 1.35rem; }}
+  .help .demo .brk {{ color: var(--muted); font-size: .88rem; margin-top: 4px; }}
+  .help .demo .star {{ cursor: pointer; font-size: 1.5rem; user-select: none; }}
+  .help .demo .stbtn {{ padding: 6px 10px; border-radius: 8px; border: 1px solid var(--chip-border);
+    background: var(--card); color: var(--text); cursor: pointer; font-size: .9rem; }}
+  .help .demo .stbtn.on {{ background: var(--accent); color: #fff; border-color: var(--accent); }}
+  .help kbd {{ background: var(--chip-bg); border: 1px solid var(--chip-border); border-bottom-width: 2px;
+    border-radius: 6px; padding: 1px 7px; font-size: .85rem; color: var(--text); }}
 </style>
 </head>
 <body>
@@ -225,85 +260,226 @@ def render_help_html() -> str:
     <div class="topbar">{_nav("help")}{_THEME_BTN}</div>
     <div class="eyebrow">九上科技 · 智慧儀表板</div>
     <h1>📖 使用說明</h1>
-    <div class="sub">一頁看懂整個網站怎麼用 · 白話版 · 更新於 {now}</div>
+    <div class="sub">一頁看懂整個網站怎麼用 · 可展開／可試玩 · 更新於 {now}</div>
 
     <div class="q">
       <h2>這是什麼？</h2>
-      <p>這是一套幫九上科技「自動盯行情、找人、找供應商、開發客戶、算報價」的免費網站。資料每天自動更新，
-      不用開電腦、不用付費、不用維護。上面一排是七個分頁，點一下就切換：</p>
-      <p>
-        <span class="tag">🏠 首頁</span><span class="tag">🔩 原料</span><span class="tag">🔧 招募</span>
-        <span class="tag">🏭 供應商</span><span class="tag">🎯 客戶</span><span class="tag">🧮 報價</span>
-        <span class="tag">📖 說明</span>
-      </p>
+      <p>這是一套幫九上科技<b>自動盯原料行情、找人才、找供應商、開發客戶、快速報價</b>的網站。資料每天自動更新，
+      不用開電腦、不用付費、不用維護。最上面一排是七個分頁，點一下就切換。</p>
+      <p class="muted">👇 點下面任一顆，直接跳到該功能的詳細說明：</p>
+      <div class="jump">
+        <a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
+        <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a>
+        <a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
+      </div>
     </div>
 
     <div class="q">
       <h2>七個分頁各自怎麼用</h2>
+      <p class="muted">點每一條標題可以展開／收合詳細說明。</p>
 
-      <h3>🏠 首頁</h3>
-      <p>每天的重點總覽。每張大卡片是一個功能，點下去就進去。也有一張「🗂️ 九上資料庫」卡片，直接打開公司的 Google 試算表。</p>
+      <details class="acc" id="f-home" open>
+        <summary>🏠 首頁 <span class="sm">— 每天先看這頁</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p>每天打開先看這頁。每張大卡片就是一個功能，卡片上會顯示今天的重點數字（原料漲跌、追蹤到的職缺數、供應商家數、客戶家數）。<b>點卡片</b>就進到那個功能。</p>
+          <p>還有一張「🗂️ 九上資料庫」卡片，點下去直接打開公司的 Google 試算表，看所有存下來的收藏、備註、報價。</p>
+          <a class="gobtn" href="index.html">前往首頁 →</a>
+        </div>
+      </details>
 
-      <h3>🔩 原料</h3>
-      <p>看銅、鋁、鎳、鋼的國際價格走勢（換算成台幣）。買方視角：<b>漲</b>代表進料成本變高要注意，<b>跌／區間內</b>就還好。
-      可切換單位（每公噸／每磅）、切換期間（近 7 天／30 天等），看漲跌幅。</p>
+      <details class="acc" id="f-metals">
+        <summary>🔩 原料 <span class="sm">— 銅／鋁／鎳／鋼 價格</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p>追蹤銅、鋁、鎳、鋼的國際價格（已換算成台幣）。每種金屬一張面板，有<b>現價、今日漲跌、走勢圖</b>（含月均線與你設的關注上下限）。</p>
+          <ul>
+            <li>上方可切<b>單位</b>（每公噸／每磅）。</li>
+            <li>可切<b>期間</b>（近 7 天／30 天／90 天／一年）看漲跌幅。</li>
+            <li>下面還有<b>匯率圖</b>與<b>比價圖</b>。</li>
+          </ul>
+          <p class="muted">買方視角：漲＝進料成本變高要留意；跌／區間內＝安心。</p>
+          <a class="gobtn" href="metals.html">前往原料 →</a>
+        </div>
+      </details>
 
-      <h3>🔧 招募</h3>
-      <p>自動追蹤台中金屬加工、品管（QC）相關的公開職缺行情。可搜尋、排序、只看收藏，還有薪資分布圖，幫忙抓招募的市場行情。</p>
+      <details class="acc" id="f-jobs">
+        <summary>🔧 招募 <span class="sm">— 台中品管職缺行情</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p>自動抓台中金屬加工、品管（QC）相關的<b>公開職缺</b>，幫你掌握招募的市場行情。</p>
+          <ul>
+            <li><b>搜尋框</b>打關鍵字（例：品管、量測）即時篩選。</li>
+            <li>點欄位<b>標題可排序</b>（公司、薪資⋯）。</li>
+            <li>勾<b>只看收藏</b>，只顯示你收藏的。</li>
+            <li><b>薪資分布長條圖</b>看行情落在哪個區間。</li>
+          </ul>
+          <a class="gobtn" href="jobs.html">前往招募 →</a>
+        </div>
+      </details>
 
-      <h3>🏭 供應商</h3>
-      <p>幫忙找金屬加工的供應商（CNC、表面處理、材料、螺絲沖壓⋯）。可依類別篩選、勾「只看神岡周邊」看附近的、切到地圖看位置。</p>
+      <details class="acc" id="f-sup">
+        <summary>🏭 供應商 <span class="sm">— 找金屬加工廠</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p>幫你找金屬加工供應商（CNC、表面處理、材料、螺絲沖壓、鑄造、模具⋯）。</p>
+          <ul>
+            <li><b>類別下拉</b>篩選你要的能力。</li>
+            <li>勾<b>只看神岡周邊</b>看附近的（<b>⭐近</b>＝神岡周邊，溝通打樣快）。</li>
+            <li>切<b>地圖</b>檢視看位置分佈。</li>
+            <li>每一列可<b>收藏／標狀態／寫備註</b>（需登入）。</li>
+          </ul>
+          <a class="gobtn" href="suppliers.html">前往供應商 →</a>
+        </div>
+      </details>
 
-      <h3>🎯 客戶</h3>
-      <p>找可能會買精密金屬零件的潛在客戶（光學、醫療、半導體、自行車⋯）。可依產業篩選、搜尋公司名。</p>
+      <details class="acc" id="f-cust">
+        <summary>🎯 客戶 <span class="sm">— 找潛在買主</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p>找可能會買精密金屬零件的<b>潛在客戶</b>（光學、醫療、半導體、自動化、自行車、汽車⋯），用來主動開發。</p>
+          <ul>
+            <li><b>產業下拉</b>篩選。</li>
+            <li><b>搜尋</b>公司名。</li>
+            <li>每列可<b>收藏／標記／備註</b>（需登入）。</li>
+          </ul>
+          <a class="gobtn" href="customers.html">前往客戶 →</a>
+        </div>
+      </details>
 
-      <h3>🧮 報價</h3>
-      <p>快速估報價：選材質（會自動帶入最新原料價）、填重量（或填長寬高自動算重量），就算出建議報價。
-      按「存這筆」會記進報價歷史，登入後同步到試算表。</p>
+      <details class="acc" id="f-quote">
+        <summary>🧮 報價 <span class="sm">— 快速估價</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p>快速估報價的四個步驟：</p>
+          <ol>
+            <li>選<b>材質</b>（會自動帶入最新原料價）。</li>
+            <li>填<b>重量</b>；不知道重量？填長寬高按「計算」自動換算。</li>
+            <li>看<b>建議報價</b>。</li>
+            <li>按<b>存這筆</b>記進報價歷史（登入後同步到試算表）。</li>
+          </ol>
+          <p class="muted">👇 下面「試玩看看」可以直接體驗報價怎麼算。</p>
+          <a class="gobtn" href="quote.html">前往報價 →</a>
+        </div>
+      </details>
     </div>
 
     <div class="q">
+      <h2>🧮 試玩看看：報價怎麼算</h2>
+      <p class="muted">拉一拉、選一選，數字會即時變。這只是<b>示範</b>用近似料價；實際報價頁會帶入當天最新原料價。</p>
+      <div class="demo">
+        <div class="row">
+          <label>材質
+            <select id="dMat">
+              <option data-p="90" value="不鏽鋼">不鏽鋼（約 90/kg）</option>
+              <option data-p="320" value="銅">銅（約 320/kg）</option>
+              <option data-p="95" value="鋁">鋁（約 95/kg）</option>
+              <option data-p="40" value="碳鋼">碳鋼／鐵（約 40/kg）</option>
+            </select>
+          </label>
+          <label>重量（kg）
+            <input id="dW" type="number" min="0" step="0.1" value="3">
+          </label>
+          <label>加工＋利潤倍數 <span id="dMx" class="muted">2.2×</span>
+            <input id="dMul" type="range" min="1.5" max="3" step="0.1" value="2.2">
+          </label>
+        </div>
+        <div class="out">建議報價：<b id="dQ">NT$ —</b></div>
+        <div class="brk" id="dBrk"></div>
+      </div>
+    </div>
+
+    <div class="q" id="db">
       <h2>🔐 資料庫怎麼用（重點）</h2>
-      <p>「資料庫」就是把你在網站上做的收藏、標記、報價，統統存進公司自己的 <b>Google 試算表</b>，
+      <p>「資料庫」就是把你在網站上做的<b>收藏、標記、報價</b>統統存進公司自己的 <b>Google 試算表</b>，
       這樣換手機、換電腦都看得到同一份，不會不見。</p>
 
       <h3>第一步：用 Google 登入</h3>
       <ul class="steps">
-        <li>點右上角的「使用 Google 登入」按鈕。</li>
+        <li>點右上角的「使用 Google 帳戶登入」按鈕。</li>
         <li>選公司的 Google 帳號登入。</li>
         <li>登入後右上角會顯示 👤 名字，就成功了。</li>
       </ul>
       <div class="tip">💡 登入之後<b>切換分頁不會登出</b>，大約一小時後才需要再登入一次（這是 Google 的安全設計，正常）。</div>
 
-      <h3>登入後能做什麼</h3>
+      <h3>登入後能做什麼（下面可以試玩）</h3>
+      <div class="demo">
+        <div class="row">
+          <span>⭐ 收藏：點星星試試 →</span>
+          <span class="star" id="dStar" role="button" tabindex="0">☆</span>
+          <span class="muted" id="dStarTxt">未收藏</span>
+        </div>
+        <div class="row">
+          <span>狀態：點按鈕切換 →</span>
+          <button class="stbtn" data-v="已聯絡">已聯絡</button>
+          <button class="stbtn" data-v="合作中">合作中</button>
+          <button class="stbtn" data-v="不合適">不合適</button>
+          <span class="muted" id="dStatTxt">未設定</span>
+        </div>
+      </div>
       <ul>
-        <li><b>⭐ 收藏</b>：點名單上的星星，收藏起來；勾「只看收藏」就只顯示收藏的。</li>
-        <li><b>狀態</b>：每一列可以標「已聯絡／合作中／不合適」。</li>
+        <li><b>⭐ 收藏</b>：點名單上的星星收藏；勾「只看收藏」就只顯示收藏的。</li>
+        <li><b>狀態</b>：每列可標「已聯絡／合作中／不合適」。</li>
         <li><b>📝 備註</b>：想記什麼就打在備註欄。</li>
-        <li><b>📅 排提醒</b>：一鍵開 Google 日曆，預填好「拜訪某公司」的事件。</li>
+        <li><b>📅 排提醒</b>：一鍵開 Google 日曆，預填好「拜訪某公司」事件。</li>
         <li><b>✉️ 寄信</b>：一鍵開 Gmail，預填好主旨內文。</li>
         <li><b>🧮 報價歷史</b>：報價頁按「存這筆」，紀錄會存進試算表。</li>
       </ul>
-      <p>這些全部會同步到公司的 Google 試算表。想看完整資料、或直接編輯，點首頁的「🗂️ 九上資料庫」卡片打開試算表即可。</p>
+      <p>以上全部會同步到公司的 Google 試算表。想看完整資料或直接編輯，點首頁的「🗂️ 九上資料庫」卡片打開試算表即可。</p>
     </div>
 
-    <div class="q">
+    <div class="q" id="faq">
       <h2>❓ 常見問題</h2>
-      <h3>登出了怎麼辦？</h3>
-      <p>再點一次右上角「使用 Google 登入」就好。收藏／備註都還在（存在試算表裡，不會不見）。</p>
-
-      <h3>看不到最新資料？</h3>
-      <p>按鍵盤 <b>Ctrl + F5</b>（Mac 是 Cmd + Shift + R）強制重新整理一次即可。原料價一天更新兩次，其他名單每天更新。</p>
-
-      <h3>名單好像只顯示一部分？</h3>
-      <p>頁面上為了速度只放最相關的前 600 筆（已按「離神岡近／有分類」排序）。<b>完整名單</b>在 Google 試算表裡，點首頁「🗂️ 九上資料庫」就能看全部。</p>
-
-      <h3>要錢嗎？</h3>
-      <p>不用。整套都跑在免費服務上（GitHub + Google），關機也會自己在雲端更新。</p>
+      <details class="acc" open>
+        <summary>登出了怎麼辦？<span class="chev">▾</span></summary>
+        <div class="acc-body"><p>再點一次右上角「使用 Google 帳戶登入」就好。收藏／備註都還在（存在試算表裡，不會不見）。</p></div>
+      </details>
+      <details class="acc">
+        <summary>看不到最新資料？<span class="chev">▾</span></summary>
+        <div class="acc-body"><p>按 <kbd>Ctrl</kbd> + <kbd>F5</kbd>（Mac 是 <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>）強制重新整理一次即可。原料價一天更新兩次，其他名單每天更新。</p></div>
+      </details>
+      <details class="acc">
+        <summary>名單好像只顯示一部分？<span class="chev">▾</span></summary>
+        <div class="acc-body"><p>頁面上為了速度只放最相關的前 600 筆（已按「離神岡近／有分類」排序）。<b>完整名單</b>在 Google 試算表裡，點首頁「🗂️ 九上資料庫」就能看全部。</p></div>
+      </details>
+      <details class="acc">
+        <summary>要錢嗎？<span class="chev">▾</span></summary>
+        <div class="acc-body"><p>不用。整套都跑在免費服務上（GitHub + Google），關機也會自己在雲端更新。</p></div>
+      </details>
+      <details class="acc">
+        <summary>右上角🌙是什麼？<span class="chev">▾</span></summary>
+        <div class="acc-body"><p>切換深色／淺色模式，看你眼睛舒服。設定會記住。</p></div>
+      </details>
     </div>
 
     <div class="foot">有任何看不懂的地方，回到這頁再看一次就好。全部免費、自動更新。</div>
   </div>
+  <script>
+  (function(){{
+    // 報價示範
+    var mat=document.getElementById("dMat"), w=document.getElementById("dW"),
+        mul=document.getElementById("dMul"), mx=document.getElementById("dMx"),
+        q=document.getElementById("dQ"), brk=document.getElementById("dBrk");
+    function calc(){{
+      var p=parseFloat(mat.options[mat.selectedIndex].getAttribute("data-p"))||0;
+      var kg=parseFloat(w.value)||0, m=parseFloat(mul.value)||2.2;
+      mx.textContent=m.toFixed(1)+"×";
+      var cost=p*kg, quote=Math.round(cost*m);
+      q.textContent="NT$ "+quote.toLocaleString();
+      brk.textContent="材料成本 NT$ "+Math.round(cost).toLocaleString()+"（"+p+"/kg × "+kg+"kg）× "+m.toFixed(1)+" 倍（含加工與利潤）";
+    }}
+    if(mat){{ [mat,w,mul].forEach(function(el){{ el.addEventListener("input",calc); }}); calc(); }}
+    // 收藏星星示範
+    var star=document.getElementById("dStar"), stxt=document.getElementById("dStarTxt"), on=false;
+    function toggleStar(){{ on=!on; star.textContent=on?"⭐":"☆"; stxt.textContent=on?"已收藏":"未收藏"; }}
+    if(star){{ star.addEventListener("click",toggleStar);
+      star.addEventListener("keydown",function(e){{ if(e.key==="Enter"||e.key===" "){{ e.preventDefault(); toggleStar(); }} }}); }}
+    // 狀態按鈕示範
+    var stat=document.getElementById("dStatTxt");
+    Array.prototype.forEach.call(document.querySelectorAll(".stbtn"),function(b){{
+      b.addEventListener("click",function(){{
+        var was=b.classList.contains("on");
+        document.querySelectorAll(".stbtn").forEach(function(x){{ x.classList.remove("on"); }});
+        if(!was){{ b.classList.add("on"); stat.textContent="已標記："+b.getAttribute("data-v"); }}
+        else {{ stat.textContent="未設定"; }}
+      }});
+    }});
+  }})();
+  </script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
