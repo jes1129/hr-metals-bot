@@ -108,3 +108,7 @@ python main.py --mock          # 產生 dashboard_preview.html，用瀏覽器開
 ### 日曆／Gmail
 
 名錄每列有 📅（加到 Google 日曆提醒）、✉️（用 Gmail 寄開發信）按鈕，用「預填連結」開啟，不需任何權限設定，任何 Google 帳號都能用。
+
+### NotebookLM 串接（選填）
+
+`notebooklm-export.gs`（貼進同一個 Apps Script 專案）會把 ERP 現況每天寫成一份固定 Google 文件「九上科技 ERP 每日簡報」；把它加進 NotebookLM 當來源即可問答、生語音摘要。筆記本網址填進 `docs/config.js` 的 `NOTEBOOK_URL`，首頁「🧠 NotebookLM」卡片就會直達。NotebookLM 無寫入 API，第一次來源需手動加、之後按「同步」。
