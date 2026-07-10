@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="assets/style.css?v=202607101548">
-<script src="config.js?v=202607101548"></script>
+<link rel="stylesheet" href="assets/style.css?v=202607101611">
+<script src="config.js?v=202607101611"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <title>九上科技 · 使用說明</title>
 <style>
@@ -67,7 +67,7 @@
     <div class="topbar"><div class="nav"><a href="index.html">🏠 首頁</a><details class="navdrop"><summary>📈 情報 ▾</summary><div class="navmenu"><a href="metals.html">🔩 原料行情</a><a href="jobs.html">🔧 招募雷達</a><a href="suppliers.html">🏭 供應商</a><a href="customers.html">🎯 客戶開發</a></div></details><a href="quote.html">🧮 報價</a><a href="orders.html">📦 訂單</a><a href="mrp.html">📊 庫存·MRP</a><a href="assistant.html">🤖 助手</a><a href="db.html">🗂️ 資料庫</a><a class="on" href="help.html">📖 說明</a></div><span id="gAuth" class="gauth"></span><button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button></div>
     <div class="eyebrow">九上科技 · 智慧儀表板</div>
     <h1>📖 使用說明</h1>
-    <div class="sub">一頁看懂整個網站怎麼用 · 可展開／可試玩 · 更新於 2026-07-10</div>
+    <div class="sub">一頁看懂整個網站怎麼用 · 可展開／可試玩 · 更新於 2026-07-11</div>
 
     <div class="q">
       <h2>這是什麼？</h2>
@@ -251,15 +251,14 @@
       </details>
 
       <details class="acc" id="f-email">
-        <summary>📧 信箱通知 <span class="sm">— 自動早報／警示＋一鍵寄信</span><span class="chev">▾</span></summary>
+        <summary>📧 信箱通知 <span class="sm">— 每日自動寄早報給你</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>系統可用公司 Gmail 帳號自動寄信、也能一鍵把報價/通知寄給客戶。</p>
+          <p>系統每天早上用公司 Gmail 帳號，自動把 ERP 現況寄到你信箱，不用開網站就收到重點：</p>
           <ul>
-            <li><b>每日 ERP 早報</b>：每天早上把營收/待出貨/逾期/缺料/低庫存＋原料行情寄到你信箱；有缺料或逾期時主旨會帶 ⚠️。</li>
-            <li><b>一鍵寄客戶</b>：報價頁填客戶 email → <b>「✉️ 寄報價給客戶」</b>；訂單編輯裡 <b>「✉️ 通知客戶」</b>（接單/出貨通知）。</li>
-            <li><b>發詢價信</b>：庫存·MRP 有缺料時，<b>「✉️ 發詢價信」</b>填供應商 email，內文自動帶入缺料清單。</li>
+            <li><b>每日 ERP 早報</b>：營收、待出貨、逾期、缺料採購建議、低於安全庫存，加原料行情。</li>
+            <li><b>警示</b>：有缺料或逾期時，信件主旨會帶 <b>⚠️</b>，一眼看出今天要注意什麼。</li>
           </ul>
-          <div class="tip">💡 一次性設定（工程師協助）：貼 <code>email-notify.gs</code>、在指令碼屬性填 <b>NOTIFY_EMAILS</b>（收件人）、開每日觸發；一鍵寄信需後端更新 <code>sendMail</code> 並登入。Gmail 每天約 100 封上限，內部＋少量對外足夠。</div>
+          <div class="tip">💡 一次性設定（工程師協助）：貼 <code>email-notify.gs</code>、在指令碼屬性填 <b>NOTIFY_EMAILS</b>（收件人 email）、執行 <code>installEmailTrigger</code> 開每日自動。</div>
           <a class="gobtn" href="https://mail.google.com" target="_blank" rel="noopener">開啟 Gmail →</a>
         </div>
       </details>
@@ -324,7 +323,6 @@
         <li><b>狀態</b>：每列可標「已聯絡／合作中／不合適」。</li>
         <li><b>📝 備註</b>：想記什麼就打在備註欄。</li>
         <li><b>📅 排提醒</b>：一鍵開 Google 日曆，預填好「拜訪某公司」事件。</li>
-        <li><b>✉️ 寄信</b>：一鍵開 Gmail，預填好主旨內文。</li>
         <li><b>🧮 報價歷史</b>：報價頁按「存這筆」，紀錄會存進試算表。</li>
       </ul>
       <p>以上全部會同步到公司的 Google 試算表。</p>
@@ -401,6 +399,6 @@
     });
   })();
   </script>
-  <script src="assets/app.js?v=202607101548"></script>
+  <script src="assets/app.js?v=202607101611"></script>
 </body>
 </html>
