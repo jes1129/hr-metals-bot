@@ -201,23 +201,31 @@ function tImport_(table, rows, wantHeader, by) {
 }
 
 // ===========================================================================
-// AI 助手（Gemini 免費）— 金鑰放在 Apps Script「指令碼屬性」GEMINI_API_KEY，不進公開 repo
-//   啟用方式：Apps Script 左側「專案設定」→「指令碼屬性」→ 新增 GEMINI_API_KEY = 你的金鑰。
-//   （免費金鑰申請：https://aistudio.google.com/apikey）未設定時回 need_setup，網站會顯示提示。
+// AI 助手（Groq 免費、免綁卡）— 金鑰放在 Apps Script「指令碼屬性」GROQ_API_KEY，不進公開 repo
+//   啟用方式：console.groq.com 拿免費金鑰 → Apps Script「專案設定」→「指令碼屬性」→ GROQ_API_KEY = 金鑰。
+//   模型失效時把 AI_MODEL 換成 Groq 目前提供的其他免費模型即可。
 // ===========================================================================
+var AI_MODEL = "llama-3.3-70b-versatile";  // Groq 免費模型；若報 model 不存在可改 "llama-3.1-8b-instant"
 function ai_(question, context) {
-  var key = PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY");
-  if (!key) return { error: "未設定 GEMINI_API_KEY", need_setup: true };
-  var sys = "你是九上科技（精密金屬零件加工廠）的 ERP 助手。請用繁體中文、精簡、條列、盡量引用下列資料中的數字回答；"
-    + "若資料不足就說明還缺什麼。以下為目前系統資料摘要（JSON）：\n" + JSON.stringify(context || {});
-  var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + encodeURIComponent(key);
-  var payload = { contents: [{ parts: [{ text: sys + "\n\n使用者問題：" + String(question || "") }] }] };
+  var key = PropertiesService.getScriptProperties().getProperty("GROQ_API_KEY");
+  if (!key) return { error: "未設定 GROQ_API_KEY", need_setup: true };
+  var sys = "你是九上科技（精密金屬零件加工廠）的 ERP 助手。請用繁體中文、親切、精簡、條列回答；"
+    + "遇到「怎麼用/教學」類問題，依『網站功能說明』給具體操作步驟；資料類問題盡量引用下列 JSON 的數字。"
+    + "以下為目前系統資料摘要（JSON）：\n" + JSON.stringify(context || {});
+  var payload = {
+    model: AI_MODEL,
+    messages: [{ role: "system", content: sys }, { role: "user", content: String(question || "") }],
+    temperature: 0.5
+  };
   try {
-    var r = UrlFetchApp.fetch(url, { method: "post", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true });
+    var r = UrlFetchApp.fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "post", contentType: "application/json",
+      headers: { Authorization: "Bearer " + key },
+      payload: JSON.stringify(payload), muteHttpExceptions: true
+    });
     var d = JSON.parse(r.getContentText());
-    if (d.error) return { error: d.error.message || "Gemini 錯誤" };
-    var parts = (((d.candidates || [])[0] || {}).content || {}).parts || [];
-    var text = parts[0] ? parts[0].text : "";
+    if (d.error) return { error: (d.error && d.error.message) || "Groq 錯誤" };
+    var text = (((d.choices || [])[0] || {}).message || {}).content || "";
     return { ok: true, text: text || "（AI 沒有回覆內容）" };
   } catch (e) { return { error: String(e) }; }
 }

@@ -318,7 +318,7 @@ def render_assistant_html() -> str:
     <div id="aiView" class="aiview">
       <div class="dbloading">載入中…（若一直沒出現，請先用右上角「使用 Google 帳戶登入」）</div>
     </div>
-    <div class="foot">快速問答由系統即時計算（不外傳、免費）。自由提問使用客戶自己的免費 Gemini 金鑰（放在 Apps Script）。</div>
+    <div class="foot">快速問答由系統即時計算（不外傳、免費）。自由提問使用客戶自己的免費 AI 金鑰（Groq，放在 Apps Script）。</div>
   </div>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
@@ -549,16 +549,16 @@ def render_help_html() -> str:
           <p>登入後，點按鈕或打字就能問公司資料：</p>
           <ul>
             <li><b>快速問答</b>（免設定、免費、即時）：本月要補哪些料、哪些訂單逾期、本月營收概況、待出貨清單、庫存過低品項。</li>
-            <li><b>自由提問</b>：直接打一句話問（需啟用免費 Gemini，見下方）。</li>
+            <li><b>自由提問</b>：直接打一句話問，什麼都能聊（需啟用免費 AI，見下方）。</li>
           </ul>
-          <h3>（選用）啟用「自由提問」的 Gemini：一次性設定</h3>
+          <h3>（選用）啟用「自由提問」：一次性設定（用免費 Groq）</h3>
           <ol>
-            <li>去 <b>aistudio.google.com/apikey</b> 用公司 Google 帳號申請免費金鑰（複製起來）。</li>
+            <li>去 <b>console.groq.com</b> 用 Google 登入，建立免費 API 金鑰（免綁卡，複製起來）。</li>
             <li>打開公司試算表 → 擴充功能 → Apps Script → 左側 <b>「專案設定」⚙️</b>。</li>
-            <li>下方 <b>「指令碼屬性」→ 新增屬性</b>：名稱填 <b>GEMINI_API_KEY</b>、值貼上金鑰 → 儲存。</li>
+            <li>下方 <b>「指令碼屬性」→ 新增屬性</b>：名稱填 <b>GROQ_API_KEY</b>、值貼上金鑰 → 儲存。</li>
             <li>回程式碼把最新版 <code>google-apps-script.gs</code> 貼上、重新部署（新版本）即可。</li>
           </ol>
-          <p class="muted">不設定也沒關係——快速問答本來就能用。</p>
+          <p class="muted">不設定也沒關係——快速問答與「教我用網站」本來就能用。</p>
           <a class="gobtn" href="assistant.html">前往 AI 助手 →</a>
         </div>
       </details>

@@ -1478,15 +1478,15 @@
         if (d && d.ok && d.text) { wait.textContent = d.text; return; }   // Gemini 已啟用 → 什麼都能答
         var local = matchHelp(q);                        // 沒 Gemini → 本地教學小腦袋
         if (local) {
-          wait.textContent = local + "\n\n💡 想讓我像 ChatGPT 一樣什麼都能聊？在「📖 說明→🤖 AI 助手」照步驟啟用免費 Gemini（一次就好）。";
+          wait.textContent = local + "\n\n💡 想讓我像 ChatGPT 一樣什麼都能聊？在「📖 說明→🤖 AI 助手」照步驟啟用免費 AI（一次就好）。";
           return;
         }
         if (d && d.need_setup) {
-          wait.textContent = "這題要啟用 Gemini 我才能自由回答～設定很簡單(一次就好)，「📖 說明→🤖 AI 助手」有圖解。\n或先問我：報價怎麼用 / 怎麼建訂單 / 缺料 / 這個網站怎麼用。";
+          wait.textContent = "這題要啟用免費 AI 我才能自由回答～設定很簡單(一次就好)，「📖 說明→🤖 AI 助手」有圖解。\n或先問我：報價怎麼用 / 怎麼建訂單 / 缺料 / 這個網站怎麼用。";
           return;
         }
         if (d && d.error) { wait.textContent = "⚠️ AI 失敗：" + d.error + "\n先試試：報價怎麼用 / 缺料 / 逾期。"; return; }
-        wait.textContent = "這題我暫時答不了(可能未登入或未設定 Gemini)。試試問：報價怎麼用 / 怎麼建訂單 / 缺料 / 這個網站怎麼用。";
+        wait.textContent = "這題我暫時答不了(可能未登入或未設定 AI)。試試問：報價怎麼用 / 怎麼建訂單 / 缺料 / 這個網站怎麼用。";
       });
     }
 
@@ -1502,7 +1502,7 @@
       + '</div>'
       + '<div class="ailog" id="aiLog"></div>'
       + '<div class="airow"><input id="aiInput" class="dbsearch" placeholder="什麼都能問：報價怎麼用？怎麼建訂單？這個月缺什麼料？"><button class="dbbtn primary" id="aiSend">送出</button></div>'
-      + '<div class="dbfoot">打字問我「網站怎麼用、報價/訂單/庫存怎麼操作、缺料/逾期/營收」都行。啟用免費 Gemini 後(見說明)可像 ChatGPT 一樣自由聊。</div>';
+      + '<div class="dbfoot">打字問我「網站怎麼用、報價/訂單/庫存怎麼操作、缺料/逾期/營收」都行。啟用免費 AI 後(見說明)可像 ChatGPT 一樣自由聊。</div>';
 
     msg("ai", "嗨！我是九上 ERP 助手 🤖\n・想學怎麼用？點「📖 教我用這個網站」，或直接問我「報價怎麼用」「怎麼建訂單」——再小的問題都可以。\n・想查資料？點按鈕或問「這個月缺什麼料 / 哪些逾期 / 營收多少」。");
     Array.prototype.forEach.call(mount.querySelectorAll(".aichips [data-q]"), function (b) {
