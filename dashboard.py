@@ -197,6 +197,11 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
         '<div class="he">🧠</div><div class="ht">NotebookLM 知識庫</div>'
         '<div class="hl"><div class="mnote">把 ERP 現況＋公司文件變 AI 知識庫：問答、生語音簡報</div></div>'
         '<div class="hcta">開啟知識庫 →</div></a>')
+    cards.append(
+        '<a class="hcard" href="https://mail.google.com" target="_blank" rel="noopener">'
+        '<div class="he">📧</div><div class="ht">信箱</div>'
+        '<div class="hl"><div class="mnote">收每日 ERP 早報/警示、開 Gmail；報價/訂單頁可一鍵寄客戶</div></div>'
+        '<div class="hcta">開啟信箱 →</div></a>')
     cards.append(_hcard(
         "help.html", "📖", "使用說明",
         '<div class="mnote">新手上路、每項功能怎麼用、常見問題（不會用先看這裡）</div>',
@@ -412,7 +417,7 @@ def render_help_html() -> str:
       <div class="jump">
         <a href="#start">🚀 新手上路</a><a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
         <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a>
-        <a href="#f-orders">📦 訂單</a><a href="#f-mrp">📊 庫存·MRP</a><a href="#f-ai">🤖 助手</a><a href="#f-notebook">🧠 NotebookLM</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
+        <a href="#f-orders">📦 訂單</a><a href="#f-mrp">📊 庫存·MRP</a><a href="#f-ai">🤖 助手</a><a href="#f-notebook">🧠 NotebookLM</a><a href="#f-email">📧 信箱</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
       </div>
     </div>
 
@@ -582,6 +587,20 @@ def render_help_html() -> str:
           <div class="tip">💡 重要：文件<b>不會自動</b>跑進 NotebookLM——<b>第一次要手動「加來源」一次</b>；之後系統改寫<b>同一份</b>文件，你在 NotebookLM 該來源按「同步」就更新，不必重加。</div>
           <p class="muted">它負責「文件知識庫＋問答/音檔」，跟網站的「即時運算/儀表板」互補。設定步驟（貼 <code>notebooklm-export.gs</code>、開每日更新、加來源）由工程師協助一次即可。</p>
           <a class="gobtn" id="nbGo" href="https://notebooklm.google.com" target="_blank" rel="noopener">開啟 NotebookLM →</a>
+        </div>
+      </details>
+
+      <details class="acc" id="f-email">
+        <summary>📧 信箱通知 <span class="sm">— 自動早報／警示＋一鍵寄信</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p>系統可用公司 Gmail 帳號自動寄信、也能一鍵把報價/通知寄給客戶。</p>
+          <ul>
+            <li><b>每日 ERP 早報</b>：每天早上把營收/待出貨/逾期/缺料/低庫存＋原料行情寄到你信箱；有缺料或逾期時主旨會帶 ⚠️。</li>
+            <li><b>一鍵寄客戶</b>：報價頁填客戶 email → <b>「✉️ 寄報價給客戶」</b>；訂單編輯裡 <b>「✉️ 通知客戶」</b>（接單/出貨通知）。</li>
+            <li><b>發詢價信</b>：庫存·MRP 有缺料時，<b>「✉️ 發詢價信」</b>填供應商 email，內文自動帶入缺料清單。</li>
+          </ul>
+          <div class="tip">💡 一次性設定（工程師協助）：貼 <code>email-notify.gs</code>、在指令碼屬性填 <b>NOTIFY_EMAILS</b>（收件人）、開每日觸發；一鍵寄信需後端更新 <code>sendMail</code> 並登入。Gmail 每天約 100 封上限，內部＋少量對外足夠。</div>
+          <a class="gobtn" href="https://mail.google.com" target="_blank" rel="noopener">開啟 Gmail →</a>
         </div>
       </details>
     </div>
@@ -1272,7 +1291,11 @@ def render_quote_html(history: dict) -> str:
       <div class="qr"><div class="qk">總成本（料＋工）</div><div class="qv" id="qTotal">—</div></div>
       <div class="qr big"><div class="qk">建議報價</div><div class="qv" id="qQuote">—</div></div>
     </div>
-    <div style="text-align:center;margin:14px 0 18px"><button id="qSave" class="gbtn" style="font-size:14px;padding:9px 18px">💾 存這筆報價</button></div>
+    <div style="text-align:center;margin:14px 0 10px"><button id="qSave" class="gbtn" style="font-size:14px;padding:9px 18px">💾 存這筆報價</button></div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:0 0 18px">
+      <input id="qEmail" placeholder="客戶 email（要寄報價才填）" style="padding:8px 12px;border-radius:10px;border:1px solid var(--chip-border);background:var(--card);color:var(--text);font-size:14px;min-width:220px">
+      <button id="qMail" class="gbtn" style="font-size:14px;padding:9px 16px">✉️ 寄報價給客戶</button>
+    </div>
 
     <div class="panel">
       <h3>🧾 報價歷史</h3>

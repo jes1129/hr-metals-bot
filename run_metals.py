@@ -7,13 +7,35 @@ run_metals.py — 功能 B 入口（每日 2 次，最頻繁）→ 同時產生�
       → 突破區間時發告警（若有設 webhook）。
 """
 import asyncio
+import datetime
 import json
 import os
 
+import config
 import dashboard
 import metals
 
 DATA_DIR = os.environ.get("METALS_DATA_DIR", "/data")
+
+
+def _build_signals(history):
+    """原料現況/突破訊號 → 給 email 早報讀取（docs/signals.json，Pages 會 serve）。"""
+    metals_list, alerts = [], []
+    for key, cfg in config.METALS.items():
+        series = history.get(key, []) or []
+        latest = series[-1] if series else {}
+        status = metals.check_status(key, latest.get("price"))
+        metals_list.append({
+            "key": key, "name": cfg.get("name", key),
+            "price_twd": latest.get("price_twd"), "pct": latest.get("change_pct"),
+            "status": status, "note": cfg.get("note", ""),
+        })
+        if status == "break_high":
+            alerts.append(cfg.get("name", key) + " 漲破上線（原料變貴，注意成本）")
+        elif status == "break_low":
+            alerts.append(cfg.get("name", key) + " 跌破下線（變便宜，可考慮進貨）")
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    return {"updated": now, "metals": metals_list, "alerts": alerts}
 
 
 def _read(path, default):
@@ -51,6 +73,9 @@ def main():
     # AI 助手（純靜態外殼，快速問答本地算、自由提問走 Gemini）
     with open(os.path.join("docs", "assistant.html"), "w", encoding="utf-8") as f:
         f.write(dashboard.render_assistant_html())
+    # 原料現況/突破訊號（供 email 早報讀取）
+    with open(os.path.join("docs", "signals.json"), "w", encoding="utf-8") as f:
+        json.dump(_build_signals(history), f, ensure_ascii=False)
 
     # 首頁總覽數字（跨 data 檔，可能落後數小時，可接受）
     jobs = _read(os.path.join(DATA_DIR, "jobs.json"), [])

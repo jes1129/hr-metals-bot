@@ -73,6 +73,17 @@
   function markSet(id, m) { Marks[id] = m; lsSet("marks", Marks); dbCall("markSet", { id: id, value: m }); }
   function quoteAdd(q) { Quotes.unshift(q); lsSet("quotes", Quotes); dbCall("quoteAdd", { value: q }); }
   function quoteDel(ts) { Quotes = Quotes.filter(function (x) { return x.ts !== ts; }); lsSet("quotes", Quotes); dbCall("quoteDel", { ts: ts }); }
+  // 一鍵寄信（報價單/詢價/訂單通知）→ 後端 sendMail（以公司 Gmail 帳號寄）
+  function sendMail(to, subject, body) {
+    if (!idToken) { alert(CLIENT_ID ? "請先用右上角「使用 Google 帳戶登入」再寄信。" : "尚未設定 Google（見說明頁）。"); return Promise.resolve(null); }
+    to = (to || "").trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { alert("請填正確的收件人 email。"); return Promise.resolve(null); }
+    return dbCall("sendMail", { to: to, subject: subject, body: body }).then(function (d) {
+      if (d && d.ok) alert("已寄出 ✅ → " + d.to);
+      else alert("寄信失敗：" + ((d && d.error) || "請確認後端已更新 sendMail 並重新部署"));
+      return d;
+    });
+  }
 
   // ---------- Google 登入（Identity Services；只用身分，不要敏感權限） ----------
   var authReady = false, pulledOnce = false;
@@ -664,6 +675,19 @@
     if (histEl) histEl.addEventListener("click", function (e) {
       if (e.target.classList.contains("qdel")) { quoteDel(parseInt(e.target.getAttribute("data-ts"), 10)); renderHist(); }
     });
+    // 一鍵寄報價給客戶
+    var qMailBtn = document.getElementById("qMail");
+    if (qMailBtn) qMailBtn.addEventListener("click", function () {
+      var w = parseFloat(wEl.value) || 0, p = parseFloat(pEl.value) || 0;
+      if (!(w && p)) { alert("請先填重量與料價，算好報價再寄。"); return; }
+      var proc = parseFloat(procEl.value) || 0, mg = parseFloat(mgEl.value) || 0;
+      var quote = Math.round((w * p + proc) * (1 + mg / 100));
+      var to = (document.getElementById("qEmail") || {}).value || "";
+      var body = "您好，\n\n以下為報價：\n材質：" + cur().name + "\n重量：" + w + " kg\n料價：NT$ " + p + "/kg"
+        + (proc ? ("\n加工費：NT$ " + proc) : "") + "\n利潤：" + mg + "%\n建議報價：NT$ " + quote.toLocaleString()
+        + "\n\n如有需要歡迎回信洽詢。\n\n九上科技 敬上";
+      sendMail(to, "【九上科技】報價：" + cur().name, body);
+    });
     var driveBtn = document.getElementById("qDrive");
     if (driveBtn) driveBtn.addEventListener("click", function () {
       if (needLogin()) { alert("請先用右上角「Google 登入」，才能存到公司 Drive。"); return; }
@@ -731,6 +755,7 @@
         { k: "status", label: "狀態", type: "select", opts: ["報價", "接單", "生產", "出貨", "結案", "取消"], filter: true, stat: true },
         { k: "order_date", label: "下單日", type: "date" },
         { k: "due", label: "交期", type: "date" },
+        { k: "email", label: "客戶信箱" },
         { k: "note", label: "備註", wide: true }
       ]
     },
@@ -1161,11 +1186,26 @@
         + '<div class="dbform">' + fields + "</div>"
         + '<div class="dbdlgbtns">'
         + (editing ? '<button class="dbbtn" data-del style="margin-right:auto;color:var(--up)">🗑️ 刪除</button>' : "")
+        + (editing ? '<button class="dbbtn" data-mail>✉️ 通知客戶</button>' : "")
         + '<button class="dbbtn" data-x>取消</button><button class="dbbtn primary" data-ok>儲存</button></div></div>';
       document.body.appendChild(ov);
       function close() { document.body.removeChild(ov); }
       ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
       ov.querySelector("[data-x]").onclick = close;
+      var mailBtn = ov.querySelector("[data-mail]");
+      if (mailBtn) mailBtn.onclick = function () {
+        var to = (ov.querySelector('[data-f="email"]') || {}).value || row.email || "";
+        var cust = (ov.querySelector('[data-f="customer"]') || {}).value || row.customer || "客戶";
+        var prod = (ov.querySelector('[data-f="product"]') || {}).value || row.product || "";
+        var st = (ov.querySelector('[data-f="status"]') || {}).value || row.status || "";
+        var due = (ov.querySelector('[data-f="due"]') || {}).value || row.due || "";
+        var subj = "【九上科技】訂單通知：" + prod + "（" + st + "）";
+        var body = cust + " 您好，\n\n您的訂單「" + prod + "」目前狀態為【" + st + "】"
+          + (due ? ("，交期 " + due) : "") + "。\n數量 " + num(ov.querySelector('[data-f="qty"]') ? ov.querySelector('[data-f="qty"]').value : row.qty)
+          + "，金額 " + ntfmt(amt({ amount: (ov.querySelector('[data-f="amount"]') || {}).value, qty: (ov.querySelector('[data-f="qty"]') || {}).value, price: (ov.querySelector('[data-f="price"]') || {}).value }))
+          + "。\n\n如有問題歡迎回信。\n\n九上科技 敬上";
+        sendMail(to, subj, body);
+      };
       var del = ov.querySelector("[data-del]");
       if (del) del.onclick = function () { if (confirm("確定刪除這筆訂單？")) { rows = rows.filter(function (o) { return String(o.id) !== String(row.id); }); lsSet(ck(), rows); render(); dbCall("tRemove", { table: "orders", id: row.id }); close(); } };
       ov.querySelector("[data-ok]").onclick = function () {
@@ -1255,6 +1295,7 @@
         + '<button class="dbbtn primary" id="mAddItem">＋ 新增料號</button>'
         + '<button class="dbbtn" id="mAddBom">＋ 新增 BOM</button>'
         + '<button class="dbbtn" id="mReload">↻ 重算</button>'
+        + (shortList.length ? '<button class="dbbtn" id="mRfq">✉️ 發詢價信</button>' : "")
         + (list.length ? "" : '<button class="dbbtn" id="mSample">載入範例資料</button>')
         + '<a class="dbbtn" href="db.html">🗂️ 在資料庫管理料號/BOM</a>'
         + '</div>';
@@ -1287,6 +1328,7 @@
       var bb = document.getElementById("mAddBom"); if (bb) bb.onclick = function () { if (auth()) openForm2(SCHEMAS.bom, null); };
       var rl = document.getElementById("mReload"); if (rl) rl.onclick = load;
       var sp = document.getElementById("mSample"); if (sp) sp.onclick = loadSample;
+      var rfq = document.getElementById("mRfq"); if (rfq) rfq.onclick = function () { if (auth()) openRfq_(list.filter(function (x) { return x.shortage > 0; })); };
       Array.prototype.forEach.call(mount.querySelectorAll(".dbtable tbody tr[data-edit]"), function (tr) {
         tr.style.cursor = "pointer";
         tr.onclick = function () { if (!auth()) return; var it = items.filter(function (x) { return String(x.id) === String(tr.getAttribute("data-edit")); })[0]; if (it) openForm2(SCHEMAS.items, it); };
@@ -1325,6 +1367,25 @@
         var out = {}; if (editing) out.id = row.id;
         Array.prototype.forEach.call(ov.querySelectorAll("[data-f]"), function (el) { out[el.getAttribute("data-f")] = el.value; });
         dbCall("tUpsert", { table: schema.table, row: out, header: schema.cols.map(function (c) { return c.k; }) }).then(load);
+        close();
+      };
+    }
+    // 發詢價信：填供應商 email，內文自動帶入缺料清單
+    function openRfq_(shortList) {
+      var listText = shortList.map(function (x) { return "- " + x.code + " " + (x.name || "") + "：需採購約 " + x.shortage.toLocaleString() + " " + (x.unit || ""); }).join("\n");
+      var body = "您好，\n\n九上科技擬採購以下品項，煩請報價與交期：\n\n" + listText + "\n\n請回覆單價、最小訂購量與交期，謝謝。\n\n九上科技 敬上";
+      var ov = document.createElement("div"); ov.className = "dbmodal";
+      ov.innerHTML = '<div class="dbdialog"><h3>✉️ 發詢價信給供應商</h3>'
+        + '<div class="dbform">'
+        + '<label class="dbfield"><span>供應商 email</span><input data-rfq-to placeholder="supplier@example.com"></label>'
+        + '<label class="dbfield"><span>內容（可修改）</span><textarea data-rfq-body rows="8" style="padding:9px 11px;border-radius:9px;border:1px solid var(--chip-border);background:var(--bg);color:var(--text);font-size:14px">' + escAttr(body) + '</textarea></label>'
+        + '</div><div class="dbdlgbtns"><button class="dbbtn" data-x>取消</button><button class="dbbtn primary" data-ok>送出</button></div></div>';
+      document.body.appendChild(ov);
+      function close() { document.body.removeChild(ov); }
+      ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
+      ov.querySelector("[data-x]").onclick = close;
+      ov.querySelector("[data-ok]").onclick = function () {
+        sendMail(ov.querySelector("[data-rfq-to]").value, "【九上科技】採購詢價", ov.querySelector("[data-rfq-body]").value);
         close();
       };
     }

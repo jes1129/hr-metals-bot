@@ -37,6 +37,7 @@ function doPost(e) {
       case "tRemove":  out = tRemove_(p.table, p.id); break;
       case "tImport":  out = tImport_(p.table, p.rows, p.header, email); break;
       case "ai":       out = ai_(p.question, p.context); break;
+      case "sendMail": out = sendMail_(p.to, p.subject, p.body, email); break;
       default:         out = { error: "unknown action" };
     }
     return json_(out);
@@ -228,6 +229,14 @@ function ai_(question, context) {
     var text = (((d.choices || [])[0] || {}).message || {}).content || "";
     return { ok: true, text: text || "（AI 沒有回覆內容）" };
   } catch (e) { return { error: String(e) }; }
+}
+
+// ---- 一鍵寄信（報價單/詢價/訂單通知）；以公司 Gmail 帳號寄出 ----
+function sendMail_(to, subject, body, by) {
+  to = String(to || "").trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return { error: "收件人 email 格式不正確：" + to };
+  GmailApp.sendEmail(to, String(subject || "(無主旨)"), String(body || ""), { name: "九上科技" });
+  return { ok: true, to: to, by: by };
 }
 
 function json_(o) {
