@@ -58,13 +58,19 @@ def _sparkline(points, up: bool, w=120, h=32) -> str:
 
 def _nav(active: str) -> str:
     a = ' class="on"'
+    # 市場情報（原料/招募/供應商/客戶）收進一個下拉，讓上排不擁擠
+    intel = active in ("metals", "jobs", "suppliers", "customers")
     return (
         '<div class="nav">'
         f'<a{a if active == "home" else ""} href="index.html">🏠 首頁</a>'
-        f'<a{a if active == "metals" else ""} href="metals.html">🔩 原料</a>'
-        f'<a{a if active == "jobs" else ""} href="jobs.html">🔧 招募</a>'
+        '<details class="navdrop">'
+        f'<summary{" class=\"on\"" if intel else ""}>📈 情報 ▾</summary>'
+        '<div class="navmenu">'
+        f'<a{a if active == "metals" else ""} href="metals.html">🔩 原料行情</a>'
+        f'<a{a if active == "jobs" else ""} href="jobs.html">🔧 招募雷達</a>'
         f'<a{a if active == "suppliers" else ""} href="suppliers.html">🏭 供應商</a>'
-        f'<a{a if active == "customers" else ""} href="customers.html">🎯 客戶</a>'
+        f'<a{a if active == "customers" else ""} href="customers.html">🎯 客戶開發</a>'
+        '</div></details>'
         f'<a{a if active == "quote" else ""} href="quote.html">🧮 報價</a>'
         f'<a{a if active == "orders" else ""} href="orders.html">📦 訂單</a>'
         f'<a{a if active == "mrp" else ""} href="mrp.html">📊 庫存·MRP</a>'
@@ -165,11 +171,24 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
             f'<div class="big">{cust_total} <span>家</span></div>'
             '<div class="mnote">會買精密金屬零件的潛在客戶</div>',
             "找新客戶"))
+    # ERP 營運新功能卡（登入後可用；資料存公司試算表）
+    cards.append(_hcard(
+        "orders.html", "📦", "訂單管理",
+        '<div class="mnote">建客戶訂單、狀態看板，老闆一眼看<b>營收／待出貨／逾期</b></div>',
+        "管理訂單"))
+    cards.append(_hcard(
+        "mrp.html", "📊", "庫存 · MRP",
+        '<div class="mnote">料號／庫存／BOM，自動算<b>「要補哪些料、補多少」</b></div>',
+        "看缺料建議"))
+    cards.append(_hcard(
+        "assistant.html", "🤖", "AI 助手",
+        '<div class="mnote">問一句就答：缺料、逾期、營收、待出貨、低庫存</div>',
+        "問問看"))
     # 九上資料庫快捷卡（進站內「資料庫操作中心」db.html；免開試算表就能增刪改查）
     cards.append(
         '<a class="hcard" id="dbCard" href="db.html">'
         '<div class="he">🗂️</div><div class="ht">九上資料庫</div>'
-        '<div class="hl"><div class="mnote">站內直接管理：我的名單/待辦、收藏標記、報價歷史（免開試算表）</div></div>'
+        '<div class="hl"><div class="mnote">站內直接管理：訂單/料號/BOM/名單/報價（免開試算表）</div></div>'
         '<div class="hcta">開啟資料庫 →</div></a>')
 
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
@@ -375,18 +394,33 @@ def render_help_html() -> str:
 
     <div class="q">
       <h2>這是什麼？</h2>
-      <p>這是一套幫九上科技<b>自動盯原料行情、找人才、找供應商、開發客戶、快速報價</b>的網站。資料每天自動更新，
-      不用開電腦、不用付費、不用維護。最上面一排是七個分頁，點一下就切換。</p>
+      <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情、找人才、找供應商、開發客戶；一邊管報價、訂單、庫存與缺料，還有 AI 助手。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
+      <p>上面一排分成幾類：<b>🏠 首頁</b>總覽、<b>📈 情報</b>（原料/招募/供應商/客戶，點開是下拉選單）、以及營運工具 <b>🧮 報價 · 📦 訂單 · 📊 庫存·MRP · 🤖 助手 · 🗂️ 資料庫</b>，最後是 <b>📖 說明</b>（本頁）。</p>
       <p class="muted">👇 點下面任一顆，直接跳到該功能的詳細說明：</p>
       <div class="jump">
-        <a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
+        <a href="#start">🚀 新手上路</a><a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
         <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a>
         <a href="#f-orders">📦 訂單</a><a href="#f-mrp">📊 庫存·MRP</a><a href="#f-ai">🤖 助手</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
       </div>
     </div>
 
+    <div class="q" id="start">
+      <h2>🚀 新手上路：建議使用順序</h2>
+      <p>第一次用不知道從哪開始？照這個順序做一遍，就通了：</p>
+      <ul class="steps">
+        <li><b>用 Google 登入</b>（右上角）——這樣資料才會存進公司試算表、換裝置也看得到。</li>
+        <li><b>看情報</b>：📈 情報裡的原料行情、供應商、客戶，平常參考用。</li>
+        <li><b>報價</b>：客人詢價 → 🧮 報價算一算 → 存起來。</li>
+        <li><b>轉訂單</b>：接到單 → 📦 訂單「從報價轉單」或「＋新增訂單」，用看板追進度。</li>
+        <li><b>建庫存底稿</b>：📊 庫存·MRP 先在「🗂️ 資料庫」把<b>料號/庫存</b>與<b>產品用料(BOM)</b>建好（可先按「載入範例資料」看長怎樣）。</li>
+        <li><b>看缺料</b>：回 📊 庫存·MRP，系統自動算「要補哪些料、補多少」。</li>
+        <li><b>問 AI</b>：🤖 助手點按鈕或打字，隨時問「這月要補什麼料 / 哪些逾期 / 營收多少」。</li>
+      </ul>
+      <div class="tip">💡 只想輕鬆用？每天開<b>首頁</b>看重點卡片、需要時點 🤖 <b>助手</b>問一句，就很夠了。</div>
+    </div>
+
     <div class="q">
-      <h2>七個分頁各自怎麼用</h2>
+      <h2>每一項功能詳細說明</h2>
       <p class="muted">點每一條標題可以展開／收合詳細說明。</p>
 
       <details class="acc" id="f-home" open>

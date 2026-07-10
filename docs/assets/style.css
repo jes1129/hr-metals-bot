@@ -20,11 +20,20 @@ body { font-family: -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
 a { color: var(--accent); }
 .wrap { max-width: 920px; margin: 28px auto; padding: 0 20px; }
 
-.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.nav { display: flex; gap: 8px; }
-.nav a { font-size: 13px; text-decoration: none; padding: 7px 14px; border-radius: 999px;
-  border: 1px solid var(--chip-border); color: var(--muted); background: var(--chip-bg); }
-.nav a.on { background: var(--chip-on-bg); color: var(--chip-on-fg); border-color: var(--chip-on-bg); }
+.topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.nav { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.nav a, .navdrop > summary { font-size: 12.5px; text-decoration: none; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--chip-border); color: var(--muted); background: var(--chip-bg); white-space: nowrap; }
+.nav a.on, .navdrop > summary.on { background: var(--chip-on-bg); color: var(--chip-on-fg); border-color: var(--chip-on-bg); }
+/* 情報下拉（原生 details，免 JS） */
+.navdrop { position: relative; }
+.navdrop > summary { list-style: none; cursor: pointer; display: inline-block; }
+.navdrop > summary::-webkit-details-marker { display: none; }
+.navdrop[open] > summary { border-color: var(--accent); color: var(--text); }
+.navmenu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 50; min-width: 148px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.2); padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.navmenu a { display: block; }
 .theme-btn { cursor: pointer; font-size: 16px; line-height: 1; padding: 8px 11px; border-radius: 999px;
   border: 1px solid var(--chip-border); background: var(--chip-bg); color: var(--text); }
 

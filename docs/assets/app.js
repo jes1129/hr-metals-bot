@@ -1464,5 +1464,11 @@
     if (document.getElementById("mrpView")) initMrp();            // 庫存 / BOM / MRP
     if (document.getElementById("aiView")) initAssistant();       // AI 助手
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
+    // 情報下拉：點空白處收起（原生 details 負責開關）
+    document.addEventListener("click", function (e) {
+      Array.prototype.forEach.call(document.querySelectorAll("details.navdrop[open]"), function (d) {
+        if (!d.contains(e.target)) d.removeAttribute("open");
+      });
+    });
   });
 })();

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="assets/style.css?v=202607101219">
-<script src="config.js?v=202607101219"></script>
+<link rel="stylesheet" href="assets/style.css?v=202607101231">
+<script src="config.js?v=202607101231"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <title>九上科技 · 使用說明</title>
 <style>
@@ -64,25 +64,40 @@
 </head>
 <body>
   <div class="wrap help">
-    <div class="topbar"><div class="nav"><a href="index.html">🏠 首頁</a><a href="metals.html">🔩 原料</a><a href="jobs.html">🔧 招募</a><a href="suppliers.html">🏭 供應商</a><a href="customers.html">🎯 客戶</a><a href="quote.html">🧮 報價</a><a href="orders.html">📦 訂單</a><a href="mrp.html">📊 庫存·MRP</a><a href="assistant.html">🤖 助手</a><a href="db.html">🗂️ 資料庫</a><a class="on" href="help.html">📖 說明</a></div><span id="gAuth" class="gauth"></span><button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button></div>
+    <div class="topbar"><div class="nav"><a href="index.html">🏠 首頁</a><details class="navdrop"><summary>📈 情報 ▾</summary><div class="navmenu"><a href="metals.html">🔩 原料行情</a><a href="jobs.html">🔧 招募雷達</a><a href="suppliers.html">🏭 供應商</a><a href="customers.html">🎯 客戶開發</a></div></details><a href="quote.html">🧮 報價</a><a href="orders.html">📦 訂單</a><a href="mrp.html">📊 庫存·MRP</a><a href="assistant.html">🤖 助手</a><a href="db.html">🗂️ 資料庫</a><a class="on" href="help.html">📖 說明</a></div><span id="gAuth" class="gauth"></span><button id="themeBtn" class="theme-btn" aria-label="切換深淺色">🌙</button></div>
     <div class="eyebrow">九上科技 · 智慧儀表板</div>
     <h1>📖 使用說明</h1>
     <div class="sub">一頁看懂整個網站怎麼用 · 可展開／可試玩 · 更新於 2026-07-10</div>
 
     <div class="q">
       <h2>這是什麼？</h2>
-      <p>這是一套幫九上科技<b>自動盯原料行情、找人才、找供應商、開發客戶、快速報價</b>的網站。資料每天自動更新，
-      不用開電腦、不用付費、不用維護。最上面一排是七個分頁，點一下就切換。</p>
+      <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情、找人才、找供應商、開發客戶；一邊管報價、訂單、庫存與缺料，還有 AI 助手。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
+      <p>上面一排分成幾類：<b>🏠 首頁</b>總覽、<b>📈 情報</b>（原料/招募/供應商/客戶，點開是下拉選單）、以及營運工具 <b>🧮 報價 · 📦 訂單 · 📊 庫存·MRP · 🤖 助手 · 🗂️ 資料庫</b>，最後是 <b>📖 說明</b>（本頁）。</p>
       <p class="muted">👇 點下面任一顆，直接跳到該功能的詳細說明：</p>
       <div class="jump">
-        <a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
+        <a href="#start">🚀 新手上路</a><a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
         <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a>
         <a href="#f-orders">📦 訂單</a><a href="#f-mrp">📊 庫存·MRP</a><a href="#f-ai">🤖 助手</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
       </div>
     </div>
 
+    <div class="q" id="start">
+      <h2>🚀 新手上路：建議使用順序</h2>
+      <p>第一次用不知道從哪開始？照這個順序做一遍，就通了：</p>
+      <ul class="steps">
+        <li><b>用 Google 登入</b>（右上角）——這樣資料才會存進公司試算表、換裝置也看得到。</li>
+        <li><b>看情報</b>：📈 情報裡的原料行情、供應商、客戶，平常參考用。</li>
+        <li><b>報價</b>：客人詢價 → 🧮 報價算一算 → 存起來。</li>
+        <li><b>轉訂單</b>：接到單 → 📦 訂單「從報價轉單」或「＋新增訂單」，用看板追進度。</li>
+        <li><b>建庫存底稿</b>：📊 庫存·MRP 先在「🗂️ 資料庫」把<b>料號/庫存</b>與<b>產品用料(BOM)</b>建好（可先按「載入範例資料」看長怎樣）。</li>
+        <li><b>看缺料</b>：回 📊 庫存·MRP，系統自動算「要補哪些料、補多少」。</li>
+        <li><b>問 AI</b>：🤖 助手點按鈕或打字，隨時問「這月要補什麼料 / 哪些逾期 / 營收多少」。</li>
+      </ul>
+      <div class="tip">💡 只想輕鬆用？每天開<b>首頁</b>看重點卡片、需要時點 🤖 <b>助手</b>問一句，就很夠了。</div>
+    </div>
+
     <div class="q">
-      <h2>七個分頁各自怎麼用</h2>
+      <h2>每一項功能詳細說明</h2>
       <p class="muted">點每一條標題可以展開／收合詳細說明。</p>
 
       <details class="acc" id="f-home" open>
@@ -356,6 +371,6 @@
     });
   })();
   </script>
-  <script src="assets/app.js?v=202607101219"></script>
+  <script src="assets/app.js?v=202607101231"></script>
 </body>
 </html>
