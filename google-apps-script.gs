@@ -36,6 +36,7 @@ function doPost(e) {
       case "tUpsert":  out = tUpsert_(p.table, p.row, p.header, email); break;
       case "tRemove":  out = tRemove_(p.table, p.id); break;
       case "tImport":  out = tImport_(p.table, p.rows, p.header, email); break;
+      case "ai":       out = ai_(p.question, p.context); break;
       default:         out = { error: "unknown action" };
     }
     return json_(out);
@@ -197,6 +198,28 @@ function tRemove_(table, id) {
 function tImport_(table, rows, wantHeader, by) {
   (rows || []).forEach(function (r) { tUpsert_(table, r, wantHeader, by); });
   return { ok: true, n: (rows || []).length };
+}
+
+// ===========================================================================
+// AI 助手（Gemini 免費）— 金鑰放在 Apps Script「指令碼屬性」GEMINI_API_KEY，不進公開 repo
+//   啟用方式：Apps Script 左側「專案設定」→「指令碼屬性」→ 新增 GEMINI_API_KEY = 你的金鑰。
+//   （免費金鑰申請：https://aistudio.google.com/apikey）未設定時回 need_setup，網站會顯示提示。
+// ===========================================================================
+function ai_(question, context) {
+  var key = PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY");
+  if (!key) return { error: "未設定 GEMINI_API_KEY", need_setup: true };
+  var sys = "你是九上科技（精密金屬零件加工廠）的 ERP 助手。請用繁體中文、精簡、條列、盡量引用下列資料中的數字回答；"
+    + "若資料不足就說明還缺什麼。以下為目前系統資料摘要（JSON）：\n" + JSON.stringify(context || {});
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(key);
+  var payload = { contents: [{ parts: [{ text: sys + "\n\n使用者問題：" + String(question || "") }] }] };
+  try {
+    var r = UrlFetchApp.fetch(url, { method: "post", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true });
+    var d = JSON.parse(r.getContentText());
+    if (d.error) return { error: d.error.message || "Gemini 錯誤" };
+    var parts = (((d.candidates || [])[0] || {}).content || {}).parts || [];
+    var text = parts[0] ? parts[0].text : "";
+    return { ok: true, text: text || "（AI 沒有回覆內容）" };
+  } catch (e) { return { error: String(e) }; }
 }
 
 function json_(o) {

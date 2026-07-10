@@ -120,6 +120,7 @@
     if (window.__refreshConsole) window.__refreshConsole();
     if (window.__refreshOrders) window.__refreshOrders();
     if (window.__refreshMrp) window.__refreshMrp();
+    if (window.__refreshAssistant) window.__refreshAssistant();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
@@ -1330,6 +1331,127 @@
     load();
   }
 
+  // ===========================================================================
+  // AI 助手（assistant.html）— 快速問答本地即時算（免設定）；自由提問走 Gemini（Apps Script 代理）
+  // ===========================================================================
+  function initAssistant() {
+    var mount = document.getElementById("aiView");
+    if (!mount) return;
+    function num(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
+    function nt(n) { return "NT$ " + Math.round(n).toLocaleString(); }
+    function today() { var d = new Date(); return d.getFullYear() + "-" + zz(d.getMonth() + 1) + "-" + zz(d.getDate()); }
+    function zz(n) { return (n < 10 ? "0" : "") + n; }
+    function D(t) { return lsGet("console_" + t, []) || []; }
+
+    function pullAll() {
+      if (!idToken) return;
+      var bn = mount.querySelector(".dbbanner"); if (bn) bn.parentNode.removeChild(bn);  // 登入後移除「未登入」提示
+      ["orders", "items", "bom"].forEach(function (t) { dbCall("tList", { table: t }).then(function (d) { if (d && d.rows) lsSet("console_" + t, d.rows); }); });
+    }
+    window.__refreshAssistant = pullAll;
+
+    function shortages() {
+      var orders = D("orders"), bom = D("bom"), items = D("items"), demand = {};
+      orders.forEach(function (o) {
+        if (["接單", "生產"].indexOf(o.status) < 0) return;
+        bom.forEach(function (b) { if (String(b.product) === String(o.product)) demand[b.item_code] = (demand[b.item_code] || 0) + num(o.qty) * num(b.per); });
+      });
+      return items.map(function (it) {
+        var sh = Math.max(0, (demand[it.code] || 0) + num(it.safety) - num(it.stock) - num(it.on_order));
+        return { code: it.code, name: it.name, unit: it.unit || "", shortage: sh, amount: sh * num(it.cost) };
+      }).filter(function (x) { return x.shortage > 0; }).sort(function (a, b) { return b.amount - a.amount; });
+    }
+    function overdueList() {
+      var t = today();
+      return D("orders").filter(function (o) { return o.due && String(o.due) < t && ["報價", "接單", "生產"].indexOf(o.status) >= 0; });
+    }
+    function kpi() {
+      var tm = today().slice(0, 7), rev = 0, cnt = 0, ship = 0;
+      D("orders").forEach(function (o) {
+        if (o.status === "取消") return;
+        if (String(o.order_date || "").slice(0, 7) === tm) { rev += (num(o.amount) || num(o.qty) * num(o.price)); cnt++; }
+        if (o.status === "接單" || o.status === "生產") ship++;
+      });
+      return { rev: rev, cnt: cnt, ship: ship };
+    }
+    function lowStock() { return D("items").filter(function (i) { return num(i.stock) < num(i.safety); }); }
+
+    function ans(type) {
+      if (type === "short") {
+        var s = shortages();
+        if (!s.length) return "目前沒有缺料 ✅（需要有「接單/生產」的訂單和對應 BOM 才會算出需求）。";
+        var tot = s.reduce(function (a, x) { return a + x.amount; }, 0);
+        return "本月建議採購（缺料）：\n" + s.map(function (x) { return "・" + x.code + " " + (x.name || "") + "：缺 " + x.shortage.toLocaleString() + " " + x.unit + "（約 " + nt(x.amount) + "）"; }).join("\n") + "\n\n建議採購總金額約 " + nt(tot) + "。";
+      }
+      if (type === "overdue") {
+        var o = overdueList();
+        if (!o.length) return "目前沒有逾期未出貨的訂單 ✅。";
+        return "逾期訂單（交期已過、尚未出貨）：\n" + o.map(function (x) { return "・" + (x.customer || "?") + "／" + (x.product || "") + "：交期 " + x.due + "（狀態：" + x.status + "）"; }).join("\n");
+      }
+      if (type === "kpi") {
+        var k = kpi();
+        return "本月概況：\n・營收：" + nt(k.rev) + "\n・訂單數：" + k.cnt + " 筆\n・待出貨：" + k.ship + " 筆\n・逾期：" + overdueList().length + " 筆";
+      }
+      if (type === "ship") {
+        var sh = D("orders").filter(function (x) { return x.status === "接單" || x.status === "生產"; });
+        if (!sh.length) return "目前沒有待出貨的訂單。";
+        return "待出貨清單（接單/生產中）：\n" + sh.map(function (x) { return "・" + (x.customer || "?") + "／" + (x.product || "") + " ×" + num(x.qty) + "（交期 " + (x.due || "未定") + "）"; }).join("\n");
+      }
+      if (type === "low") {
+        var l = lowStock();
+        if (!l.length) return "目前沒有低於安全庫存的品項 ✅。";
+        return "低於安全庫存的品項：\n" + l.map(function (x) { return "・" + x.code + " " + (x.name || "") + "：庫存 " + num(x.stock) + " / 安全 " + num(x.safety); }).join("\n");
+      }
+      return "";
+    }
+    function buildContext() {
+      var k = kpi();
+      return { 月份: today().slice(0, 7), 本月營收: k.rev, 本月訂單數: k.cnt, 待出貨: k.ship,
+        逾期訂單: overdueList().map(function (o) { return { 客戶: o.customer, 品名: o.product, 交期: o.due, 狀態: o.status }; }),
+        缺料清單: shortages().map(function (x) { return { 料號: x.code, 品名: x.name, 缺: x.shortage, 建議採購金額: x.amount }; }),
+        低庫存: lowStock().map(function (i) { return { 料號: i.code, 庫存: i.stock, 安全: i.safety }; }) };
+    }
+
+    function msg(role, text) {
+      var log = document.getElementById("aiLog");
+      var b = document.createElement("div"); b.className = "aimsg " + role; b.textContent = text;
+      log.appendChild(b); log.scrollTop = log.scrollHeight; return b;
+    }
+    function askAI(q) {
+      msg("user", q);
+      var wait = msg("ai", "🤖 思考中…");
+      dbCall("ai", { question: q, context: buildContext() }).then(function (d) {
+        if (d && d.ok && d.text) { wait.textContent = d.text; return; }
+        if (d && d.need_setup) { wait.textContent = "🤖 自由提問需要一次性啟用 Gemini（把免費金鑰加到 Apps Script 的「指令碼屬性」GEMINI_API_KEY，見說明頁）。\n在此之前，上面的快速問答已可即時使用（免設定）。"; return; }
+        if (d && d.error) { wait.textContent = "⚠️ AI 回覆失敗：" + d.error; return; }
+        wait.textContent = "⚠️ 目前無法連到 AI（可能未登入或未設定）。可先用上方快速問答。";
+      });
+    }
+
+    mount.innerHTML =
+      (!idToken ? '<div class="dbbanner">🔒 尚未登入：登入後我才能讀公司資料回答你。</div>' : "")
+      + '<div class="aichips">'
+      + '<button class="dbbtn" data-q="short">🧯 本月要補哪些料？</button>'
+      + '<button class="dbbtn" data-q="overdue">⏰ 哪些訂單逾期？</button>'
+      + '<button class="dbbtn" data-q="kpi">💰 本月營收概況</button>'
+      + '<button class="dbbtn" data-q="ship">🚚 待出貨清單</button>'
+      + '<button class="dbbtn" data-q="low">⚠️ 庫存過低品項</button>'
+      + '</div>'
+      + '<div class="ailog" id="aiLog"></div>'
+      + '<div class="airow"><input id="aiInput" class="dbsearch" placeholder="用一句話問我：訂單、庫存、營收、要補什麼料…"><button class="dbbtn primary" id="aiSend">送出</button></div>'
+      + '<div class="dbfoot">快速問答＝即時本地計算（免設定、免費）。自由提問＝用免費 Gemini（需在 Apps Script 加金鑰，見說明頁）。</div>';
+
+    msg("ai", "嗨！我是九上 ERP 助手 🤖\n點上面的按鈕可立刻查「缺料 / 逾期 / 營收 / 待出貨 / 低庫存」；或直接打字問我。");
+    Array.prototype.forEach.call(mount.querySelectorAll(".aichips [data-q]"), function (b) {
+      b.onclick = function () { var t = b.getAttribute("data-q"); msg("user", b.textContent.replace(/^\S+\s/, "")); msg("ai", ans(t)); };
+    });
+    var input = document.getElementById("aiInput"), send = document.getElementById("aiSend");
+    function go() { var v = (input.value || "").trim(); if (!v) return; input.value = ""; if (!idToken) { msg("user", v); msg("ai", "請先用右上角 Google 登入，我才能讀資料回答你。"); return; } askAI(v); }
+    send.onclick = go;
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
+    pullAll();
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     if (window.METALS_DATA) initMetals(window.METALS_DATA);
@@ -1340,6 +1462,7 @@
     if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
     if (document.getElementById("ordersView")) initOrders();     // 訂單 + 老闆儀表板
     if (document.getElementById("mrpView")) initMrp();            // 庫存 / BOM / MRP
+    if (document.getElementById("aiView")) initAssistant();       // AI 助手
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
   });
 })();

@@ -326,3 +326,12 @@ th .arrow { opacity: .5; font-size: 10px; }
 .mrpview .dbtable tbody tr.mrpshort td { background: color-mix(in srgb, var(--up) 12%, transparent); }
 .mrpview .dbtable tbody tr.mrpshort:hover td { background: color-mix(in srgb, var(--up) 20%, transparent); }
 .mrpok { color: var(--down); padding: 8px 2px; font-size: 14px; }
+
+/* ===== AI 助手 ===== */
+.aichips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.ailog { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-height: 220px; max-height: 460px; overflow-y: auto; margin-bottom: 10px; }
+.aimsg { max-width: 82%; padding: 10px 14px; border-radius: 14px; margin: 8px 0; white-space: pre-wrap; line-height: 1.7; font-size: 14px; }
+.aimsg.ai { background: var(--line2); color: var(--text); border-top-left-radius: 4px; }
+.aimsg.user { background: var(--accent); color: #fff; margin-left: auto; border-top-right-radius: 4px; }
+.airow { display: flex; gap: 8px; }
+.airow .dbsearch { flex: 1; }

@@ -48,6 +48,9 @@ def main():
     # 庫存 · MRP 缺料建議（純靜態外殼，資料登入後由前端載入）
     with open(os.path.join("docs", "mrp.html"), "w", encoding="utf-8") as f:
         f.write(dashboard.render_mrp_html())
+    # AI 助手（純靜態外殼，快速問答本地算、自由提問走 Gemini）
+    with open(os.path.join("docs", "assistant.html"), "w", encoding="utf-8") as f:
+        f.write(dashboard.render_assistant_html())
 
     # 首頁總覽數字（跨 data 檔，可能落後數小時，可接受）
     jobs = _read(os.path.join(DATA_DIR, "jobs.json"), [])

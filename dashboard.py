@@ -68,6 +68,7 @@ def _nav(active: str) -> str:
         f'<a{a if active == "quote" else ""} href="quote.html">🧮 報價</a>'
         f'<a{a if active == "orders" else ""} href="orders.html">📦 訂單</a>'
         f'<a{a if active == "mrp" else ""} href="mrp.html">📊 庫存·MRP</a>'
+        f'<a{a if active == "ai" else ""} href="assistant.html">🤖 助手</a>'
         f'<a{a if active == "db" else ""} href="db.html">🗂️ 資料庫</a>'
         f'<a{a if active == "help" else ""} href="help.html">📖 說明</a>'
         "</div>"
@@ -274,6 +275,33 @@ def render_mrp_html() -> str:
 
 
 # ===========================================================================
+# AI 助手（🤖 快速問答本地即時算 + 自由提問走免費 Gemini）
+# ===========================================================================
+def render_assistant_html() -> str:
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+{_HEAD}
+<title>九上科技 · AI 助手</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">{_nav("ai")}{_THEME_BTN}</div>
+    <div class="eyebrow">九上科技 · 智慧儀表板</div>
+    <h1>🤖 AI 助手</h1>
+    <div class="sub">問一句就答：缺料、逾期、營收、待出貨、低庫存 · 快速問答免設定、免費 · 更新於 {now}</div>
+    <div id="aiView" class="aiview">
+      <div class="dbloading">載入中…（若一直沒出現，請先用右上角「使用 Google 帳戶登入」）</div>
+    </div>
+    <div class="foot">快速問答由系統即時計算（不外傳、免費）。自由提問使用客戶自己的免費 Gemini 金鑰（放在 Apps Script）。</div>
+  </div>
+  <script src="assets/app.js?v={_VER}"></script>
+</body>
+</html>"""
+
+
+# ===========================================================================
 # 說明頁（📖 白話使用教學；給非科技用戶）
 # ===========================================================================
 def render_help_html() -> str:
@@ -353,7 +381,7 @@ def render_help_html() -> str:
       <div class="jump">
         <a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
         <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a>
-        <a href="#f-orders">📦 訂單</a><a href="#f-mrp">📊 庫存·MRP</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
+        <a href="#f-orders">📦 訂單</a><a href="#f-mrp">📊 庫存·MRP</a><a href="#f-ai">🤖 助手</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
       </div>
     </div>
 
@@ -473,6 +501,26 @@ def render_help_html() -> str:
             <li>第一次用可按 <b>「載入範例資料」</b> 看效果（要有「接單/生產」的訂單才算得出缺料）。</li>
           </ul>
           <a class="gobtn" href="mrp.html">前往庫存 · MRP →</a>
+        </div>
+      </details>
+
+      <details class="acc" id="f-ai">
+        <summary>🤖 AI 助手 <span class="sm">— 問一句就答</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p>登入後，點按鈕或打字就能問公司資料：</p>
+          <ul>
+            <li><b>快速問答</b>（免設定、免費、即時）：本月要補哪些料、哪些訂單逾期、本月營收概況、待出貨清單、庫存過低品項。</li>
+            <li><b>自由提問</b>：直接打一句話問（需啟用免費 Gemini，見下方）。</li>
+          </ul>
+          <h3>（選用）啟用「自由提問」的 Gemini：一次性設定</h3>
+          <ol>
+            <li>去 <b>aistudio.google.com/apikey</b> 用公司 Google 帳號申請免費金鑰（複製起來）。</li>
+            <li>打開公司試算表 → 擴充功能 → Apps Script → 左側 <b>「專案設定」⚙️</b>。</li>
+            <li>下方 <b>「指令碼屬性」→ 新增屬性</b>：名稱填 <b>GEMINI_API_KEY</b>、值貼上金鑰 → 儲存。</li>
+            <li>回程式碼把最新版 <code>google-apps-script.gs</code> 貼上、重新部署（新版本）即可。</li>
+          </ol>
+          <p class="muted">不設定也沒關係——快速問答本來就能用。</p>
+          <a class="gobtn" href="assistant.html">前往 AI 助手 →</a>
         </div>
       </details>
     </div>
