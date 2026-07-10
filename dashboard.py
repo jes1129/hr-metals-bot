@@ -726,10 +726,7 @@ def render_quote_html(history: dict) -> str:
       <div class="qr"><div class="qk">總成本（料＋工）</div><div class="qv" id="qTotal">—</div></div>
       <div class="qr big"><div class="qk">建議報價</div><div class="qv" id="qQuote">—</div></div>
     </div>
-    <div style="text-align:center;margin:14px 0 18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-      <button id="qSave" class="gbtn" style="font-size:14px;padding:9px 18px">💾 存這筆報價</button>
-      <button id="qDrive" class="gbtn" style="font-size:14px;padding:9px 18px">📄 報價歷史另存到 Drive</button>
-    </div>
+    <div style="text-align:center;margin:14px 0 18px"><button id="qSave" class="gbtn" style="font-size:14px;padding:9px 18px">💾 存這筆報價</button></div>
 
     <div class="panel">
       <h3>🧾 報價歷史</h3>
