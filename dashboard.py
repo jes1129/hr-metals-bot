@@ -732,7 +732,7 @@ def render_help_html() -> str:
 # ===========================================================================
 # 功能 B — 銅鋁儀表板
 # ===========================================================================
-def render_html(history: dict, daily: dict = None) -> str:
+def render_html(history: dict, daily: dict = None, news: list = None) -> str:
     daily = daily or {}
     metals_data = {}
     panels = []
@@ -811,12 +811,32 @@ def render_html(history: dict, daily: dict = None) -> str:
       <section class="mpanel" data-fx="1">
         <div class="mhead"><div><span class="mname">匯率</span><span class="men">USD / TWD</span></div><span class="fval sm" id="fxNow">—</span></div>
         <div class="chart sm" data-chart="fx"></div>
+        <div class="fxnote"><b>怎麼看：</b>1 美元換多少台幣。原料是用<b>美元</b>報價、你付<b>台幣</b>，所以匯率也影響成本——<b>數字變大</b>＝台幣走貶，進口原料換算台幣<b>變貴</b>；<b>變小</b>＝台幣走升，<b>變便宜</b>。</div>
       </section>
       <section class="mpanel" data-ratio="1">
         <div class="mhead"><div><span class="mname">銅鋁比價</span><span class="men">COPPER / ALUMINUM</span></div><span class="fval sm" id="ratioNow">—</span></div>
         <div class="chart sm" data-chart="ratio"></div>
+        <div class="fxnote"><b>怎麼看：</b>銅價 ÷ 鋁價，看兩種原料<b>誰相對貴</b>。比值<b>高</b>＝銅相對鋁貴（銅常反映景氣/需求強）；比值<b>低</b>＝鋁相對強。可當「原料替代、成本比較」的參考。</div>
       </section>
     </div>"""
+
+    # 原料相關新聞（run_metals 抓 Google 新聞傳入；本機重生時為空 → 顯示占位）
+    if news:
+        _items = "".join(
+            f'<a class="newsitem" href="{html.escape(n.get("link", ""))}" target="_blank" rel="noopener">'
+            f'<div class="nt">{html.escape(n.get("title", ""))}</div>'
+            f'<div class="nm">{html.escape(n.get("source", ""))}'
+            f'{" · " + html.escape(n.get("date", "")) if n.get("date") else ""}</div></a>'
+            for n in news
+        )
+    else:
+        _items = '<div class="mnote" style="padding:14px 4px">（新聞每日自動更新，稍後顯示）</div>'
+    news_panel = (
+        '<section class="mpanel newspanel">'
+        '<div class="mhead"><div><span class="mname">📰 原料相關新聞</span>'
+        '<span class="men">了解為什麼會漲跌</span></div></div>'
+        f'<div class="newslist">{_items}</div></section>'
+    )
 
     names = " · ".join(m["name"] for m in config.METALS.values())
     data_script = (
@@ -856,9 +876,11 @@ def render_html(history: dict, daily: dict = None) -> str:
         <button data-range="365">1 年</button>
       </div>
     </div>
+    <div class="unitnote">單位說明：<b>/t = 每公噸</b>（1 公噸＝1,000 公斤）· /lb ＝每磅 · /kg ＝每公斤 · NT$＝新台幣、US$＝美元。國際原料習慣用「每公噸」報價。</div>
 {''.join(panels)}
 {fx_panel}
-    <div class="foot">現價/告警：LME 官方價（Westmetall）· 走勢圖：Yahoo Finance 每日收盤（銅為 COMEX 近月，與 LME 走勢近乎一致）· 匯率 Yahoo · 單位由美元/公噸換算 · 僅供內部參考。</div>
+{news_panel}
+    <div class="foot">現價：LME 官方結算價（Westmetall）· 走勢圖：Yahoo Finance 每日收盤（銅為 COMEX 近月，與 LME 走勢近乎一致）· 匯率 Yahoo · 新聞：Google 新聞 · 單位由美元/公噸換算 · 僅供內部參考。</div>
   </div>
 {data_script}
   <script src="assets/app.js?v={_VER}"></script>

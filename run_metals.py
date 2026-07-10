@@ -33,6 +33,49 @@ def _build_signals(history):
     return {"updated": now, "metals": metals_list}
 
 
+def _fetch_news(max_n=6):
+    """抓 Google 新聞（銅鋁鎳鋼/金屬原料）最新標題，讓使用者了解漲跌原因。免金鑰。"""
+    import email.utils
+    import urllib.parse
+    import xml.etree.ElementTree as ET
+
+    import httpx
+    q = "銅價 OR 鋁價 OR 鎳價 OR 金屬 原料 價格 when:30d"   # 近 30 天
+    url = ("https://news.google.com/rss/search?q=" + urllib.parse.quote(q)
+           + "&hl=zh-TW&gl=TW&ceid=TW:zh-Hant")
+    try:
+        r = httpx.get(url, timeout=15, follow_redirects=True,
+                      headers={"User-Agent": "Mozilla/5.0"})
+        root = ET.fromstring(r.text)
+        rows = []
+        for it in root.findall(".//item"):
+            title = (it.findtext("title") or "").strip()
+            link = (it.findtext("link") or "").strip()
+            src = it.find("source")
+            source = (src.text.strip() if src is not None and src.text else "")
+            if source and title.endswith(" - " + source):   # 拿掉標題尾端重複的「 - 來源」
+                title = title[: -(len(source) + 3)].strip()
+            dt = None
+            pub = it.findtext("pubDate")
+            if pub:
+                try:
+                    dt = email.utils.parsedate_to_datetime(pub).astimezone(
+                        datetime.timezone(datetime.timedelta(hours=8)))
+                except Exception:  # noqa: BLE001
+                    pass
+            if title and link:
+                rows.append((dt, {"title": title, "link": link, "source": source,
+                                  "date": dt.strftime("%m/%d") if dt else ""}))
+        _old = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+        rows.sort(key=lambda x: x[0] or _old, reverse=True)   # 最新在前（無日期者最後）
+        out = [r for _, r in rows[:max_n]]
+        print(f"[news] 取得 {len(out)} 則原料新聞")
+        return out
+    except Exception as e:  # noqa: BLE001
+        print("[news] 取新聞失敗：", e)
+        return []
+
+
 def _read(path, default):
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -47,9 +90,9 @@ def main():
     history = result["history"]
 
     os.makedirs("docs", exist_ok=True)
-    # 原料頁
+    # 原料頁（含相關新聞）
     with open(os.path.join("docs", "metals.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_html(history, daily))
+        f.write(dashboard.render_html(history, daily, news=_fetch_news()))
     # 報價試算頁（用最新原料現價）
     with open(os.path.join("docs", "quote.html"), "w", encoding="utf-8") as f:
         f.write(dashboard.render_quote_html(history))
