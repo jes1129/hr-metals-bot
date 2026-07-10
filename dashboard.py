@@ -160,6 +160,12 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
             f'<div class="big">{cust_total} <span>家</span></div>'
             '<div class="mnote">會買精密金屬零件的潛在客戶</div>',
             "找新客戶"))
+    # 九上資料庫快捷卡（連到公司 Google 試算表；href 由 config.js 的 SHEET_URL 於前端設定，未填則隱藏）
+    cards.append(
+        '<a class="hcard" id="dbCard" href="#" target="_blank" rel="noopener" style="display:none">'
+        '<div class="he">🗂️</div><div class="ht">九上資料庫</div>'
+        '<div class="hl"><div class="mnote">打開公司 Google 試算表：收藏/標記/報價都存這裡</div></div>'
+        '<div class="hcta">開啟試算表 →</div></a>')
 
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     return f"""<!doctype html>
@@ -177,6 +183,7 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
     <div class="hcards">{''.join(cards)}</div>
     <div class="foot">原料價／招募／供應商每日自動更新；報價用最新原料行情試算。全部免費、關機也會自己跑。</div>
   </div>
+  <script>(function(){{var u=(window.APP_CONFIG||{{}}).SHEET_URL||"";var c=document.getElementById("dbCard");if(c&&u){{c.href=u;c.style.display="";}}}})();</script>
 </body>
 </html>"""
 

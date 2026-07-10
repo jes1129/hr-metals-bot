@@ -11,5 +11,7 @@ window.APP_CONFIG = {
   // ② Apps Script Web App 部署網址（讀寫試算表/Drive 的後端）
   APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycby6YPEI9DlLcry6xz7JJflayKa60VnIMreGIJMG3oYxhDy6_WHyJ_9LvpXb5w8FefaouA/exec",
   // ③（選填）擁有試算表的 Google 帳號 email（顯示用）
-  OWNER_EMAIL: "champ.ma999@gmail.com"
+  OWNER_EMAIL: "champ.ma999@gmail.com",
+  // ④（選填）「九上資料庫」試算表的網址，填了首頁會出現一張「🗂️ 九上資料庫」快捷卡片
+  SHEET_URL: "https://docs.google.com/spreadsheets/d/1LphX_BytpNuieeh1md6AawQjT-B127tE8v81orySptU/edit"
 };
