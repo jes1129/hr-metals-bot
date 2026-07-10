@@ -97,7 +97,8 @@
       var o = document.getElementById("gOut"); if (o) o.onclick = signOut;
     } else {
       box.innerHTML = '<div id="gBtn"></div>';
-      try { google.accounts.id.renderButton(document.getElementById("gBtn"), { type: "standard", size: "medium", text: "signin_with", shape: "pill" }); google.accounts.id.prompt(); } catch (e) {}
+      // 只放「Sign in with Google」按鈕，不呼叫 One Tap prompt()（避免自動彈窗與未登入時的 console 噪音）
+      try { google.accounts.id.renderButton(document.getElementById("gBtn"), { type: "standard", size: "medium", text: "signin_with", shape: "pill" }); } catch (e) {}
     }
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼

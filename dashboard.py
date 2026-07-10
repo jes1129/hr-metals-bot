@@ -184,6 +184,7 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
     <div class="foot">原料價／招募／供應商每日自動更新；報價用最新原料行情試算。全部免費、關機也會自己跑。</div>
   </div>
   <script>(function(){{var u=(window.APP_CONFIG||{{}}).SHEET_URL||"";var c=document.getElementById("dbCard");if(c&&u){{c.href=u;c.style.display="";}}}})();</script>
+  <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
 
