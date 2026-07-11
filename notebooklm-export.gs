@@ -46,10 +46,10 @@ function installDailyTrigger() {
 }
 
 // ---- 主流程：算摘要 → 寫進固定的 Google 文件 ----
-function updateNotebookDoc() {
-  // 只在平日(週一~週五)更新；週末不動（以台北時區判斷）
+function updateNotebookDoc(e) {
+  // 自動排程(e 有值)時，週末(六/日)不更新；手動從編輯器執行(e 為空)則一律更新，方便測試（台北時區）
   var dow = Utilities.formatDate(new Date(), "Asia/Taipei", "u");  // 1=一 … 6=六 7=日
-  if (dow === "6" || dow === "7") return "週末不更新";
+  if (e && (dow === "6" || dow === "7")) return "週末不更新（自動排程）";
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty("NOTEBOOK_DOC_ID");
   var doc = null;

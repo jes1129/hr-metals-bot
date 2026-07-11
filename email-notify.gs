@@ -43,10 +43,10 @@ function metalsSignalText_() {
   } catch (e) { return "【原料行情】暫時取不到。"; }
 }
 
-function sendDailyDigest() {
-  // 只在平日(週一~週五)寄送；週末工廠休不打擾（以台北時區判斷）
+function sendDailyDigest(e) {
+  // 自動排程(e 有值)時，週末(六/日)不寄；手動從編輯器執行(e 為空)則一律寄，方便測試（台北時區）
   var dow = Utilities.formatDate(new Date(), "Asia/Taipei", "u");  // 1=一 … 6=六 7=日
-  if (dow === "6" || dow === "7") return "週末不寄送";
+  if (e && (dow === "6" || dow === "7")) return "週末不寄送（自動排程）";
   var c = erpAlertCounts_();
   var mmdd = Utilities.formatDate(new Date(), "Asia/Taipei", "M/d");
   var warn = [];
