@@ -799,27 +799,6 @@ def render_html(history: dict, daily: dict = None, news: list = None) -> str:
     </section>"""
         )
 
-    # 匯率、銅鋁比價序列
-    fx_series = daily.get("fx", [])
-    cu = {d["ts"]: d["usd"] for d in daily.get("copper", []) if d.get("usd")}
-    al = {d["ts"]: d["usd"] for d in daily.get("aluminum", []) if d.get("usd")}
-    ratio = [{"ts": d, "v": round(cu[d] / al[d], 3)}
-             for d in sorted(set(cu) & set(al)) if al.get(d)]
-
-    fx_panel = """
-    <div class="grid2">
-      <section class="mpanel" data-fx="1">
-        <div class="mhead"><div><span class="mname">匯率</span><span class="men">USD / TWD</span></div><span class="fval sm" id="fxNow">—</span></div>
-        <div class="chart sm" data-chart="fx"></div>
-        <div class="fxnote"><b>怎麼看：</b>1 美元換多少台幣。原料是用美元買的，所以這個數字<b>越大＝買原料越貴</b>、<b>越小＝越便宜</b>。</div>
-      </section>
-      <section class="mpanel" data-ratio="1">
-        <div class="mhead"><div><span class="mname">銅鋁比價</span><span class="men">COPPER / ALUMINUM</span></div><span class="fval sm" id="ratioNow">—</span></div>
-        <div class="chart sm" data-chart="ratio"></div>
-        <div class="fxnote"><b>怎麼看：</b>銅價 ÷ 鋁價，就是「銅比鋁貴幾倍」。數字<b>越大＝銅越貴</b>（常代表景氣旺）；<b>越小＝鋁相對划算</b>。可當「要用銅還是鋁」的成本參考。</div>
-      </section>
-    </div>"""
-
     # 原料相關新聞（run_metals 抓 Google 新聞傳入；本機重生時為空 → 顯示占位）
     if news:
         _items = "".join(
@@ -840,9 +819,7 @@ def render_html(history: dict, daily: dict = None, news: list = None) -> str:
 
     names = " · ".join(m["name"] for m in config.METALS.values())
     data_script = (
-        "<script>window.METALS_DATA = " + json.dumps(metals_data, ensure_ascii=False) + ";"
-        "window.FX_DATA = " + json.dumps(fx_series, ensure_ascii=False) + ";"
-        "window.RATIO_DATA = " + json.dumps(ratio, ensure_ascii=False) + ";</script>"
+        "<script>window.METALS_DATA = " + json.dumps(metals_data, ensure_ascii=False) + ";</script>"
     )
 
     return f"""<!doctype html>
@@ -878,7 +855,6 @@ def render_html(history: dict, daily: dict = None, news: list = None) -> str:
     </div>
     <div class="unitnote">單位說明：<b>/t = 每公噸</b>（1 公噸＝1,000 公斤）· /lb ＝每磅 · /kg ＝每公斤 · NT$＝新台幣、US$＝美元。國際原料習慣用「每公噸」報價。</div>
 {''.join(panels)}
-{fx_panel}
 {news_panel}
     <div class="foot">現價：LME 官方結算價（Westmetall）· 走勢圖：Yahoo Finance 每日收盤（銅為 COMEX 近月，與 LME 走勢近乎一致）· 匯率 Yahoo · 新聞：Google 新聞 · 單位由美元/公噸換算 · 僅供內部參考。</div>
   </div>

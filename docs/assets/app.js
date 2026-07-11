@@ -310,7 +310,7 @@
       });
     }
 
-    function redraw() { Object.keys(DATA).forEach(renderOne); drawFxRatio(); }
+    function redraw() { Object.keys(DATA).forEach(renderOne); }
     REDRAWS.push(redraw);
 
     document.querySelectorAll(".unitbar button").forEach(function (b) {
@@ -328,25 +328,6 @@
     markBar(".unitbar", "data-unit", state.unit);
     markBar(".rangebar", "data-range", state.range);
     redraw();
-  }
-
-  function drawFxRatio() {
-    var fx = window.FX_DATA || [];
-    var fxc = document.querySelector('.chart[data-chart="fx"]');
-    if (fxc && fx.length) {
-      drawSeries(fxc, fx.map(function (d) { return { ts: d.ts, val: d.rate }; }),
-        { ma: MA_N, color: cssVar("--accent"), fmt: function (v) { return v.toFixed(3); } });
-      var now = fx[fx.length - 1]; var el = document.getElementById("fxNow");
-      if (el && now) el.textContent = now.rate.toFixed(3);
-    }
-    var rt = window.RATIO_DATA || [];
-    var rtc = document.querySelector('.chart[data-chart="ratio"]');
-    if (rtc && rt.length) {
-      drawSeries(rtc, rt.map(function (d) { return { ts: d.ts, val: d.v }; }),
-        { ma: MA_N, color: cssVar("--accent"), fmt: function (v) { return v.toFixed(2); } });
-      var rnow = rt[rt.length - 1]; var rel = document.getElementById("ratioNow");
-      if (rel && rnow) rel.textContent = rnow.v.toFixed(2);
-    }
   }
 
   // ============================================================ 人才頁
