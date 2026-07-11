@@ -194,7 +194,10 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
     cards += [sup_card, jobs_card]
     cards += [_grp("🧰 工具 · 說明"), assistant_card, db_card, notebook_card, help_card]
 
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    _tw = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+    now = _tw.strftime("%Y-%m-%d %H:%M")
+    greeting = "早安" if _tw.hour < 11 else ("午安" if _tw.hour < 18 else "晚安")
+    date_s = _tw.strftime("%Y/%m/%d") + "（週" + "一二三四五六日"[_tw.weekday()] + "）"
     return f"""<!doctype html>
 <html lang="zh-TW">
 <head>
@@ -204,9 +207,18 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
 <body>
   <div class="wrap">
     <div class="topbar">{_nav("home")}{_THEME_BTN}</div>
-    <div class="eyebrow">九上科技 · 智慧儀表板</div>
-    <h1>今日重點總覽</h1>
-    <div class="sub">點下面任一張卡片進入該功能 · 資料每日自動更新 · 更新於 {now}</div>
+    <div class="hero">
+      <div class="eyebrow">九上科技 · 智慧儀表板</div>
+      <h1>{greeting}，老闆 👋</h1>
+      <div class="sub">今天 {date_s}　·　這裡是今日重點 · 更新於 {now}</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-k">💰 本月營收</div><div class="stat-v" id="stRev">—</div></div>
+      <div class="stat"><div class="stat-k">🚚 待出貨</div><div class="stat-v" id="stShip">—</div></div>
+      <div class="stat" id="stOverCard"><div class="stat-k">⏰ 逾期未出貨</div><div class="stat-v" id="stOver">—</div></div>
+      <div class="stat"><div class="stat-k">📦 本月訂單</div><div class="stat-v" id="stCnt">—</div></div>
+    </div>
+    <div class="stats-hint" id="stHint">🔒 登入後這裡會帶入你的即時數字（本月營收、待出貨、逾期、訂單數）</div>
     <div class="hcards">{''.join(cards)}</div>
     <div class="foot">原料價／招募／供應商每日自動更新；報價用最新原料行情試算。全部免費、關機也會自己跑。</div>
   </div>

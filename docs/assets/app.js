@@ -116,11 +116,11 @@
       // 只放「Sign in with Google」按鈕，不呼叫 One Tap prompt()（避免自動彈窗與未登入時的 console 噪音）
       try { google.accounts.id.renderButton(document.getElementById("gBtn"), { type: "standard", size: "medium", text: "signin_with", shape: "pill" }); } catch (e) {}
     }
-    // 登入狀態一改變就刷新資料庫操作中心 / 訂單頁（顯示/隱藏「未登入」橫幅、載入雲端資料）
+    // 登入狀態一改變就刷新資料庫操作中心 / 訂單頁 / 首頁數字（顯示/隱藏「未登入」橫幅、載入雲端資料）
     if (window.__refreshConsole) window.__refreshConsole();
     if (window.__refreshOrders) window.__refreshOrders();
-    if (window.__refreshMrp) window.__refreshMrp();
     if (window.__refreshAssistant) window.__refreshAssistant();
+    if (window.__refreshHome) window.__refreshHome();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
@@ -1407,6 +1407,39 @@
     pullAll();
   }
 
+  // 首頁「今日數字」大看板：登入後由訂單即時算出（未登入顯示 —）
+  function initHome() {
+    if (!document.getElementById("stRev")) return;
+    function num(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
+    function set(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
+    function today() { var d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+    function render(orders) {
+      var tm = today().slice(0, 7), t = today(), rev = 0, cnt = 0, ship = 0, over = 0;
+      orders.forEach(function (o) {
+        if (o.status === "取消") return;
+        if (String(o.order_date || "").slice(0, 7) === tm) { rev += (num(o.amount) || num(o.qty) * num(o.price)); cnt++; }
+        if (o.status === "接單" || o.status === "生產") ship++;
+        if (o.due && String(o.due) < t && ["報價", "接單", "生產"].indexOf(o.status) >= 0) over++;
+      });
+      set("stRev", "NT$ " + Math.round(rev).toLocaleString());
+      set("stShip", ship + " 筆"); set("stOver", over + " 筆"); set("stCnt", cnt + " 筆");
+      var oc = document.getElementById("stOverCard"); if (oc) oc.classList.toggle("warn", over > 0);
+      var hint = document.getElementById("stHint"); if (hint) hint.style.display = "none";
+    }
+    function load() {
+      if (!idToken) {
+        ["stRev", "stShip", "stOver", "stCnt"].forEach(function (id) { set(id, "—"); });
+        var hint = document.getElementById("stHint"); if (hint) hint.style.display = "";
+        return;
+      }
+      var cached = lsGet("console_orders", null);
+      if (cached && cached.length) render(cached);
+      dbCall("tList", { table: "orders" }).then(function (d) { if (d && d.rows) { lsSet("console_orders", d.rows); render(d.rows); } });
+    }
+    window.__refreshHome = load;
+    load();
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     if (window.METALS_DATA) initMetals(window.METALS_DATA);
@@ -1417,6 +1450,7 @@
     if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
     if (document.getElementById("ordersView")) initOrders();     // 訂單 + 老闆儀表板
     if (document.getElementById("aiView")) initAssistant();       // AI 助手
+    if (document.getElementById("stRev")) initHome();             // 首頁今日數字看板
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
     // 情報下拉：點空白處收起（原生 details 負責開關）
     document.addEventListener("click", function (e) {
