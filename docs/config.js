@@ -15,5 +15,7 @@ window.APP_CONFIG = {
   // ④（選填）「九上資料庫」試算表的網址，填了首頁會出現一張「🗂️ 九上資料庫」快捷卡片
   SHEET_URL: "https://docs.google.com/spreadsheets/d/1LphX_BytpNuieeh1md6AawQjT-B127tE8v81orySptU/edit",
   // ⑤（選填）NotebookLM 筆記本網址；填了首頁「🧠 NotebookLM」卡會直接連到它，未填則連 notebooklm.google.com
-  NOTEBOOK_URL: "https://notebooklm.google.com/notebook/9d828a71-402e-4ebf-ab2f-93a92120d428"
+  NOTEBOOK_URL: "https://notebooklm.google.com/notebook/9d828a71-402e-4ebf-ab2f-93a92120d428",
+  // ⑥（選填）教育訓練用的另一本 NotebookLM 網址（老師傅 SOP/廠規/安全，移工可用越南文學）
+  TRAIN_NOTEBOOK_URL: ""
 };

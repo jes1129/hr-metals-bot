@@ -187,6 +187,12 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
         '<div class="he">📧</div><div class="ht">信箱</div>'
         '<div class="hl"><div class="mnote">開 Gmail 收每日 ERP 早報／警示（缺料、逾期、原料行情）</div></div>'
         '<div class="hcta">開啟信箱 →</div></a>')
+    # 教育訓練知識庫卡（連到訓練用的 NotebookLM；href 由 config.js 的 TRAIN_NOTEBOOK_URL 設定）
+    cards.append(
+        '<a class="hcard" id="trainCard" href="https://notebooklm.google.com" target="_blank" rel="noopener">'
+        '<div class="he">🎓</div><div class="ht">教育訓練知識庫</div>'
+        '<div class="hl"><div class="mnote">老師傅 SOP／廠規／安全，移工可用<b>越南文</b>直接問（NotebookLM）</div></div>'
+        '<div class="hcta">開啟知識庫 →</div></a>')
     cards.append(_hcard(
         "help.html", "📖", "使用說明",
         '<div class="mnote">新手上路、每項功能怎麼用、常見問題（不會用先看這裡）</div>',
@@ -208,7 +214,7 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
     <div class="hcards">{''.join(cards)}</div>
     <div class="foot">原料價／招募／供應商每日自動更新；報價用最新原料行情試算。全部免費、關機也會自己跑。</div>
   </div>
-  <script>(function(){{var u=(window.APP_CONFIG||{{}}).NOTEBOOK_URL;var c=document.getElementById("nbCard");if(c&&u)c.href=u;}})();</script>
+  <script>(function(){{var C=window.APP_CONFIG||{{}};var a=document.getElementById("nbCard");if(a&&C.NOTEBOOK_URL)a.href=C.NOTEBOOK_URL;var b=document.getElementById("trainCard");if(b&&C.TRAIN_NOTEBOOK_URL)b.href=C.TRAIN_NOTEBOOK_URL;}})();</script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
