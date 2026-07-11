@@ -957,8 +957,7 @@
       }).join("") + '</div>';
 
       mount.innerHTML = (!idToken ? '<div class="dbbanner">🔒 尚未登入：目前顯示本機快取。登入後可新增/更新訂單並同步到公司試算表。</div>' : "")
-        + kpiHTML + charts + tools + board
-        + '<div class="dbfoot">訂單資料存在公司 Google 試算表（與資料庫操作中心同一份）。</div>';
+        + kpiHTML + charts + tools + board;
       wire();
     }
     function kcard(label, val, cls) {
