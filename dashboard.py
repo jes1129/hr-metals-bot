@@ -811,12 +811,12 @@ def render_html(history: dict, daily: dict = None, news: list = None) -> str:
       <section class="mpanel" data-fx="1">
         <div class="mhead"><div><span class="mname">匯率</span><span class="men">USD / TWD</span></div><span class="fval sm" id="fxNow">—</span></div>
         <div class="chart sm" data-chart="fx"></div>
-        <div class="fxnote"><b>怎麼看：</b>1 美元換多少台幣。原料是用<b>美元</b>報價、你付<b>台幣</b>，所以匯率也影響成本——<b>數字變大</b>＝台幣走貶，進口原料換算台幣<b>變貴</b>；<b>變小</b>＝台幣走升，<b>變便宜</b>。</div>
+        <div class="fxnote"><b>怎麼看：</b>1 美元換多少台幣。原料是用美元買的，所以這個數字<b>越大＝買原料越貴</b>、<b>越小＝越便宜</b>。</div>
       </section>
       <section class="mpanel" data-ratio="1">
         <div class="mhead"><div><span class="mname">銅鋁比價</span><span class="men">COPPER / ALUMINUM</span></div><span class="fval sm" id="ratioNow">—</span></div>
         <div class="chart sm" data-chart="ratio"></div>
-        <div class="fxnote"><b>怎麼看：</b>銅價 ÷ 鋁價，看兩種原料<b>誰相對貴</b>。比值<b>高</b>＝銅相對鋁貴（銅常反映景氣/需求強）；比值<b>低</b>＝鋁相對強。可當「原料替代、成本比較」的參考。</div>
+        <div class="fxnote"><b>怎麼看：</b>銅價 ÷ 鋁價，就是「銅比鋁貴幾倍」。數字<b>越大＝銅越貴</b>（常代表景氣旺）；<b>越小＝鋁相對划算</b>。可當「要用銅還是鋁」的成本參考。</div>
       </section>
     </div>"""
 
