@@ -20,9 +20,11 @@ var NOTEBOOK_DOC_NAME = "九上科技 ERP 每日簡報";
 // ---- 試算表選單（打開試算表時出現）----
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu("🧠 NotebookLM")
-    .addItem("🔄 立即更新簡報", "menuUpdate_")
-    .addItem("🔗 顯示簡報連結", "menuLink_")
+    .createMenu("🧠 NotebookLM / 早報")
+    .addItem("📧 立即寄一封 ERP 早報", "sendDailyDigest")
+    .addSeparator()
+    .addItem("🔄 立即更新簡報文件", "menuUpdate_")
+    .addItem("🔗 顯示簡報文件連結", "menuLink_")
     .addItem("⏰ 開啟每日自動更新", "installDailyTrigger")
     .addToUi();
 }
