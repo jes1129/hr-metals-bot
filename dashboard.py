@@ -74,7 +74,6 @@ def _nav(active: str) -> str:
         '</div></details>'
         f'<a{a if active == "quote" else ""} href="quote.html">🧮 報價</a>'
         f'<a{a if active == "orders" else ""} href="orders.html">📦 訂單</a>'
-        f'<a{a if active == "mrp" else ""} href="mrp.html">📊 庫存·MRP</a>'
         f'<a{a if active == "ai" else ""} href="assistant.html">🤖 助手</a>'
         f'<a{a if active == "db" else ""} href="db.html">🗂️ 資料庫</a>'
         f'<a{a if active == "help" else ""} href="help.html">📖 說明</a>'
@@ -163,12 +162,8 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
         '<div class="mnote">建客戶訂單、狀態看板，老闆一眼看<b>營收／待出貨／逾期</b></div>',
         "管理訂單"))
     cards.append(_hcard(
-        "mrp.html", "📊", "庫存 · MRP",
-        '<div class="mnote">料號／庫存／BOM，自動算<b>「要補哪些料、補多少」</b></div>',
-        "看缺料建議"))
-    cards.append(_hcard(
         "assistant.html", "🤖", "AI 助手",
-        '<div class="mnote">問一句就答：缺料、逾期、營收…＋🗣️ 中越對話（老闆⇄越南員工）</div>',
+        '<div class="mnote">問一句就答：逾期、營收、待出貨…＋🗣️ 中越對話（老闆⇄越南員工）</div>',
         "問問看"))
     # 九上資料庫快捷卡（進站內「資料庫操作中心」db.html；免開試算表就能增刪改查）
     cards.append(
@@ -269,33 +264,6 @@ def render_orders_html() -> str:
 
 
 # ===========================================================================
-# 庫存 · 料號 · BOM · MRP 缺料建議（📊 由訂單×BOM 算要補的料）
-# ===========================================================================
-def render_mrp_html() -> str:
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
-    return f"""<!doctype html>
-<html lang="zh-TW">
-<head>
-{_HEAD}
-<title>九上科技 · 庫存與 MRP 缺料建議</title>
-</head>
-<body>
-  <div class="wrap">
-    <div class="topbar">{_nav("mrp")}{_THEME_BTN}</div>
-    <div class="eyebrow">九上科技 · 智慧儀表板</div>
-    <h1>📊 庫存 · MRP 缺料建議</h1>
-    <div class="sub">由「已接訂單 × 產品用料(BOM)」自動算出要補哪些料、補多少 · 更新於 {now}</div>
-    <div id="mrpView" class="mrpview">
-      <div class="dbloading">載入中…（若一直沒出現，請先用右上角「使用 Google 帳戶登入」）</div>
-    </div>
-    <div class="foot">料號/庫存/BOM 存在公司自己的 Google 試算表（與資料庫操作中心同一份、免費）。</div>
-  </div>
-  <script src="assets/app.js?v={_VER}"></script>
-</body>
-</html>"""
-
-
-# ===========================================================================
 # AI 助手（🤖 快速問答本地即時算 + 自由提問走免費 Gemini）
 # ===========================================================================
 def render_assistant_html() -> str:
@@ -311,7 +279,7 @@ def render_assistant_html() -> str:
     <div class="topbar">{_nav("ai")}{_THEME_BTN}</div>
     <div class="eyebrow">九上科技 · 智慧儀表板</div>
     <h1>🤖 AI 助手</h1>
-    <div class="sub">問一句就答：缺料、逾期、營收、待出貨、低庫存 · 快速問答免設定、免費 · 更新於 {now}</div>
+    <div class="sub">問一句就答：逾期、營收、待出貨 · 快速問答免設定、免費 · ＋🗣️ 中越對話 · 更新於 {now}</div>
     <div id="aiView" class="aiview">
       <div class="dbloading">載入中…（若一直沒出現，請先用右上角「使用 Google 帳戶登入」）</div>
     </div>
@@ -396,13 +364,13 @@ def render_help_html() -> str:
 
     <div class="q">
       <h2>這是什麼？</h2>
-      <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情、找人才、找供應商、開發客戶；一邊管報價、訂單、庫存與缺料，還有 AI 助手。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
-      <p>上面一排分成幾類：<b>🏠 首頁</b>總覽、<b>📈 情報</b>（原料/招募/供應商/客戶，點開是下拉選單）、以及營運工具 <b>🧮 報價 · 📦 訂單 · 📊 庫存·MRP · 🤖 助手 · 🗂️ 資料庫</b>，最後是 <b>📖 說明</b>（本頁）。</p>
+      <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情、找人才、找供應商、開發客戶；一邊管報價、訂單，還有 AI 助手（含中越對話）。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
+      <p>上面一排分成幾類：<b>🏠 首頁</b>總覽、<b>📈 情報</b>（原料/招募/供應商/客戶，點開是下拉選單）、以及營運工具 <b>🧮 報價 · 📦 訂單 · 🤖 助手 · 🗂️ 資料庫</b>，最後是 <b>📖 說明</b>（本頁）。</p>
       <p class="muted">👇 點下面任一顆，直接跳到該功能的詳細說明：</p>
       <div class="jump">
         <a href="#start">🚀 新手上路</a><a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
         <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a>
-        <a href="#f-orders">📦 訂單</a><a href="#f-mrp">📊 庫存·MRP</a><a href="#f-ai">🤖 助手</a><a href="#f-notebook">🧠 NotebookLM</a><a href="#f-email">📧 信箱</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
+        <a href="#f-orders">📦 訂單</a><a href="#f-ai">🤖 助手</a><a href="#f-notebook">🧠 NotebookLM</a><a href="#f-email">📧 信箱</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
       </div>
     </div>
 
@@ -414,9 +382,7 @@ def render_help_html() -> str:
         <li><b>看情報</b>：📈 情報裡的原料行情、供應商、客戶，平常參考用。</li>
         <li><b>報價</b>：客人詢價 → 🧮 報價算一算 → 存起來。</li>
         <li><b>轉訂單</b>：接到單 → 📦 訂單「從報價轉單」或「＋新增訂單」，用看板追進度。</li>
-        <li><b>建庫存底稿</b>：📊 庫存·MRP 先在「🗂️ 資料庫」把<b>料號/庫存</b>與<b>產品用料(BOM)</b>建好（可先按「載入範例資料」看長怎樣）。</li>
-        <li><b>看缺料</b>：回 📊 庫存·MRP，系統自動算「要補哪些料、補多少」。</li>
-        <li><b>問 AI</b>：🤖 助手點按鈕或打字，隨時問「這月要補什麼料 / 哪些逾期 / 營收多少」。</li>
+        <li><b>問 AI</b>：🤖 助手點按鈕或打字，隨時問「哪些逾期 / 營收多少 / 待出貨」；要跟越南員工溝通就切「🗣️ 中越對話」。</li>
       </ul>
       <div class="tip">💡 只想輕鬆用？每天開<b>首頁</b>看重點卡片、需要時點 🤖 <b>助手</b>問一句，就很夠了。</div>
     </div>
@@ -517,26 +483,6 @@ def render_help_html() -> str:
           </ul>
           <p class="muted">訂單和資料庫是同一份試算表；要批次整理可到「🗂️ 資料庫」的「訂單」分頁。</p>
           <a class="gobtn" href="orders.html">前往訂單儀表板 →</a>
-        </div>
-      </details>
-
-      <details class="acc" id="f-mrp">
-        <summary>📊 庫存 · MRP <span class="sm">— 自動算要補什麼料</span><span class="chev">▾</span></summary>
-        <div class="acc-body">
-          <p>先建好兩份基本資料，系統就會自動幫你算「要補哪些料、補多少」：</p>
-          <ol>
-            <li><b>料號 / 庫存</b>：每種材料/零件的料號、品名、<b>庫存量</b>、<b>安全庫存</b>、在途、單價。</li>
-            <li><b>產品用料（BOM）</b>：每個產品要用到哪些料號、<b>每件用量</b>多少。</li>
-          </ol>
-          <p>接著系統用公式自動算：<br>
-          <b>需求</b> ＝ 已接訂單（接單/生產）數量 × 該產品 BOM 用量；<br>
-          <b>缺口</b> ＝ 需求 ＋ 安全庫存 − 庫存 − 在途 → <b>缺口 &gt; 0 就是要補的料</b>。</p>
-          <ul>
-            <li>上方 KPI：料號數、低於安全庫存、缺料項目、<b>建議採購總金額</b>。</li>
-            <li><b>缺料建議表</b>：紅色列＝要補；顯示缺多少、建議採購金額。點一列可改庫存。</li>
-            <li>第一次用可按 <b>「載入範例資料」</b> 看效果（要有「接單/生產」的訂單才算得出缺料）。</li>
-          </ul>
-          <a class="gobtn" href="mrp.html">前往庫存 · MRP →</a>
         </div>
       </details>
 
