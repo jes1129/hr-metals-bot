@@ -1,7 +1,7 @@
 /**
  * 九上科技儀表板 — NotebookLM 匯出橋樑（Google Apps Script）
  *
- * 用途：每天（或手動）把試算表裡的 ERP 現況（訂單/庫存/缺料/營收/往來）
+ * 用途：每天（或手動）把試算表裡的 ERP 現況（訂單/營收/待出貨/逾期/報價/往來）
  *       寫成一份固定的 Google 文件「九上科技 ERP 每日簡報」，讓 NotebookLM 當來源。
  *
  * 安裝（貼進「同一個」Apps Script 專案，當第二個檔案）：
@@ -80,7 +80,7 @@ function ymd_(v) { return (v instanceof Date) ? Utilities.formatDate(v, "Asia/Ta
 function amt_(o) { var a = Number(o.amount); return (!isNaN(a) && o.amount !== "" && o.amount != null) ? a : n_(o.qty) * n_(o.price); }
 
 function buildBriefText_() {
-  var orders = readTable_("orders"), items = readTable_("items"), bom = readTable_("bom"),
+  var orders = readTable_("orders"),
       quotes = readTable_("quotes"), marks = readTable_("marks");
   var today = Utilities.formatDate(new Date(), "Asia/Taipei", "yyyy-MM-dd");
   var month = today.slice(0, 7);
@@ -96,20 +96,6 @@ function buildBriefText_() {
     if (o.status === "接單" || o.status === "生產") { ship++; shipList.push(o); }
     if (overdue(o)) overdueList.push(o);
   });
-
-  // MRP 缺料
-  var demand = {};
-  orders.forEach(function (o) {
-    if (o.status !== "接單" && o.status !== "生產") return;
-    bom.forEach(function (b) { if (String(b.product) === String(o.product)) demand[b.item_code] = (demand[b.item_code] || 0) + n_(o.qty) * n_(b.per); });
-  });
-  var shortages = [], buyTotal = 0, lowStock = [];
-  items.forEach(function (it) {
-    var sh = Math.max(0, (demand[it.code] || 0) + n_(it.safety) - n_(it.stock) - n_(it.on_order));
-    if (sh > 0) { var amt = sh * n_(it.cost); shortages.push({ it: it, sh: sh, amt: amt }); buyTotal += amt; }
-    if (n_(it.stock) < n_(it.safety)) lowStock.push(it);
-  });
-  shortages.sort(function (a, b) { return b.amt - a.amt; });
 
   var L = [];
   L.push("九上科技 ERP 每日簡報");
@@ -132,18 +118,6 @@ function buildBriefText_() {
   else shipList.forEach(function (o) { L.push("- " + (o.customer || "?") + "／" + (o.product || "") + " ×" + n_(o.qty) + "（交期 " + (ymd_(o.due) || "未定") + "，金額 " + nt_(amt_(o)) + "）"); });
   L.push("");
 
-  L.push("【缺料採購建議（MRP）】需求＝已接訂單×BOM用量；缺口＝需求＋安全庫存−庫存−在途");
-  if (!shortages.length) L.push("- 目前無缺料（或尚無接單/生產訂單與對應 BOM）");
-  else {
-    shortages.forEach(function (s) { L.push("- " + s.it.code + " " + (s.it.name || "") + "：缺 " + comma_(s.sh) + " " + (s.it.unit || "") + "，建議採購約 " + nt_(s.amt)); });
-    L.push("- 建議採購總額：" + nt_(buyTotal));
-  }
-  L.push("");
-
-  L.push("【低於安全庫存的品項】");
-  if (!lowStock.length) L.push("- 無");
-  else lowStock.forEach(function (it) { L.push("- " + it.code + " " + (it.name || "") + "：庫存 " + comma_(it.stock) + " / 安全 " + comma_(it.safety) + "（單位 " + (it.unit || "") + "）"); });
-  L.push("");
 
   L.push("【最近報價（近 8 筆）】");
   var qz = quotes.slice().sort(function (a, b) { return n_(b.ts) - n_(a.ts); }).slice(0, 8);

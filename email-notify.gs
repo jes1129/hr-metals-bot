@@ -20,24 +20,13 @@ function getNotifyEmails_() {
   return (v && v.trim()) ? v.trim() : Session.getActiveUser().getEmail();
 }
 
-// 從訂單/庫存/BOM 算「需注意」數字（重用 notebooklm-export.gs 的 readTable_/n_/ymd_）
+// 從訂單算「需注意」數字（只看逾期；不做缺料/庫存，MRP 已移除）
 function erpAlertCounts_() {
-  var orders = readTable_("orders"), items = readTable_("items"), bom = readTable_("bom");
+  var orders = readTable_("orders");
   var today = Utilities.formatDate(new Date(), "Asia/Taipei", "yyyy-MM-dd");
   var overdue = 0;
   orders.forEach(function (o) { var d = ymd_(o.due); if (d && d < today && ["報價", "接單", "生產"].indexOf(o.status) >= 0) overdue++; });
-  var demand = {};
-  orders.forEach(function (o) {
-    if (o.status !== "接單" && o.status !== "生產") return;
-    bom.forEach(function (b) { if (String(b.product) === String(o.product)) demand[b.item_code] = (demand[b.item_code] || 0) + n_(o.qty) * n_(b.per); });
-  });
-  var shortN = 0, buy = 0, lowN = 0;
-  items.forEach(function (it) {
-    var sh = Math.max(0, (demand[it.code] || 0) + n_(it.safety) - n_(it.stock) - n_(it.on_order));
-    if (sh > 0) { shortN++; buy += sh * n_(it.cost); }
-    if (n_(it.stock) < n_(it.safety)) lowN++;
-  });
-  return { shortN: shortN, buy: buy, lowN: lowN, overdue: overdue };
+  return { overdue: overdue };
 }
 
 // 原料現況（讀網站 signals.json）— 現價＋今日漲跌%（不做上下線告警）
@@ -58,16 +47,12 @@ function sendDailyDigest() {
   var c = erpAlertCounts_();
   var mmdd = Utilities.formatDate(new Date(), "Asia/Taipei", "M/d");
   var warn = [];
-  if (c.shortN) warn.push("缺料" + c.shortN);
   if (c.overdue) warn.push("逾期" + c.overdue);
-  if (c.lowN) warn.push("低庫存" + c.lowN);
   var subject = warn.length ? ("⚠️ 九上 ERP：" + warn.join("/") + "（" + mmdd + "）") : ("九上 ERP 早報 " + mmdd);
   var head = "";
   if (warn.length) {
     head = "⚠️ 需注意\n";
-    if (c.shortN) head += "- 缺料 " + c.shortN + " 項，建議採購約 NT$ " + comma_(c.buy) + "\n";
     if (c.overdue) head += "- 逾期未出貨 " + c.overdue + " 筆\n";
-    if (c.lowN) head += "- 低於安全庫存 " + c.lowN + " 項\n";
     head += "\n";
   }
   var body = head + buildBriefText_() + "\n\n" + metalsSignalText_()

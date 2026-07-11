@@ -149,43 +149,50 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
         '<div class="mnote">選材質、輸入重量，用<b>當下行情</b>算料錢＋建議報價</div>',
         "開始試算")
 
-    cards = [metals_card, jobs_card, sup_card, quote_card]
+    customers_card = ""
     if cust_total is not None:
-        cards.insert(3, _hcard(
+        customers_card = _hcard(
             "customers.html", "🎯", "客戶開發雷達",
             f'<div class="big">{cust_total} <span>家</span></div>'
             '<div class="mnote">會買精密金屬零件的潛在客戶</div>',
-            "找新客戶"))
-    # ERP 營運新功能卡（登入後可用；資料存公司試算表）
-    cards.append(_hcard(
+            "找新客戶")
+    orders_card = _hcard(
         "orders.html", "📦", "訂單管理",
         '<div class="mnote">建客戶訂單、狀態看板，老闆一眼看<b>營收／待出貨／逾期</b></div>',
-        "管理訂單"))
-    cards.append(_hcard(
+        "管理訂單")
+    email_card = (
+        '<a class="hcard" href="https://mail.google.com" target="_blank" rel="noopener">'
+        '<div class="he">📧</div><div class="ht">每日早報信箱</div>'
+        '<div class="hl"><div class="mnote">開 Gmail 收每日 ERP 早報（逾期、營收、待出貨、原料行情）</div></div>'
+        '<div class="hcta">開啟信箱 →</div></a>')
+    assistant_card = _hcard(
         "assistant.html", "🤖", "AI 助手",
         '<div class="mnote">問一句就答：逾期、營收、待出貨…＋🗣️ 中越對話（老闆⇄越南員工）</div>',
-        "問問看"))
-    # 九上資料庫快捷卡（進站內「資料庫操作中心」db.html；免開試算表就能增刪改查）
-    cards.append(
+        "問問看")
+    db_card = (
         '<a class="hcard" id="dbCard" href="db.html">'
         '<div class="he">🗂️</div><div class="ht">九上資料庫</div>'
         '<div class="hl"><div class="mnote">站內直接管理：訂單/料號/BOM/名單/報價（免開試算表）</div></div>'
         '<div class="hcta">開啟資料庫 →</div></a>')
-    # NotebookLM 知識庫快捷卡（href 由 config.js 的 NOTEBOOK_URL 於前端設定，未填則連 notebooklm.google.com）
-    cards.append(
+    notebook_card = (
         '<a class="hcard" id="nbCard" href="https://notebooklm.google.com" target="_blank" rel="noopener">'
         '<div class="he">🧠</div><div class="ht">NotebookLM 知識庫</div>'
         '<div class="hl"><div class="mnote">把 ERP 現況＋公司文件變 AI 知識庫：問答、生語音簡報</div></div>'
         '<div class="hcta">開啟知識庫 →</div></a>')
-    cards.append(
-        '<a class="hcard" href="https://mail.google.com" target="_blank" rel="noopener">'
-        '<div class="he">📧</div><div class="ht">信箱</div>'
-        '<div class="hl"><div class="mnote">開 Gmail 收每日 ERP 早報／警示（缺料、逾期、原料行情）</div></div>'
-        '<div class="hcta">開啟信箱 →</div></a>')
-    cards.append(_hcard(
+    help_card = _hcard(
         "help.html", "📖", "使用說明",
         '<div class="mnote">新手上路、每項功能怎麼用、常見問題（不會用先看這裡）</div>',
-        "看教學"))
+        "看教學")
+
+    def _grp(t):
+        return f'<div class="hgroup">{t}</div>'
+    # 分三組，最常用的置頂
+    cards = [_grp("🔑 每天必看"), orders_card, email_card, metals_card, quote_card]
+    cards.append(_grp("📡 情報雷達"))
+    if customers_card:
+        cards.append(customers_card)
+    cards += [sup_card, jobs_card]
+    cards += [_grp("🧰 工具 · 說明"), assistant_card, db_card, notebook_card, help_card]
 
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     return f"""<!doctype html>
@@ -510,7 +517,7 @@ def render_help_html() -> str:
       <details class="acc" id="f-notebook">
         <summary>🧠 NotebookLM 知識庫 <span class="sm">— 進階／選用</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p><b>NotebookLM</b> 是 Google 的免費 AI 筆記工具。我們每天自動把公司的 ERP 現況（訂單、庫存、缺料、營收、往來重點）寫成一份 Google 文件；你把這份文件、加上公司自己的文件（SOP、報價政策、產品規格、合約…）放進 NotebookLM，它就變成一個<b>公司專屬 AI 知識庫</b>：</p>
+          <p><b>NotebookLM</b> 是 Google 的免費 AI 筆記工具。我們每天自動把公司的 ERP 現況（訂單、營收、待出貨、逾期、報價、往來重點）寫成一份 Google 文件；你把這份文件、加上公司自己的文件（SOP、報價政策、產品規格、合約…）放進 NotebookLM，它就變成一個<b>公司專屬 AI 知識庫</b>：</p>
           <ul>
             <li>🔎 <b>問答附出處</b>：問「這個月要補什麼料？」「跟大雅精密往來如何？」「我們報價怎麼抓？」。</li>
             <li>🎧 <b>音檔導覽</b>：把資料變成兩人對談的 Podcast，巡廠/開車用聽的。</li>
@@ -527,8 +534,8 @@ def render_help_html() -> str:
         <div class="acc-body">
           <p>系統每天早上用公司 Gmail 帳號，自動把 ERP 現況寄到你信箱，不用開網站就收到重點：</p>
           <ul>
-            <li><b>每日 ERP 早報</b>：營收、待出貨、逾期、缺料採購建議、低於安全庫存，加原料行情。</li>
-            <li><b>警示</b>：有缺料或逾期時，信件主旨會帶 <b>⚠️</b>，一眼看出今天要注意什麼。</li>
+            <li><b>每日 ERP 早報</b>：本月營收、待出貨、逾期未出貨、最近報價，加原料行情。</li>
+            <li><b>警示</b>：有訂單逾期時，信件主旨會帶 <b>⚠️</b>，一眼看出今天要注意什麼。</li>
           </ul>
           <div class="tip">💡 一次性設定（工程師協助）：貼 <code>email-notify.gs</code>、在指令碼屬性填 <b>NOTIFY_EMAILS</b>（收件人 email）、執行 <code>installEmailTrigger</code> 開每日自動。</div>
           <a class="gobtn" href="https://mail.google.com" target="_blank" rel="noopener">開啟 Gmail →</a>

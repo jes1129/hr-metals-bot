@@ -165,6 +165,9 @@ th .arrow { opacity: .5; font-size: 10px; }
 
 /* 首頁大卡片（整張可點，非科技用戶友善） */
 .hcards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 8px 0 18px; }
+.hgroup { grid-column: 1 / -1; font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: .5px;
+  margin: 12px 0 -2px; padding-bottom: 5px; border-bottom: 1px solid var(--line); }
+.hgroup:first-child { margin-top: 0; }
 .hcard { display: block; text-decoration: none; color: var(--text); background: var(--card);
   border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: var(--shadow);
   transition: transform .12s, box-shadow .12s, border-color .12s; }
