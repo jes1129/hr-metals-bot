@@ -186,7 +186,38 @@ th .arrow { opacity: .5; font-size: 10px; }
   background: color-mix(in srgb, var(--up) 8%, var(--card)); }
 .stat.warn .stat-v { color: var(--up); }
 .stats-hint { font-size: 12.5px; color: var(--muted); margin: 0 0 16px; }
-@media (max-width: 560px) { .stats { grid-template-columns: repeat(2, 1fr); } .hero h1 { font-size: 26px; } }
+
+/* 首頁：大焦點主卡（訂單／早報） */
+.hfeat { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 4px 0 22px; }
+.hfcard { position: relative; display: flex; flex-direction: column; text-decoration: none; color: var(--text);
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px;
+  box-shadow: var(--shadow); overflow: hidden; min-height: 156px;
+  transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
+.hfcard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--accent); }
+.hfcard:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.hfic { display: inline-flex; align-items: center; justify-content: center; width: 54px; height: 54px;
+  font-size: 27px; border-radius: 15px; background: var(--accent-soft); }
+.hfbody { flex: 1; margin-top: 14px; }
+.hft { font-size: 21px; font-weight: 800; margin-bottom: 6px; }
+.hfl { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+.hfcta { margin-top: 14px; font-size: 14px; font-weight: 700; color: var(--accent); }
+
+/* 首頁：小捷徑 icon 格 */
+.hqlabel { font-size: 12.5px; font-weight: 800; color: var(--muted); letter-spacing: .5px; margin: 2px 0 10px; }
+.hquick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+.hq { display: flex; align-items: center; gap: 11px; text-decoration: none; color: var(--text);
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 13px 15px;
+  box-shadow: var(--shadow); transition: transform .12s, border-color .12s, box-shadow .12s; }
+.hq:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.hqi { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px;
+  font-size: 20px; border-radius: 11px; background: var(--accent-soft); flex: none; }
+.hqt { font-size: 14.5px; font-weight: 700; }
+@media (max-width: 560px) {
+  .stats { grid-template-columns: repeat(2, 1fr); } .hero h1 { font-size: 26px; }
+  .hfeat { grid-template-columns: 1fr; } .hquick { grid-template-columns: repeat(2, 1fr); }
+}
 
 /* 首頁大卡片（整張可點，非科技用戶友善） */
 .hcards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 8px 0 18px; }

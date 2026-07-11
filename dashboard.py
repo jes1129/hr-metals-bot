@@ -114,85 +114,42 @@ def _hcard(href: str, emoji: str, title: str, lines: str, cta: str) -> str:
 
 
 def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None) -> str:
-    # 原料卡：每個金屬一行（現價＋今日漲跌%；不做上下線判斷，由使用者自行判斷）
-    metal_lines = []
-    for key, cfg in config.METALS.items():
-        series = history.get(key, [])
-        latest = series[-1] if series else {}
-        price_twd = latest.get("price_twd")
-        pct = latest.get("change_pct")
-        price_s = f"NT${price_twd:,}/噸" if price_twd else "—"
-        if pct is not None:
-            arrow = "▲" if pct >= 0 else "▼"
-            pct_s = f'<span style="color:{"var(--up)" if pct >= 0 else "var(--down)"}">{arrow}{abs(pct):.1f}%</span>'
-        else:
-            pct_s = ""
-        metal_lines.append(
-            f'<div class="mrow"><b>{html.escape(cfg["name"])}</b> {price_s} {pct_s}</div>'
-        )
-    metals_card = _hcard("metals.html", "🔩", "原料行情", "".join(metal_lines), "看銅鋁鎳鋼走勢")
+    # 大焦點：最常用的兩張主卡（訂單、每日早報）
+    def _feat(href, icon, title, note, cta, ext=False, cid=""):
+        idattr = f' id="{cid}"' if cid else ""
+        tgt = ' target="_blank" rel="noopener"' if ext else ""
+        return (f'<a class="hfcard"{idattr} href="{href}"{tgt}>'
+                f'<div class="hfic">{icon}</div>'
+                f'<div class="hfbody"><div class="hft">{title}</div><div class="hfl">{note}</div></div>'
+                f'<div class="hfcta">{cta} →</div></a>')
+    feat = (
+        _feat("orders.html", "📦", "訂單管理",
+              "建客戶訂單、狀態看板，一眼看營收／待出貨／逾期。", "管理訂單")
+        + _feat("https://mail.google.com", "📧", "每日早報信箱",
+                "每天自動收 ERP 早報：營收、待出貨、逾期、原料行情。", "開啟信箱", ext=True)
+    )
 
-    jobs_card = _hcard(
-        "jobs.html", "🔧", "招募雷達",
-        f'<div class="big">{jobs_total} <span>筆</span></div>'
-        '<div class="mnote">台中金屬加工・品管職缺（⭐符合重點者已標）</div>',
-        "看招募行情")
-
-    near_s = f'<div class="mnote">神岡周邊 {sup_near} 家 ⭐</div>' if sup_near is not None else ""
-    sup_card = _hcard(
-        "suppliers.html", "🏭", "供應商雷達",
-        f'<div class="big">{sup_total} <span>家</span></div>{near_s}',
-        "找金屬加工供應商")
-
-    quote_card = _hcard(
-        "quote.html", "🧮", "報價試算",
-        '<div class="mnote">選材質、輸入重量，用<b>當下行情</b>算料錢＋建議報價</div>',
-        "開始試算")
-
-    customers_card = ""
+    # 小捷徑：其餘功能收成一排 icon 格
+    def _q(href, icon, label, ext=False, cid=""):
+        idattr = f' id="{cid}"' if cid else ""
+        tgt = ' target="_blank" rel="noopener"' if ext else ""
+        return (f'<a class="hq"{idattr} href="{href}"{tgt}>'
+                f'<span class="hqi">{icon}</span><span class="hqt">{label}</span></a>')
+    quick_items = [
+        _q("metals.html", "🔩", "原料行情"),
+        _q("quote.html", "🧮", "報價試算"),
+        _q("assistant.html", "🤖", "AI 助手"),
+    ]
     if cust_total is not None:
-        customers_card = _hcard(
-            "customers.html", "🎯", "客戶開發雷達",
-            f'<div class="big">{cust_total} <span>家</span></div>'
-            '<div class="mnote">會買精密金屬零件的潛在客戶</div>',
-            "找新客戶")
-    orders_card = _hcard(
-        "orders.html", "📦", "訂單管理",
-        '<div class="mnote">建客戶訂單、狀態看板，老闆一眼看<b>營收／待出貨／逾期</b></div>',
-        "管理訂單")
-    email_card = (
-        '<a class="hcard" href="https://mail.google.com" target="_blank" rel="noopener">'
-        '<div class="he">📧</div><div class="ht">每日早報信箱</div>'
-        '<div class="hl"><div class="mnote">開 Gmail 收每日 ERP 早報（逾期、營收、待出貨、原料行情）</div></div>'
-        '<div class="hcta">開啟信箱 →</div></a>')
-    assistant_card = _hcard(
-        "assistant.html", "🤖", "AI 助手",
-        '<div class="mnote">問一句就答：逾期、營收、待出貨…＋🗣️ 中越對話（老闆⇄越南員工）</div>',
-        "問問看")
-    db_card = (
-        '<a class="hcard" id="dbCard" href="db.html">'
-        '<div class="he">🗂️</div><div class="ht">九上資料庫</div>'
-        '<div class="hl"><div class="mnote">站內直接管理：訂單/料號/BOM/名單/報價（免開試算表）</div></div>'
-        '<div class="hcta">開啟資料庫 →</div></a>')
-    notebook_card = (
-        '<a class="hcard" id="nbCard" href="https://notebooklm.google.com" target="_blank" rel="noopener">'
-        '<div class="he">🧠</div><div class="ht">NotebookLM 知識庫</div>'
-        '<div class="hl"><div class="mnote">把 ERP 現況＋公司文件變 AI 知識庫：問答、生語音簡報</div></div>'
-        '<div class="hcta">開啟知識庫 →</div></a>')
-    help_card = _hcard(
-        "help.html", "📖", "使用說明",
-        '<div class="mnote">新手上路、每項功能怎麼用、常見問題（不會用先看這裡）</div>',
-        "看教學")
-
-    def _grp(t):
-        return f'<div class="hgroup">{t}</div>'
-    # 分三組，最常用的置頂
-    cards = [_grp("🔑 每天必看"), orders_card, email_card, metals_card, quote_card]
-    cards.append(_grp("📡 情報雷達"))
-    if customers_card:
-        cards.append(customers_card)
-    cards += [sup_card, jobs_card]
-    cards += [_grp("🧰 工具 · 說明"), assistant_card, db_card, notebook_card, help_card]
+        quick_items.append(_q("customers.html", "🎯", "客戶開發"))
+    quick_items += [
+        _q("suppliers.html", "🏭", "供應商"),
+        _q("jobs.html", "🔧", "招募雷達"),
+        _q("db.html", "🗂️", "九上資料庫", cid="dbCard"),
+        _q("https://notebooklm.google.com", "🧠", "NotebookLM", ext=True, cid="nbCard"),
+        _q("help.html", "📖", "使用說明"),
+    ]
+    quick = "".join(quick_items)
 
     _tw = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     now = _tw.strftime("%Y-%m-%d %H:%M")
@@ -219,7 +176,9 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
       <div class="stat"><div class="stat-k">📦 本月訂單</div><div class="stat-v" id="stCnt">—</div></div>
     </div>
     <div class="stats-hint" id="stHint">🔒 登入後這裡會帶入你的即時數字（本月營收、待出貨、逾期、訂單數）</div>
-    <div class="hcards">{''.join(cards)}</div>
+    <div class="hfeat">{feat}</div>
+    <div class="hqlabel">快速前往</div>
+    <div class="hquick">{quick}</div>
     <div class="foot">原料價／招募／供應商每日自動更新；報價用最新原料行情試算。全部免費、關機也會自己跑。</div>
   </div>
   <script>(function(){{var u=(window.APP_CONFIG||{{}}).NOTEBOOK_URL;var c=document.getElementById("nbCard");if(c&&u)c.href=u;}})();</script>
