@@ -907,25 +907,6 @@
       });
       return { rev: rev, cnt: cnt, ship: ship, late: late };
     }
-    function barsHTML(pairs, money) {
-      var mx = 1; pairs.forEach(function (p) { mx = Math.max(mx, p[1]); });
-      return '<div class="obars">' + pairs.map(function (p) {
-        return '<div class="obar-row"><div class="obar-label">' + escAttr(p[0]) + '</div>'
-          + '<div class="obar-track"><div class="obar-fill" style="width:' + Math.round(p[1] / mx * 100) + '%"></div></div>'
-          + '<div class="obar-val">' + (money ? ntfmt(p[1]) : p[1]) + '</div></div>';
-      }).join("") + '</div>';
-    }
-    function revenueByMonth() {
-      var out = [], d = new Date();
-      for (var i = 5; i >= 0; i--) { var m = new Date(d.getFullYear(), d.getMonth() - i, 1); out.push([m.getFullYear() + "-" + z(m.getMonth() + 1), 0]); }
-      var idx = {}; out.forEach(function (p, i) { idx[p[0]] = i; });
-      rows.forEach(function (o) { if (o.status === "取消") return; var k = ym(o.order_date); if (idx[k] != null) out[idx[k]][1] += amt(o); });
-      return out.map(function (p) { return [p[0].slice(2), p[1]]; });  // 顯示 YY-MM
-    }
-    function statusCounts() {
-      return ORDER_FLOW.map(function (s) { return [s, rows.filter(function (o) { return o.status === s; }).length]; });
-    }
-
     function render() {
       var k = kpis();
       var kpiHTML = '<div class="okpis">'
@@ -933,16 +914,13 @@
         + kcard("🚚 待出貨", k.ship + " 筆", "")
         + kcard("⏰ 逾期未出", k.late + " 筆", k.late ? "warn" : "")
         + '</div>';
-      var charts = '<div class="ocharts">'
-        + '<div class="ocard"><div class="octitle">訂單狀態分佈</div>' + barsHTML(statusCounts(), false) + '</div>'
-        + '</div>';
       var tools = '<div class="otools">'
         + '<button class="dbbtn primary" id="oAdd">＋ 新增訂單</button>'
         + '<button class="dbbtn" id="oConv">🧮 從報價轉單</button>'
         + '<a class="dbbtn" href="db.html">🗂️ 在資料庫管理全部訂單</a>'
         + '</div>';
-      // 看板
-      var board = '<div class="okanban">' + ORDER_FLOW.map(function (st) {
+      // 看板（每欄依狀態上色 oks0..oks4）
+      var board = '<div class="okanban">' + ORDER_FLOW.map(function (st, si) {
         var cards = rows.filter(function (o) { return o.status === st; });
         var body = cards.map(function (o) {
           return '<div class="ocardk' + (overdue(o) ? " od" : "") + '" data-edit="' + escAttr(o.id) + '">'
@@ -952,12 +930,12 @@
             + '<select class="ock-move" data-id="' + escAttr(o.id) + '">'
             + ORDER_FLOW.concat(["取消"]).map(function (s) { return '<option' + (s === st ? " selected" : "") + '>' + s + '</option>'; }).join("")
             + '</select></div>';
-        }).join("") || '<div class="ock-empty">—</div>';
-        return '<div class="okcol"><div class="okhead">' + st + ' <span>' + cards.length + '</span></div>' + body + '</div>';
+        }).join("") || '<div class="ock-empty">尚無</div>';
+        return '<div class="okcol oks' + si + '"><div class="okhead">' + st + ' <span>' + cards.length + '</span></div>' + body + '</div>';
       }).join("") + '</div>';
 
       mount.innerHTML = (!idToken ? '<div class="dbbanner">🔒 尚未登入：目前顯示本機快取。登入後可新增/更新訂單並同步到公司試算表。</div>' : "")
-        + kpiHTML + charts + tools + board;
+        + kpiHTML + tools + board;
       wire();
     }
     function kcard(label, val, cls) {

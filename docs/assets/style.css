@@ -361,12 +361,13 @@ th .arrow { opacity: .5; font-size: 10px; }
 }
 
 /* ===== 訂單 + 老闆儀表板 ===== */
-.okpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 10px 0 16px; }
-.okpi { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
-.okpi-l { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-.okpi-v { font-size: 1.5rem; font-weight: 700; color: var(--text); }
-.okpi.accent .okpi-v { color: var(--accent); }
-.okpi.warn { border-color: var(--up); }
+.okpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 10px 0 16px; }
+.okpi { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 15px 16px;
+  box-shadow: var(--shadow); transition: box-shadow .14s; }
+.okpi:hover { box-shadow: var(--shadow-lg); }
+.okpi-l { font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 6px; }
+.okpi-v { font-size: 1.6rem; font-weight: 800; color: var(--accent); letter-spacing: -.3px; }
+.okpi.warn { border-color: color-mix(in srgb, var(--up) 55%, var(--line)); background: color-mix(in srgb, var(--up) 8%, var(--card)); }
 .okpi.warn .okpi-v { color: var(--up); }
 .ocharts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
 .ocard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
@@ -379,12 +380,21 @@ th .arrow { opacity: .5; font-size: 10px; }
 .otools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
 .otools a.dbbtn { text-decoration: none; }
 .okanban { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
-.okcol { flex: 1; min-width: 176px; background: var(--line2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
-.okhead { font-weight: 600; color: var(--text); font-size: 14px; display: flex; justify-content: space-between; }
-.okhead span { background: var(--chip-bg); border: 1px solid var(--chip-border); border-radius: 999px; padding: 0 8px; font-size: 12px; color: var(--muted); }
-.oksum { font-size: 12px; color: var(--muted); margin: 2px 0 8px; }
-.ocardk { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 9px 10px; margin-bottom: 8px; cursor: pointer; }
-.ocardk:hover { border-color: var(--accent); }
+.okcol { flex: 1; min-width: 176px; background: var(--line2); border: 1px solid var(--line);
+  border-top: 3px solid var(--line); border-radius: 12px; padding: 10px 10px 12px; }
+.okcol.oks0 { border-top-color: #a2938a; }
+.okcol.oks1 { border-top-color: #3b82c4; }
+.okcol.oks2 { border-top-color: #d68a2e; }
+.okcol.oks3 { border-top-color: #2f9e8f; }
+.okcol.oks4 { border-top-color: #2f8f5b; }
+.okhead { font-weight: 800; color: var(--text); font-size: 15px; display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 10px; }
+.okhead span { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px;
+  font-size: 12px; font-weight: 700; color: var(--muted); }
+.ocardk { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 11px;
+  padding: 10px 11px; margin-bottom: 8px; cursor: pointer; box-shadow: var(--shadow);
+  transition: transform .12s, box-shadow .12s, border-color .12s; }
+.ocardk:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: var(--shadow-lg); }
 .ocardk.od { border-left-color: var(--up); }
 .ock-cust { font-weight: 600; color: var(--text); font-size: 13.5px; }
 .ock-prod { color: var(--muted); font-size: 12.5px; margin: 2px 0 6px; }
