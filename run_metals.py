@@ -34,13 +34,13 @@ def _build_signals(history):
 
 
 def _fetch_news(max_n=6):
-    """抓 Google 新聞（銅鋁鎳鋼/金屬原料）最新標題，讓使用者了解漲跌原因。免金鑰。"""
+    """抓 Google 新聞（銅鋁／金屬原料）最新標題，讓使用者了解漲跌原因。免金鑰。"""
     import email.utils
     import urllib.parse
     import xml.etree.ElementTree as ET
 
     import httpx
-    q = "銅價 OR 鋁價 OR 鎳價 OR 金屬 原料 價格 when:30d"   # 近 30 天
+    q = "銅價 OR 鋁價 OR 金屬 原料 價格 when:30d"   # 近 30 天
     url = ("https://news.google.com/rss/search?q=" + urllib.parse.quote(q)
            + "&hl=zh-TW&gl=TW&ceid=TW:zh-Hant")
     try:

@@ -233,19 +233,7 @@ METALS = {
         "yh": "ALI=F",           # Yahoo 日線回補（LME 鋁，USD/公噸）
         "yh_unit": "t",
     },
-    "nickel": {
-        "name": "鎳",
-        "en": "NICKEL · LME（不鏽鋼指標）",
-        "field": "LME_Ni_cash",  # 現價用 Westmetall；無 Yahoo 日線→走勢圖靠快照累積
-        "note": "不鏽鋼無單一市場價，以鎳為主要成本指標",
-    },
-    "steel": {
-        "name": "鋼",
-        "en": "STEEL · HRC（美國熱軋）",
-        "yh": "HRC=F",           # 無 Westmetall；現價與日線皆用 Yahoo（美國 HRC 期貨）
-        "yh_unit": "short_ton",  # USD/short ton → ×1.10231 換 USD/公噸
-        "note": "美國熱軋鋼捲基準，與台灣鋼價有差，僅供趨勢參考",
-    },
+    # 客戶主力為銅／鋁，已移除鎳（不鏽鋼指標）與鋼（HRC）以聚焦。
 }
 
 # 儀表板迷你走勢取最近幾筆

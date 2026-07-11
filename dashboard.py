@@ -522,10 +522,8 @@ def render_help_html() -> str:
         <div class="row">
           <label>材質
             <select id="dMat">
-              <option data-p="90" value="不鏽鋼">不鏽鋼（約 90/kg）</option>
               <option data-p="320" value="銅">銅（約 320/kg）</option>
               <option data-p="95" value="鋁">鋁（約 95/kg）</option>
-              <option data-p="40" value="碳鋼">碳鋼／鐵（約 40/kg）</option>
             </select>
           </label>
           <label>重量（kg）
@@ -1136,11 +1134,6 @@ def render_quote_html(history: dict) -> str:
          "density": _DENSITY["copper"], "live": True},
         {"key": "aluminum", "name": "鋁", "nt": _nt_per_kg("aluminum"),
          "density": _DENSITY["aluminum"], "live": True},
-        {"key": "stainless", "name": "不鏽鋼(304)", "nt": 90.0,
-         "density": _DENSITY["stainless"], "live": False,
-         "note": "不鏽鋼無即時行情，預設為參考值，請填你的實際採購價"},
-        {"key": "steel", "name": "鋼(碳鋼)", "nt": _nt_per_kg("steel"),
-         "density": _DENSITY["steel"], "live": True},
     ]
     data_script = "<script>window.QUOTE_MATERIALS = " + json.dumps(mats, ensure_ascii=False) + ";</script>"
 
