@@ -2,9 +2,8 @@
 """
 run_metals.py — 功能 B 入口（每日 2 次，最頻繁）→ 同時產生首頁與原料頁。
 
-流程：Westmetall 取銅鋁鎳現價 + Yahoo 日線回補 → 存 prices/daily.json
-      → 產生 docs/metals.html（原料頁）與 docs/index.html（首頁總覽，讀各 data 檔數字）
-      → 突破區間時發告警（若有設 webhook）。
+流程：Westmetall 取銅／鋁現價 + Yahoo 日線回補 → 存 prices/daily.json
+      → 產生 docs/metals.html（原料頁）與 docs/index.html（首頁總覽，讀各 data 檔數字）。
 """
 import asyncio
 import datetime

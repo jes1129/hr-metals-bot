@@ -133,7 +133,7 @@ def backfill_daily() -> dict:
 
     daily = {"fx": [{"ts": d, "rate": round(fxd[d], 4)} for d in fx_dates]}
     for key, cfg in config.METALS.items():
-        if not cfg.get("yh"):          # 無 Yahoo 日線（鎳）→ 走勢圖靠 prices.json 快照
+        if not cfg.get("yh"):          # 無 Yahoo 日線來源者 → 走勢圖靠 prices.json 快照
             continue
         raw = _yahoo_daily(cfg["yh"])
         mult = _yh_mult(cfg)

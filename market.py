@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 market.py — 功能 A（實驗版）：公開職缺行情追蹤。
+【已停用】「招募雷達」前端功能已下架、talent.yml 工作流已移除，本模組不再被呼叫；
+保留原始碼供日後需要時恢復（還原 talent.yml 並重建 dashboard.render_jobs_html 即可）。
 
 流程：Playwright（+stealth，過 Cloudflare）爬 104 公開職缺搜尋
       → 解析薪資/地區/年資 → 相關性過濾 → 彙整統計 + 存快照算週熱度變化
@@ -417,12 +419,8 @@ async def run() -> dict:
     summary = ai_market_summary(stats, jobs)
     save_snapshot(history, stats)  # history 追加今日 → 供走勢圖含今日
 
-    # 產生網頁儀表板到 docs/jobs.html（與銅鋁 index.html 同一個 GitHub Pages）
-    import dashboard  # 延遲匯入，避免無關流程也載入
-    os.makedirs("docs", exist_ok=True)
-    with open(os.path.join("docs", "jobs.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_jobs_html(stats, summary, jobs, history, delta))
-    print("[market] 已更新 docs/jobs.html")
+    # 「招募雷達」功能已於前端下架（talent.yml 工作流亦已移除），不再產生 docs/jobs.html。
+    # 本模組保留供日後需要時恢復；正常情況不會被任何工作流呼叫。
 
     content = f"**🔧 台中・金屬加工・品管招募雷達**（{datetime.date.today():%Y/%m/%d}）"
     notify.send_embeds(build_embeds(stats, summary, delta, jobs), content=content)

@@ -175,7 +175,7 @@ th .arrow { opacity: .5; font-size: 10px; }
 /* 首頁 hero 問候 + 今日數字看板 */
 .hero { margin: 2px 0 16px; }
 .hero h1 { font-size: 31px; }
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0 0 6px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0 0 6px; }
 .stat { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 15px 16px; box-shadow: var(--shadow); transition: border-color .14s, box-shadow .14s; }
 .stat:hover { box-shadow: var(--shadow-lg); }
@@ -397,11 +397,6 @@ th .arrow { opacity: .5; font-size: 10px; }
   .ocharts { grid-template-columns: 1fr; }
   .okcol { min-width: 150px; }
 }
-
-/* ===== MRP 缺料 ===== */
-.mrpview .dbtable tbody tr.mrpshort td { background: color-mix(in srgb, var(--up) 12%, transparent); }
-.mrpview .dbtable tbody tr.mrpshort:hover td { background: color-mix(in srgb, var(--up) 20%, transparent); }
-.mrpok { color: var(--down); padding: 8px 2px; font-size: 14px; }
 
 /* ===== 原料頁：單位說明 / 圖表解讀 / 新聞 ===== */
 .unitnote { font-size: 12.5px; color: var(--muted); background: var(--line2); border: 1px solid var(--line);

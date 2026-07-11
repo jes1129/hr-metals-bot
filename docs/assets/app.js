@@ -1,5 +1,5 @@
-/* 儀表板互動 — 主題切換 + 銅鋁日線圖(單位切換/MA/關注線/期間統計) + 匯率/比價/職缺圖
-   + 職缺搜尋/篩選/排序/直方圖。資料由頁面內嵌的 window.* 提供，無外部請求。 */
+/* 儀表板互動 — 主題切換 + 銅鋁日線走勢圖(單位切換/期間統計) + 報價/訂單/資料庫/助手(含中越對話)
+   等 ERP 模組。資料由頁面內嵌的 window.* 或登入後的試算表提供，無第三方外部請求。 */
 (function () {
   "use strict";
   var LB_PER_TONNE = 2204.62, MA_N = 20;
@@ -328,91 +328,6 @@
     markBar(".unitbar", "data-unit", state.unit);
     markBar(".rangebar", "data-range", state.range);
     redraw();
-  }
-
-  // ============================================================ 人才頁
-  function initJobsCharts() {
-    var h = window.JOBS_HISTORY || [];
-    function draw(sel, key, f) {
-      var c = document.querySelector(sel); if (!c) return;
-      var redraw = function () { drawSeries(c, h.map(function (x) { return { ts: x.ts, val: x[key] }; }), { color: cssVar("--accent"), fmt: f }); };
-      REDRAWS.push(redraw); redraw();
-    }
-    draw('.chart[data-chart="jobsTotal"]', "total", function (v) { return fmt(v, 0) + " 筆"; });
-    draw('.chart[data-chart="jobsMed"]', "salary_median", function (v) { return "NT$" + fmt(v, 0); });
-  }
-
-  function initJobs(JOBS) {
-    var searchEl = document.getElementById("jobSearch"), areaEl = document.getElementById("jobArea");
-    var priEl = document.getElementById("jobPriority"), favEl = document.getElementById("jobFav");
-    var statusEl = document.getElementById("jobStatus");
-    var countEl = document.getElementById("jobCount"), tbody = document.getElementById("jobBody");
-    var sort = { key: "salary", dir: -1 };
-
-    if (areaEl) {
-      var areas = {};
-      JOBS.forEach(function (j) { var d = j.district || "其他"; areas[d] = (areas[d] || 0) + 1; });
-      Object.keys(areas).sort(function (a, b) { return areas[b] - areas[a]; }).forEach(function (a) {
-        var o = document.createElement("option"); o.value = a; o.textContent = a + "（" + areas[a] + "）"; areaEl.appendChild(o);
-      });
-    }
-    function salVal(j) { if (j.salary_low == null) return -1; return j.salary_high ? (j.salary_low + j.salary_high) / 2 : j.salary_low; }
-    function salTxt(j) {
-      if (j.salary_low == null) return ({ "面議": "面議", "時薪": "時薪", "yearly": "年薪制" })[j.salary_kind] || "—";
-      return j.salary_high ? "NT$" + fmt(j.salary_low, 0) + "~" + fmt(j.salary_high, 0) : "NT$" + fmt(j.salary_low, 0) + " 以上";
-    }
-    function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
-    function render() {
-      var q = (searchEl && searchEl.value.trim().toLowerCase()) || "", area = (areaEl && areaEl.value) || "";
-      var priOnly = priEl && priEl.checked, favOnly = favEl && favEl.checked;
-      var rows = JOBS.filter(function (j) {
-        if (priOnly && !j.is_priority) return false;
-        if (favOnly && !markGet(j.url || j.title).fav) return false;
-        if (statusEl && statusEl.value && markGet(j.url || j.title).status !== statusEl.value) return false;
-        if (area && (j.district || "其他") !== area) return false;
-        if (q && (j.title + " " + j.company).toLowerCase().indexOf(q) < 0) return false;
-        return true;
-      });
-      rows.sort(function (a, b) {
-        var va = sort.key === "salary" ? salVal(a) : (a[sort.key] || ""), vb = sort.key === "salary" ? salVal(b) : (b[sort.key] || "");
-        if (va < vb) return -sort.dir; if (va > vb) return sort.dir; return 0;
-      });
-      if (countEl) countEl.textContent = rows.length + " / " + JOBS.length + " 筆";
-      tbody.innerHTML = rows.map(function (j) {
-        var id = j.url || j.title;
-        var star = j.is_priority ? '<span class="star">⭐</span> ' : "";
-        return '<tr><td>' + favSpan(id) + star + '<a href="' + esc(j.url) + '" target="_blank" rel="noopener">' + esc(j.title.slice(0, 40)) +
-          "</a></td><td>" + esc(j.company.slice(0, 22)) + "</td><td>" + esc(j.district || "其他") + '</td><td class="num">' + salTxt(j) + "</td>" + markCell(id, j.company || j.title) + "</tr>";
-      }).join("") || '<tr><td colspan="5" style="color:var(--muted)">找不到符合的職缺</td></tr>';
-    }
-    window.__refreshMarks = render;
-    attachMarks(tbody);
-    if (searchEl) searchEl.addEventListener("input", render);
-    if (areaEl) areaEl.addEventListener("change", render);
-    if (priEl) priEl.addEventListener("change", render);
-    if (favEl) favEl.addEventListener("change", render);
-    if (statusEl) statusEl.addEventListener("change", render);
-    document.querySelectorAll("th.sortable").forEach(function (th) {
-      th.addEventListener("click", function () {
-        var k = th.getAttribute("data-key");
-        if (sort.key === k) sort.dir *= -1; else { sort.key = k; sort.dir = (k === "salary" ? -1 : 1); }
-        document.querySelectorAll("th.sortable .arrow").forEach(function (a) { a.textContent = ""; });
-        var arw = th.querySelector(".arrow"); if (arw) arw.textContent = sort.dir > 0 ? "▲" : "▼";
-        render();
-      });
-    });
-
-    var hist = document.getElementById("hist");
-    if (hist) {
-      var bk = [{ l: "<3萬", lo: 0, hi: 30000 }, { l: "3–4萬", lo: 30000, hi: 40000 }, { l: "4–5萬", lo: 40000, hi: 50000 }, { l: "5–7萬", lo: 50000, hi: 70000 }, { l: "7萬+", lo: 70000, hi: Infinity }];
-      JOBS.forEach(function (j) { var v = salVal(j); if (v < 0) return; for (var i = 0; i < bk.length; i++) if (v >= bk[i].lo && v < bk[i].hi) { bk[i].n = (bk[i].n || 0) + 1; break; } });
-      var mx = Math.max.apply(null, bk.map(function (b) { return b.n || 0; })) || 1;
-      hist.innerHTML = bk.map(function (b) {
-        return '<div class="col"><div class="bn">' + (b.n || 0) + '</div><div class="bar" style="height:' + Math.round((b.n || 0) / mx * 100) + '%"></div><div class="bl">' + b.l + "</div></div>";
-      }).join("");
-    }
-    var arw0 = document.querySelector('th.sortable[data-key="salary"] .arrow'); if (arw0) arw0.textContent = "▼";
-    render();
   }
 
   // ============================================================ 供應商頁
@@ -746,8 +661,6 @@
   };
   // 訂單狀態流程（看板欄位順序；取消單獨處理）
   var ORDER_FLOW = ["報價", "接單", "生產", "出貨", "結案"];
-  // MRP 需求採計的訂單狀態（已接的單才算真實需求；報價未成單不算）
-  var MRP_DEMAND_STATUS = ["接單", "生產"];
 
   function initDbConsole() {
     var mount = document.getElementById("dbConsole");
@@ -990,7 +903,7 @@
   }
 
   // ===========================================================================
-  // 訂單 + 老闆 KPI 儀表板（orders.html）— 讀 orders 資料表，做 KPI/看板/營收圖
+  // 訂單 + 進度儀表板（orders.html）— 讀 orders 資料表，做 KPI/狀態看板（不顯示金額）
   //   後端沿用通用 CRUD（table="orders"），不需改 Apps Script。
   // ===========================================================================
   function initOrders() {
@@ -1049,13 +962,11 @@
     function render() {
       var k = kpis();
       var kpiHTML = '<div class="okpis">'
-        + kcard("💰 本月營收", ntfmt(k.rev), "accent")
         + kcard("🧾 本月訂單", k.cnt + " 筆", "")
         + kcard("🚚 待出貨", k.ship + " 筆", "")
         + kcard("⏰ 逾期未出", k.late + " 筆", k.late ? "warn" : "")
         + '</div>';
       var charts = '<div class="ocharts">'
-        + '<div class="ocard"><div class="octitle">近 6 個月營收</div>' + barsHTML(revenueByMonth(), true) + '</div>'
         + '<div class="ocard"><div class="octitle">訂單狀態分佈</div>' + barsHTML(statusCounts(), false) + '</div>'
         + '</div>';
       var tools = '<div class="otools">'
@@ -1066,19 +977,16 @@
       // 看板
       var board = '<div class="okanban">' + ORDER_FLOW.map(function (st) {
         var cards = rows.filter(function (o) { return o.status === st; });
-        var sum = cards.reduce(function (a, o) { return a + amt(o); }, 0);
         var body = cards.map(function (o) {
           return '<div class="ocardk' + (overdue(o) ? " od" : "") + '" data-edit="' + escAttr(o.id) + '">'
             + '<div class="ock-cust">' + escAttr(o.customer || "（未填客戶）") + '</div>'
             + '<div class="ock-prod">' + escAttr(o.product || "") + '</div>'
-            + '<div class="ock-meta"><span>' + ntfmt(amt(o)) + '</span>'
-            + (o.due ? '<span class="' + (overdue(o) ? "od" : "") + '">📅 ' + escAttr(o.due) + '</span>' : '') + '</div>'
+            + (o.due ? '<div class="ock-meta"><span class="' + (overdue(o) ? "od" : "") + '">📅 ' + escAttr(o.due) + '</span></div>' : '')
             + '<select class="ock-move" data-id="' + escAttr(o.id) + '">'
             + ORDER_FLOW.concat(["取消"]).map(function (s) { return '<option' + (s === st ? " selected" : "") + '>' + s + '</option>'; }).join("")
             + '</select></div>';
         }).join("") || '<div class="ock-empty">—</div>';
-        return '<div class="okcol"><div class="okhead">' + st + ' <span>' + cards.length + '</span></div>'
-          + '<div class="oksum">' + ntfmt(sum) + '</div>' + body + '</div>';
+        return '<div class="okcol"><div class="okhead">' + st + ' <span>' + cards.length + '</span></div>' + body + '</div>';
       }).join("") + '</div>';
 
       mount.innerHTML = (!idToken ? '<div class="dbbanner">🔒 尚未登入：目前顯示本機快取。登入後可新增/更新訂單並同步到公司試算表。</div>' : "")
@@ -1193,7 +1101,7 @@
       }
       if (type === "kpi") {
         var k = kpi();
-        return "本月概況：\n・營收：" + nt(k.rev) + "\n・訂單數：" + k.cnt + " 筆\n・待出貨：" + k.ship + " 筆\n・逾期：" + overdueList().length + " 筆";
+        return "本月概況：\n・訂單數：" + k.cnt + " 筆\n・待出貨：" + k.ship + " 筆\n・逾期：" + overdueList().length + " 筆";
       }
       if (type === "ship") {
         var sh = D("orders").filter(function (x) { return x.status === "接單" || x.status === "生產"; });
@@ -1207,7 +1115,7 @@
     // 教學小腦袋（本地，免 Gemini 也能答網站怎麼用）
     var OVERVIEW = "這個網站是一套免費小型 ERP，最簡單的用法：\n"
       + "1) 右上角用 Google 登入。\n"
-      + "2) 平常開「🏠 首頁」看重點；情報類（原料/招募/供應商/客戶）在「📈 情報」下拉裡。\n"
+      + "2) 平常開「🏠 首頁」看重點；情報類（原料/供應商/客戶）在「📈 情報」下拉裡。\n"
       + "3) 客人詢價 →「🧮 報價」算一算 → 存起來。\n"
       + "4) 接到單 →「📦 訂單」按＋新增或「從報價轉單」，用看板追進度。\n"
       + "5) 任何細節直接打字問我，例如：報價怎麼用、怎麼建訂單、匯出。\n"
@@ -1229,7 +1137,7 @@
       { k: ["供應商"], a: "「🏭 供應商」(在 📈情報 下拉裡)：找金屬加工供應商，可依類別篩、勾只看神岡周邊、切地圖看位置。" },
       { k: ["客戶", "開發"], a: "「🎯 客戶」(在 📈情報 下拉裡)：找可能買精密金屬零件的潛在客戶，可依產業篩、搜尋公司名。" },
       { k: ["招募", "職缺", "徵才", "薪水", "薪資"], a: "「🔧 招募」(在 📈情報 下拉裡)：追蹤台中金屬加工/品管職缺行情，可搜尋、排序、看薪資分布。" },
-      { k: ["原料", "行情", "價格", "銅價", "鋁價"], a: "「🔩 原料」(在 📈情報 下拉裡)：看銅/鋁/鎳/鋼國際價(換算台幣)走勢，可切單位與期間。漲＝進料成本高要注意。" },
+      { k: ["原料", "行情", "價格", "銅價", "鋁價"], a: "「🔩 原料」(在 📈情報 下拉裡)：看銅/鋁國際價(換算台幣)走勢，可切單位與期間、附相關新聞。漲＝進料成本高要注意。" },
       { k: ["免費", "要錢", "收費", "費用"], a: "整套免費——跑在 GitHub + Google 的免費額度上，關機也會自己在雲端更新。" },
       { k: ["手機", "平板"], a: "手機可用：表格會自動變成一張張卡片，好點好讀。" },
       { k: ["情報", "下拉", "分頁", "選單", "找不到", "在哪"], a: "上面導覽列：🏠首頁、📈情報(點開有 原料/招募/供應商/客戶)、🧮報價、📦訂單、🤖助手、🗂️資料庫、📖說明。" }
@@ -1252,9 +1160,9 @@
 
     function buildContext() {
       var k = kpi();
-      return { 月份: today().slice(0, 7), 本月營收: k.rev, 本月訂單數: k.cnt, 待出貨: k.ship,
+      return { 月份: today().slice(0, 7), 本月訂單數: k.cnt, 待出貨: k.ship,
         逾期訂單: overdueList().map(function (o) { return { 客戶: o.customer, 品名: o.product, 交期: o.due, 狀態: o.status }; }),
-        網站功能說明: "這是九上科技的免費小型 ERP。分頁：首頁(每日總覽)、情報(原料行情/招募/供應商/客戶)、報價(選材質+重量算報價並存檔)、訂單(建單/報價轉單/狀態看板 報價→接單→生產→出貨→結案/老闆KPI)、資料庫(站內增刪改查所有資料表，含料號/庫存/BOM、匯出CSV)、助手(你，含🗣️中越對話)。右上角 Google 登入才會存資料。看不到新資料按 Ctrl+F5。全部免費。回答使用問題時請用這份說明、給具體步驟。" };
+        網站功能說明: "這是九上科技的免費小型 ERP。分頁：首頁(每日總覽)、情報(原料行情/供應商/客戶)、報價(選材質+重量算報價並存檔)、訂單(建單/報價轉單/狀態看板 報價→接單→生產→出貨→結案)、資料庫(站內增刪改查所有資料表，含料號/庫存/BOM、匯出CSV)、助手(你，含🗣️中越對話)。右上角 Google 登入才會存資料。看不到新資料按 Ctrl+F5。全部免費。回答使用問題時請用這份說明、給具體步驟。" };
     }
 
     function msg(role, text) {
@@ -1275,11 +1183,11 @@
           return;
         }
         if (d && d.need_setup) {
-          wait.textContent = "這題要啟用免費 AI 我才能自由回答～設定很簡單(一次就好)，「📖 說明→🤖 AI 助手」有圖解。\n或先問我：報價怎麼用 / 怎麼建訂單 / 缺料 / 這個網站怎麼用。";
+          wait.textContent = "這題要啟用免費 AI 我才能自由回答～設定很簡單(一次就好)，「📖 說明→🤖 AI 助手」有圖解。\n或先問我：報價怎麼用 / 怎麼建訂單 / 哪些逾期 / 這個網站怎麼用。";
           return;
         }
-        if (d && d.error) { wait.textContent = "⚠️ AI 失敗：" + d.error + "\n先試試：報價怎麼用 / 缺料 / 逾期。"; return; }
-        wait.textContent = "這題我暫時答不了(可能未登入或未設定 AI)。試試問：報價怎麼用 / 怎麼建訂單 / 缺料 / 這個網站怎麼用。";
+        if (d && d.error) { wait.textContent = "⚠️ AI 失敗：" + d.error + "\n先試試：報價怎麼用 / 待出貨 / 逾期。"; return; }
+        wait.textContent = "這題我暫時答不了(可能未登入或未設定 AI)。試試問：報價怎麼用 / 怎麼建訂單 / 哪些逾期 / 這個網站怎麼用。";
       });
     }
 
@@ -1306,12 +1214,12 @@
       + '<div class="aichips">'
       + '<button class="dbbtn" data-q="howto">📖 教我用這個網站</button>'
       + '<button class="dbbtn" data-q="overdue">⏰ 哪些訂單逾期？</button>'
-      + '<button class="dbbtn" data-q="kpi">💰 本月營收概況</button>'
+      + '<button class="dbbtn" data-q="kpi">📊 本月概況</button>'
       + '<button class="dbbtn" data-q="ship">🚚 待出貨清單</button>'
       + '</div>'
       + '<div class="ailog" id="aiLog"></div>'
       + '<div class="airow"><input id="aiInput" class="dbsearch" placeholder="什麼都能問：報價怎麼用？怎麼建訂單？哪些訂單逾期？"><button class="dbbtn primary" id="aiSend">送出</button></div>'
-      + '<div class="dbfoot">打字問我「網站怎麼用、報價/訂單怎麼操作、逾期/營收/待出貨」都行。啟用免費 AI 後(見說明)可像 ChatGPT 一樣自由聊。</div>'
+      + '<div class="dbfoot">打字問我「網站怎麼用、報價/訂單怎麼操作、逾期/待出貨/本月概況」都行。啟用免費 AI 後(見說明)可像 ChatGPT 一樣自由聊。</div>'
       + '</div>'
       // ── 🗣️ 中越對話（老闆 ⇄ 越南員工，獨立於上面）──
       + '<div id="biMode" style="display:none">'
@@ -1334,7 +1242,7 @@
     });
 
     // ── 🤖 ERP 助手 ──
-    msg("ai", "嗨！我是九上 ERP 助手 🤖\n・想學怎麼用？點「📖 教我用這個網站」，或直接問「報價怎麼用」「怎麼建訂單」。\n・想查資料？點按鈕或問「哪些訂單逾期 / 營收多少 / 待出貨」。\n・要跟越南員工溝通？上面切到「🗣️ 中越對話」。");
+    msg("ai", "嗨！我是九上 ERP 助手 🤖\n・想學怎麼用？點「📖 教我用這個網站」，或直接問「報價怎麼用」「怎麼建訂單」。\n・想查資料？點按鈕或問「哪些訂單逾期 / 本月概況 / 待出貨」。\n・要跟越南員工溝通？上面切到「🗣️ 中越對話」。");
     Array.prototype.forEach.call(mount.querySelectorAll(".aichips [data-q]"), function (b) {
       b.onclick = function () { var t = b.getAttribute("data-q"); msg("user", b.textContent.replace(/^\S+\s/, "")); msg("ai", ans(t)); };
     });
@@ -1409,26 +1317,25 @@
 
   // 首頁「今日數字」大看板：登入後由訂單即時算出（未登入顯示 —）
   function initHome() {
-    if (!document.getElementById("stRev")) return;
+    if (!document.getElementById("stShip")) return;
     function num(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
     function set(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
     function today() { var d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
     function render(orders) {
-      var tm = today().slice(0, 7), t = today(), rev = 0, cnt = 0, ship = 0, over = 0;
+      var tm = today().slice(0, 7), t = today(), cnt = 0, ship = 0, over = 0;
       orders.forEach(function (o) {
         if (o.status === "取消") return;
-        if (String(o.order_date || "").slice(0, 7) === tm) { rev += (num(o.amount) || num(o.qty) * num(o.price)); cnt++; }
+        if (String(o.order_date || "").slice(0, 7) === tm) cnt++;
         if (o.status === "接單" || o.status === "生產") ship++;
         if (o.due && String(o.due) < t && ["報價", "接單", "生產"].indexOf(o.status) >= 0) over++;
       });
-      set("stRev", "NT$ " + Math.round(rev).toLocaleString());
       set("stShip", ship + " 筆"); set("stOver", over + " 筆"); set("stCnt", cnt + " 筆");
       var oc = document.getElementById("stOverCard"); if (oc) oc.classList.toggle("warn", over > 0);
       var hint = document.getElementById("stHint"); if (hint) hint.style.display = "none";
     }
     function load() {
       if (!idToken) {
-        ["stRev", "stShip", "stOver", "stCnt"].forEach(function (id) { set(id, "—"); });
+        ["stShip", "stOver", "stCnt"].forEach(function (id) { set(id, "—"); });
         var hint = document.getElementById("stHint"); if (hint) hint.style.display = "";
         return;
       }
@@ -1443,14 +1350,13 @@
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     if (window.METALS_DATA) initMetals(window.METALS_DATA);
-    if (window.JOBS_DATA) { initJobs(window.JOBS_DATA); initJobsCharts(); }
     if (window.SUPPLIERS_DATA) { initSuppliers(window.SUPPLIERS_DATA); initSupplierMap(window.SUPPLIERS_DATA); }
     if (window.QUOTE_MATERIALS) initQuote(window.QUOTE_MATERIALS);
     if (window.CUSTOMERS_DATA) initCustomers(window.CUSTOMERS_DATA);
     if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
     if (document.getElementById("ordersView")) initOrders();     // 訂單 + 老闆儀表板
     if (document.getElementById("aiView")) initAssistant();       // AI 助手
-    if (document.getElementById("stRev")) initHome();             // 首頁今日數字看板
+    if (document.getElementById("stShip")) initHome();            // 首頁今日數字看板
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
     // 情報下拉：點空白處收起（原生 details 負責開關）
     document.addEventListener("click", function (e) {

@@ -58,11 +58,27 @@ function verify_(token) {
 }
 
 // ---- 試算表存取 ----
-function sheet_(name, header) {
+// 程式內部代號(key)一律英文(穩定)；實際分頁名顯示中文。首次存取會自動把舊英文分頁
+// 改名成中文(只改名、不複製不刪資料)；沒有舊分頁才新建。未部署本檔＝完全不影響。
+var SHEET_MAP = {
+  orders: "訂單", items: "料號庫存", bom: "產品用料",
+  mylist: "我的名單", marks: "收藏標記", quotes: "報價紀錄"
+};
+function resolveSheet_(key, header) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(name);
-  if (!sh) { sh = ss.insertSheet(name); sh.appendRow(header); }
+  var target = SHEET_MAP[key] || key;
+  var sh = ss.getSheetByName(target);
+  if (sh) return sh;                                   // 已是中文分頁
+  if (target !== key) {                                // 自動搬遷：舊英文分頁 → 改名成中文
+    var old = ss.getSheetByName(key);
+    if (old) { old.setName(target); return old; }
+  }
+  sh = ss.insertSheet(target);                         // 都不存在才新建
+  if (header && header.length) sh.appendRow(header);
   return sh;
+}
+function sheet_(name, header) {
+  return resolveSheet_(name, header);
 }
 function loadAll_() {
   var mk = sheet_("marks", ["id", "status", "note", "fav", "by", "ts"]).getDataRange().getValues();
@@ -126,10 +142,7 @@ function driveSave_(quotes, by) {
 // ===========================================================================
 function tSheet_(table) {
   if (!/^[a-z_][a-z0-9_]*$/i.test(String(table || ""))) throw "非法資料表名：" + table;
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(table);
-  if (!sh) { sh = ss.insertSheet(table); sh.appendRow(["id"]); }
-  return sh;
+  return resolveSheet_(table, ["id"]);   // key 仍走英文檢查；實際分頁名經 SHEET_MAP 轉中文並自動搬遷
 }
 function tHeader_(sh) {
   var lc = Math.max(sh.getLastColumn(), 1);

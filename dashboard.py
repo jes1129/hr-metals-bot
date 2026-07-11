@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-dashboard.py — 儀表板 HTML render（銅鋁 index.html + 人才 jobs.html）。
+dashboard.py — 儀表板 HTML render（首頁 index.html + 各功能頁）。
 
 樣式與互動在 docs/assets/style.css、docs/assets/app.js（手寫、常駐、只提交一次）。
 這裡產出 HTML 骨架並內嵌資料 <script>window.XXX = {...}</script>，前端 JS 負責
-單位切換、日線走勢圖（含 MA 均線、關注線、期間統計）、匯率/比價圖、職缺搜尋與圖表。
+單位切換與銅鋁日線走勢圖、期間統計，以及各 ERP 模組互動。
 
 分工：現價與告警用 LME 官方（Westmetall，history/prices.json）；走勢圖用 Yahoo
 每日收盤（daily.json）以看趨勢。
@@ -58,8 +58,8 @@ def _sparkline(points, up: bool, w=120, h=32) -> str:
 
 def _nav(active: str) -> str:
     a = ' class="on"'
-    # 市場情報（原料/招募/供應商/客戶）收進一個下拉，讓上排不擁擠
-    intel = active in ("metals", "jobs", "suppliers", "customers")
+    # 市場情報（原料/供應商/客戶）收進一個下拉，讓上排不擁擠
+    intel = active in ("metals", "suppliers", "customers")
     intel_on = a if intel else ""   # 避免在 f-string 內用反斜線（Python 3.11 不允許）
     return (
         '<div class="nav">'
@@ -68,7 +68,6 @@ def _nav(active: str) -> str:
         f'<summary{intel_on}>📈 情報 ▾</summary>'
         '<div class="navmenu">'
         f'<a{a if active == "metals" else ""} href="metals.html">🔩 原料行情</a>'
-        f'<a{a if active == "jobs" else ""} href="jobs.html">🔧 招募雷達</a>'
         f'<a{a if active == "suppliers" else ""} href="suppliers.html">🏭 供應商</a>'
         f'<a{a if active == "customers" else ""} href="customers.html">🎯 客戶開發</a>'
         '</div></details>'
@@ -124,9 +123,9 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
                 f'<div class="hfcta">{cta} →</div></a>')
     feat = (
         _feat("assistant.html", "🤖", "AI 助手",
-              "問一句就答：逾期、營收、待出貨…＋🗣️ 中越對話（老闆⇄越南員工）。", "問問看")
+              "問一句就答：逾期、待出貨、本月概況…＋🗣️ 中越對話（老闆⇄越南員工）。", "問問看")
         + _feat("https://mail.google.com", "📧", "每日早報信箱",
-                "每天自動收 ERP 早報：營收、待出貨、逾期、原料行情。", "開啟信箱", ext=True)
+                "每天自動收 ERP 早報：待出貨、逾期、原料行情。", "開啟信箱", ext=True)
     )
 
     # 小捷徑：其餘功能收成一排 icon 格
@@ -144,7 +143,6 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
         quick_items.append(_q("customers.html", "🎯", "客戶開發"))
     quick_items += [
         _q("suppliers.html", "🏭", "供應商"),
-        _q("jobs.html", "🔧", "招募雷達"),
         _q("db.html", "🗂️", "九上資料庫", cid="dbCard"),
         _q("https://notebooklm.google.com", "🧠", "NotebookLM", ext=True, cid="nbCard"),
         _q("help.html", "📖", "使用說明"),
@@ -170,16 +168,15 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
       <div class="sub">今天 {date_s}　·　這裡是今日重點 · 更新於 {now}</div>
     </div>
     <div class="stats">
-      <div class="stat"><div class="stat-k">💰 本月營收</div><div class="stat-v" id="stRev">—</div></div>
       <div class="stat"><div class="stat-k">🚚 待出貨</div><div class="stat-v" id="stShip">—</div></div>
       <div class="stat" id="stOverCard"><div class="stat-k">⏰ 逾期未出貨</div><div class="stat-v" id="stOver">—</div></div>
       <div class="stat"><div class="stat-k">📦 本月訂單</div><div class="stat-v" id="stCnt">—</div></div>
     </div>
-    <div class="stats-hint" id="stHint">🔒 登入後這裡會帶入你的即時數字（本月營收、待出貨、逾期、訂單數）</div>
+    <div class="stats-hint" id="stHint">🔒 登入後這裡會帶入你的即時數字（待出貨、逾期、本月訂單數）</div>
     <div class="hfeat">{feat}</div>
     <div class="hqlabel">快速前往</div>
     <div class="hquick">{quick}</div>
-    <div class="foot">原料價／招募／供應商每日自動更新；報價用最新原料行情試算。全部免費、關機也會自己跑。</div>
+    <div class="foot">原料價／供應商每日自動更新；報價用最新原料行情試算。全部免費、關機也會自己跑。</div>
   </div>
   <script>(function(){{var u=(window.APP_CONFIG||{{}}).NOTEBOOK_URL;var c=document.getElementById("nbCard");if(c&&u)c.href=u;}})();</script>
   <script src="assets/app.js?v={_VER}"></script>
@@ -215,7 +212,7 @@ def render_db_html() -> str:
 
 
 # ===========================================================================
-# 訂單 + 老闆 KPI 儀表板（📦 建單/看板/營收圖；資料走 orders 資料表）
+# 訂單 + 進度儀表板（📦 建單/狀態看板；不顯示金額；資料走 orders 資料表）
 # ===========================================================================
 def render_orders_html() -> str:
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
@@ -229,8 +226,8 @@ def render_orders_html() -> str:
   <div class="wrap">
     <div class="topbar">{_nav("orders")}{_THEME_BTN}</div>
     <div class="eyebrow">九上科技 · 智慧儀表板</div>
-    <h1>📦 訂單 · 老闆儀表板</h1>
-    <div class="sub">一眼看營收與待辦：本月營收、待出貨、逾期，加狀態看板 · 更新於 {now}</div>
+    <h1>📦 訂單 · 進度儀表板</h1>
+    <div class="sub">一眼看待辦：待出貨、逾期，加狀態看板追每張單進度 · 更新於 {now}</div>
     <div id="ordersView" class="ordersview">
       <div class="dbloading">載入中…（若一直沒出現，請先用右上角「使用 Google 帳戶登入」）</div>
     </div>
@@ -257,7 +254,7 @@ def render_assistant_html() -> str:
     <div class="topbar">{_nav("ai")}{_THEME_BTN}</div>
     <div class="eyebrow">九上科技 · 智慧儀表板</div>
     <h1>🤖 AI 助手</h1>
-    <div class="sub">問一句就答：逾期、營收、待出貨 · 快速問答免設定、免費 · ＋🗣️ 中越對話 · 更新於 {now}</div>
+    <div class="sub">問一句就答：逾期、待出貨、本月概況 · 快速問答免設定、免費 · ＋🗣️ 中越對話 · 更新於 {now}</div>
     <div id="aiView" class="aiview">
       <div class="dbloading">載入中…（若一直沒出現，請先用右上角「使用 Google 帳戶登入」）</div>
     </div>
@@ -342,11 +339,11 @@ def render_help_html() -> str:
 
     <div class="q">
       <h2>這是什麼？</h2>
-      <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情、找人才、找供應商、開發客戶；一邊管報價、訂單，還有 AI 助手（含中越對話）。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
-      <p>上面一排分成幾類：<b>🏠 首頁</b>總覽、<b>📈 情報</b>（原料/招募/供應商/客戶，點開是下拉選單）、以及營運工具 <b>🧮 報價 · 📦 訂單 · 🤖 助手 · 🗂️ 資料庫</b>，最後是 <b>📖 說明</b>（本頁）。</p>
+      <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情、找供應商、開發客戶；一邊管報價、訂單，還有 AI 助手（含中越對話）。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
+      <p>上面一排分成幾類：<b>🏠 首頁</b>總覽、<b>📈 情報</b>（原料/供應商/客戶，點開是下拉選單）、以及營運工具 <b>🧮 報價 · 📦 訂單 · 🤖 助手 · 🗂️ 資料庫</b>，最後是 <b>📖 說明</b>（本頁）。</p>
       <p class="muted">👇 點下面任一顆，直接跳到該功能的詳細說明：</p>
       <div class="jump">
-        <a href="#start">🚀 新手上路</a><a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a><a href="#f-jobs">🔧 招募</a>
+        <a href="#start">🚀 新手上路</a><a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a>
         <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a>
         <a href="#f-orders">📦 訂單</a><a href="#f-ai">🤖 助手</a><a href="#f-notebook">🧠 NotebookLM</a><a href="#f-email">📧 信箱</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
       </div>
@@ -360,7 +357,7 @@ def render_help_html() -> str:
         <li><b>看情報</b>：📈 情報裡的原料行情、供應商、客戶，平常參考用。</li>
         <li><b>報價</b>：客人詢價 → 🧮 報價算一算 → 存起來。</li>
         <li><b>轉訂單</b>：接到單 → 📦 訂單「從報價轉單」或「＋新增訂單」，用看板追進度。</li>
-        <li><b>問 AI</b>：🤖 助手點按鈕或打字，隨時問「哪些逾期 / 營收多少 / 待出貨」；要跟越南員工溝通就切「🗣️ 中越對話」。</li>
+        <li><b>問 AI</b>：🤖 助手點按鈕或打字，隨時問「哪些逾期 / 本月概況 / 待出貨」；要跟越南員工溝通就切「🗣️ 中越對話」。</li>
       </ul>
       <div class="tip">💡 只想輕鬆用？每天開<b>首頁</b>看重點卡片、需要時點 🤖 <b>助手</b>問一句，就很夠了。</div>
     </div>
@@ -372,37 +369,23 @@ def render_help_html() -> str:
       <details class="acc" id="f-home" open>
         <summary>🏠 首頁 <span class="sm">— 每天先看這頁</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>每天打開先看這頁。每張大卡片就是一個功能，卡片上會顯示今天的重點數字（原料漲跌、追蹤到的職缺數、供應商家數、客戶家數）。<b>點卡片</b>就進到那個功能。</p>
+          <p>每天打開先看這頁。上方有問候與「今日數字」（待出貨、逾期、本月訂單），下面兩張大卡是最常用的 AI 助手與每日早報，其餘功能收在「快速前往」的小圖示。<b>點卡片</b>就進到那個功能。</p>
           <p>還有一張「🗂️ 九上資料庫」卡片，點下去直接打開公司的 Google 試算表，看所有存下來的收藏、備註、報價。</p>
           <a class="gobtn" href="index.html">前往首頁 →</a>
         </div>
       </details>
 
       <details class="acc" id="f-metals">
-        <summary>🔩 原料 <span class="sm">— 銅／鋁／鎳／鋼 價格</span><span class="chev">▾</span></summary>
+        <summary>🔩 原料 <span class="sm">— 銅／鋁 價格</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>追蹤銅、鋁、鎳、鋼的國際價格（已換算成台幣）。每種金屬一張面板，有<b>現價、今日漲跌、走勢圖</b>（含月均線與你設的關注上下限）。</p>
+          <p>追蹤銅、鋁的國際價格（已換算成台幣）。每種金屬一張面板，有<b>現價、今日漲跌、走勢圖</b>。</p>
           <ul>
             <li>上方可切<b>單位</b>（每公噸／每磅）。</li>
             <li>可切<b>期間</b>（近 7 天／30 天／90 天／一年）看漲跌幅。</li>
-            <li>下面還有<b>匯率圖</b>與<b>比價圖</b>。</li>
+            <li>下面附<b>相關新聞</b>，了解漲跌原因。</li>
           </ul>
           <p class="muted">買方視角：漲＝進料成本變高要留意；跌／區間內＝安心。</p>
           <a class="gobtn" href="metals.html">前往原料 →</a>
-        </div>
-      </details>
-
-      <details class="acc" id="f-jobs">
-        <summary>🔧 招募 <span class="sm">— 台中品管職缺行情</span><span class="chev">▾</span></summary>
-        <div class="acc-body">
-          <p>自動抓台中金屬加工、品管（QC）相關的<b>公開職缺</b>，幫你掌握招募的市場行情。</p>
-          <ul>
-            <li><b>搜尋框</b>打關鍵字（例：品管、量測）即時篩選。</li>
-            <li>點欄位<b>標題可排序</b>（公司、薪資⋯）。</li>
-            <li>勾<b>只看收藏</b>，只顯示你收藏的。</li>
-            <li><b>薪資分布長條圖</b>看行情落在哪個區間。</li>
-          </ul>
-          <a class="gobtn" href="jobs.html">前往招募 →</a>
         </div>
       </details>
 
@@ -449,14 +432,14 @@ def render_help_html() -> str:
       </details>
 
       <details class="acc" id="f-orders">
-        <summary>📦 訂單 · 老闆儀表板 <span class="sm">— 建單、看板、營收圖</span><span class="chev">▾</span></summary>
+        <summary>📦 訂單 · 進度儀表板 <span class="sm">— 建單、狀態看板</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>把接到的單記進來，老闆一眼看營收與進度。</p>
+          <p>把接到的單記進來，一眼看每張單的進度與待辦（畫面不顯示金額）。</p>
           <ul>
-            <li><b>上方 KPI 卡</b>：本月營收、本月訂單數、待出貨、逾期未出（逾期會標紅）。</li>
+            <li><b>上方 KPI 卡</b>：本月訂單數、待出貨、逾期未出（逾期會標紅）。</li>
             <li><b>狀態看板</b>：報價 → 接單 → 生產 → 出貨 → 結案。每張訂單卡下方的下拉選單改狀態，就會移到對應欄位；點卡片可編輯或刪除。</li>
-            <li><b>營收圖</b>：近 6 個月營收長條圖、訂單狀態分佈。</li>
-            <li><b>＋ 新增訂單</b>：填客戶、品名、數量、單價（金額留空會自動＝數量×單價）、交期。</li>
+            <li><b>訂單狀態分佈圖</b>：看各狀態各有幾張單。</li>
+            <li><b>＋ 新增訂單</b>：填客戶、品名、數量、單價（金額留空會自動＝數量×單價）、交期。金額只存檔、不顯示在看板。</li>
             <li><b>🧮 從報價轉單</b>：一鍵把最新一筆報價帶成新訂單。</li>
           </ul>
           <p class="muted">訂單和資料庫是同一份試算表；要批次整理可到「🗂️ 資料庫」的「訂單」分頁。</p>
@@ -469,9 +452,9 @@ def render_help_html() -> str:
         <div class="acc-body">
           <p>登入後，點按鈕或打字就能問公司資料：</p>
           <ul>
-            <li><b>快速問答</b>（免設定、免費、即時）：本月要補哪些料、哪些訂單逾期、本月營收概況、待出貨清單、庫存過低品項。</li>
+            <li><b>快速問答</b>（免設定、免費、即時）：教我用這個網站、哪些訂單逾期、本月概況、待出貨清單。</li>
             <li><b>自由提問</b>：直接打一句話問，什麼都能聊（需啟用免費 AI，見下方）。</li>
-            <li><b>🗣️ 中越對話</b>（頁面上方可切換的獨立模式）：讓老闆與越南員工雙向溝通——點<b>常用句</b>立刻同時顯示中文＋越南文（免登入、免設定、即時，把手機拿給對方看即可）；要講別的話就打字，按「中 → 越」或「越 → 中」翻譯（需啟用免費 AI）。</li>
+            <li><b>🗣️ 中越對話</b>（頁面上方可切換的獨立模式）：讓老闆與越南員工雙向溝通——點<b>常用句</b>立刻同時顯示中文＋越南文（免登入、免設定、即時，把手機拿給對方看即可）；要講別的話就打字或用 🎤語音，按「翻譯」自動判斷中↔越（打字翻譯需啟用免費 AI）。</li>
           </ul>
           <h3>（選用）啟用「自由提問」：一次性設定（用免費 Groq）</h3>
           <ol>
@@ -488,7 +471,7 @@ def render_help_html() -> str:
       <details class="acc" id="f-notebook">
         <summary>🧠 NotebookLM 知識庫 <span class="sm">— 進階／選用</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p><b>NotebookLM</b> 是 Google 的免費 AI 筆記工具。我們每天自動把公司的 ERP 現況（訂單、營收、待出貨、逾期、報價、往來重點）寫成一份 Google 文件；你把這份文件、加上公司自己的文件（SOP、報價政策、產品規格、合約…）放進 NotebookLM，它就變成一個<b>公司專屬 AI 知識庫</b>：</p>
+          <p><b>NotebookLM</b> 是 Google 的免費 AI 筆記工具。我們每天自動把公司的 ERP 現況（訂單、待出貨、逾期、報價、往來重點）寫成一份 Google 文件；你把這份文件、加上公司自己的文件（SOP、報價政策、產品規格、合約…）放進 NotebookLM，它就變成一個<b>公司專屬 AI 知識庫</b>：</p>
           <ul>
             <li>🔎 <b>問答附出處</b>：問「這個月要補什麼料？」「跟大雅精密往來如何？」「我們報價怎麼抓？」。</li>
             <li>🎧 <b>音檔導覽</b>：把資料變成兩人對談的 Podcast，巡廠/開車用聽的。</li>
@@ -505,7 +488,7 @@ def render_help_html() -> str:
         <div class="acc-body">
           <p>系統每天早上用公司 Gmail 帳號，自動把 ERP 現況寄到你信箱，不用開網站就收到重點：</p>
           <ul>
-            <li><b>每日 ERP 早報</b>：本月營收、待出貨、逾期未出貨、最近報價，加原料行情。</li>
+            <li><b>每日 ERP 早報</b>：待出貨、逾期未出貨、最近報價，加原料行情。</li>
             <li><b>警示</b>：有訂單逾期時，信件主旨會帶 <b>⚠️</b>，一眼看出今天要注意什麼。</li>
           </ul>
           <div class="tip">💡 一次性設定（工程師協助）：貼 <code>email-notify.gs</code>、在指令碼屬性填 <b>NOTIFY_EMAILS</b>（收件人 email）、執行 <code>installEmailTrigger</code> 開每日自動。</div>
@@ -780,206 +763,6 @@ def render_html(history: dict, daily: dict = None, news: list = None) -> str:
 {''.join(panels)}
 {news_panel}
     <div class="foot">現價：LME 官方結算價（Westmetall）· 走勢圖：Yahoo Finance 每日收盤（銅為 COMEX 近月，與 LME 走勢近乎一致）· 匯率 Yahoo · 新聞：Google 新聞 · 單位由美元/公噸換算 · 僅供內部參考。</div>
-  </div>
-{data_script}
-  <script src="assets/app.js?v={_VER}"></script>
-</body>
-</html>"""
-
-
-# ===========================================================================
-# 功能 A（實驗版）— 金屬加工人才行情儀表板
-# ===========================================================================
-def _salary_disp(j: dict) -> str:
-    lo, hi, kind = j.get("salary_low"), j.get("salary_high"), j.get("salary_kind")
-    if lo is None:
-        return {"面議": "面議", "時薪": "時薪", "yearly": "年薪制"}.get(kind, "—")
-    if hi:
-        return f"NT${lo:,}~{hi:,}"
-    return f"NT${lo:,} 以上"
-
-
-def _delta_span(v) -> str:
-    if v is None:
-        return ""
-    if v > 0:
-        return f'<span style="color:var(--up);font-size:13px">▲{v:,}</span>'
-    if v < 0:
-        return f'<span style="color:var(--down);font-size:13px">▼{abs(v):,}</span>'
-    return '<span style="color:var(--muted);font-size:13px">持平</span>'
-
-
-def render_jobs_html(stats: dict, summary: dict, jobs: list,
-                     history: list, delta: dict) -> str:
-    last_update = "—"
-    if history:
-        try:
-            dt = datetime.datetime.fromisoformat(history[-1]["ts"]).astimezone(
-                datetime.timezone(datetime.timedelta(hours=8))
-            )
-            last_update = dt.strftime("%Y-%m-%d %H:%M")
-        except Exception:  # noqa: BLE001
-            pass
-
-    totals = [h.get("total") for h in history[-config.TREND_POINTS:]]
-    meds = [h.get("salary_median") for h in history[-config.TREND_POINTS:]]
-    spark_total = _sparkline(totals, up=(len(totals) >= 2 and (totals[-1] or 0) >= (totals[0] or 0)))
-    spark_med = _sparkline(meds, up=(len(meds) >= 2 and (meds[-1] or 0) >= (meds[0] or 0)))
-
-    med = f"NT${stats['salary_median']:,}" if stats["salary_median"] else "—"
-    avg = f"NT${stats['salary_avg']:,}" if stats["salary_avg"] else "—"
-    rng = (f"NT${stats['salary_min']:,} ~ NT${stats['salary_max']:,}"
-           if stats["salary_min"] else "—")
-
-    comp_rows = "".join(
-        f"<tr><td>{html.escape(c)}</td><td class='num'>{n}</td></tr>"
-        for c, n in stats["top_companies"]
-    ) or "<tr><td>—</td><td></td></tr>"
-    dist_rows = "".join(
-        f"<tr><td>{html.escape(a)}</td><td class='num'>{n}</td></tr>"
-        for a, n in stats["top_districts"]
-    ) or "<tr><td>—</td><td></td></tr>"
-
-    # 三張靜態長條圖
-    dist_sal_bars = _hbars([(a, m, f"NT${m:,}") for a, m, _n in stats.get("district_salary", [])])
-    cat_bars = _hbars([(lbl, n, str(n)) for lbl, n in stats.get("categories", [])])
-    skill_bars = _hbars([(s, n, str(n)) for s, n in stats.get("skills", [])])
-
-    # ⭐ 符合招募重點職缺（品管職 + 量測/金屬），依 match_score 排序
-    pri = sorted([j for j in jobs if j.get("is_priority")],
-                 key=lambda x: x.get("match_score", 0), reverse=True)
-    pri_rows = "".join(
-        f"""<tr><td><a href="{html.escape(j['url'])}" target="_blank" rel="noopener">{html.escape(j['title'][:40])}</a></td>
-        <td>{html.escape(j['company'][:22])}</td><td>{html.escape(j.get('district','—'))}</td>
-        <td class="num">{_salary_disp(j)}</td></tr>""" for j in pri[:20]
-    ) or '<tr><td colspan="4" style="color:var(--muted)">今日無完全符合招募重點的職缺（品管＋量測/金屬）。可看下方完整清單。</td></tr>'
-
-    # 完整清單後備（依薪資高→低）
-    def _mid(j):
-        lo, hi = j.get("salary_low"), j.get("salary_high")
-        return (lo + hi) / 2 if (lo and hi) else (lo or 0)
-    fb = sorted(jobs, key=_mid, reverse=True)[:30]
-    fb_rows = "".join(
-        f"""<tr><td>{'⭐ ' if j.get('is_priority') else ''}<a href="{html.escape(j['url'])}" target="_blank" rel="noopener">{html.escape(j['title'][:40])}</a></td>
-        <td>{html.escape(j['company'][:22])}</td><td>{html.escape(j.get('district','—'))}</td>
-        <td class="num">{_salary_disp(j)}</td></tr>""" for j in fb
-    ) or '<tr><td colspan="4">—</td></tr>'
-
-    # 招募重點參考卡
-    rp = config.RECRUIT_PROFILE
-    ref_card = f"""
-    <div class="ai" style="border-left:3px solid var(--accent)">
-      <h2>🎯 招募重點（{html.escape(rp['title'])}）</h2>
-      <div class="refgrid">
-        <div><span class="rk">職缺</span>{html.escape(rp['role'])}</div>
-        <div><span class="rk">產業</span>{html.escape(rp['industry'])}</div>
-        <div><span class="rk">地區</span>{html.escape(rp['region'])}</div>
-        <div><span class="rk">設備技能</span>{html.escape(rp['equipment'])}</div>
-        <div><span class="rk">經歷要求</span>{html.escape(rp['experience'])}</div>
-        <div><span class="rk">現況</span>{html.escape(rp['context'])}</div>
-      </div>
-      <div class="reftags">錄取關鍵字：{' '.join('<span class="rtag">'+html.escape(k)+'</span>' for k in rp['keywords'])}
-        <span class="rnote">※ 2.5D＝2.5 次元影像量測儀</span></div>
-    </div>"""
-
-    jobs_min = [
-        {"title": j["title"], "company": j["company"], "url": j["url"], "area": j["area"],
-         "district": j.get("district", "其他"), "salary_low": j["salary_low"],
-         "salary_high": j["salary_high"], "salary_kind": j["salary_kind"],
-         "is_priority": bool(j.get("is_priority")), "match_score": j.get("match_score", 0)}
-        for j in jobs
-    ]
-    hist_min = [
-        {"ts": h.get("ts"), "total": h.get("total"), "salary_median": h.get("salary_median")}
-        for h in history
-    ]
-    data_script = (
-        "<script>window.JOBS_DATA = " + json.dumps(jobs_min, ensure_ascii=False) + ";"
-        "window.JOBS_HISTORY = " + json.dumps(hist_min, ensure_ascii=False) + ";</script>"
-    )
-
-    return f"""<!doctype html>
-<html lang="zh-TW">
-<head>
-{_HEAD}
-<title>台中・金屬加工・品管招募雷達</title>
-</head>
-<body>
-  <div class="wrap">
-    <div class="topbar">{_nav("jobs")}{_THEME_BTN}</div>
-    <div class="eyebrow">TALENT RADAR · 104 公開職缺 · 聚焦台中</div>
-    <h1>台中・金屬加工・品管招募雷達</h1>
-    <div class="sub">聚焦台中（潭雅神清水）金屬加工品管職 · 104 公開職缺每日 08:00 彙整 · ⭐＝符合招募重點（品管＋量測/金屬）· 僅供招募參考</div>
-
-    {ref_card}
-
-    <div class="cards four">
-      <div class="card"><div class="k">台中職缺數</div><div class="v">{stats['total']} {_delta_span(delta.get('total'))}</div><div class="spk">{spark_total}</div></div>
-      <div class="card"><div class="k">⭐ 符合招募重點</div><div class="v">{stats.get('priority_count', 0)}</div><div class="k" style="margin-top:6px">品管＋量測/金屬</div></div>
-      <div class="card"><div class="k">月薪中位數</div><div class="v">{med} {_delta_span(delta.get('salary_median'))}</div><div class="spk">{spark_med}</div></div>
-      <div class="card"><div class="k">月薪平均</div><div class="v">{avg}</div><div class="k" style="margin-top:6px">區間 {rng}</div></div>
-    </div>
-
-    <div class="ai">
-      <h2>🔧 {html.escape(summary.get('headline',''))}</h2>
-      <div class="row"><div class="lbl">💰 薪資行情</div><div class="txt">{html.escape(summary.get('salary',''))}</div></div>
-      <div class="row"><div class="lbl">📈 供給熱度</div><div class="txt">{html.escape(summary.get('demand',''))}</div></div>
-      <div class="row"><div class="lbl">🛠️ 對症技能</div><div class="txt">{html.escape(summary.get('skills',''))}</div></div>
-      <div class="row"><div class="lbl">💡 招募建議</div><div class="txt">{html.escape(summary.get('advice',''))}</div></div>
-    </div>
-
-    <div class="panel" style="margin-bottom:16px">
-      <h3>⭐ 符合招募重點的職缺（品管＋量測/金屬）</h3>
-      <table>
-        <thead><tr><th>職缺</th><th>公司</th><th>行政區</th><th class="num">月薪</th></tr></thead>
-        <tbody>{pri_rows}</tbody>
-      </table>
-    </div>
-
-    <div class="grid2">
-      <section class="mpanel"><div class="mhead"><div><span class="mname">台中職缺數</span><span class="men">趨勢</span></div></div><div class="chart sm" data-chart="jobsTotal"></div></section>
-      <section class="mpanel"><div class="mhead"><div><span class="mname">月薪中位數</span><span class="men">趨勢</span></div></div><div class="chart sm" data-chart="jobsMed"></div></section>
-    </div>
-
-    <div class="grid2">
-      <div class="panel"><h3>🏢 徵才較多的公司</h3><table><tbody>{comp_rows}</tbody></table></div>
-      <div class="panel"><h3>📍 台中徵才熱區（行政區）</h3><table><tbody>{dist_rows}</tbody></table></div>
-    </div>
-
-    <div class="panel" style="margin-bottom:16px"><h3>💵 各行政區月薪中位數</h3>{dist_sal_bars}</div>
-
-    <div class="grid2">
-      <div class="panel"><h3>🗂️ 職務類別分布</h3>{cat_bars}</div>
-      <div class="panel"><h3>🏷️ 熱門技能關鍵字</h3>{skill_bars}</div>
-    </div>
-
-    <div class="panel" style="margin-bottom:16px">
-      <h3>📊 月薪分布</h3>
-      <div class="hist" id="hist"></div>
-    </div>
-
-    <div class="panel">
-      <h3>🔎 職缺清單</h3>
-      <div class="toolbar" style="padding:0 16px 12px">
-        <input id="jobSearch" placeholder="搜尋職缺 / 公司關鍵字…">
-        <select id="jobArea"><option value="">全部行政區</option></select>
-        <label class="prionly"><input type="checkbox" id="jobPriority"> 只看 ⭐ 符合招募重點</label>
-        <label class="prionly"><input type="checkbox" id="jobFav"> 只看我收藏的</label>
-        <select id="jobStatus"><option value="">狀態：全部</option><option>已聯絡</option><option>合作中</option><option>不合適</option></select>
-        <span class="count" id="jobCount"></span>
-      </div>
-      <table>
-        <thead><tr>
-          <th class="sortable" data-key="title">職缺 <span class="arrow"></span></th>
-          <th class="sortable" data-key="company">公司 <span class="arrow"></span></th>
-          <th class="sortable" data-key="district">行政區 <span class="arrow"></span></th>
-          <th class="sortable num" data-key="salary">月薪 <span class="arrow"></span></th>
-          <th>追蹤（狀態/備註）</th>
-        </tr></thead>
-        <tbody id="jobBody">{fb_rows}</tbody>
-      </table>
-    </div>
-    <div class="foot">資料來源：104 人力銀行公開職缺（聚焦台中）· 最後更新 {last_update} · ⭐＝品管職且命中量測/金屬關鍵字 · 僅供內部招募參考，非即時、不含企業人才庫。</div>
   </div>
 {data_script}
   <script src="assets/app.js?v={_VER}"></script>
