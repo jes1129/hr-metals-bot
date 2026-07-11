@@ -1466,8 +1466,26 @@
       });
     }
 
+    // 🗣️ 中越對話（獨立系統）：常用句免登入即時顯示；打字翻譯走現成 Groq
+    var PHRASES = [
+      ["上班打卡", "Chấm công đi làm"], ["下班了", "Tan làm rồi"], ["休息時間", "Giờ nghỉ"],
+      ["來我這裡", "Đến chỗ tôi"], ["去領料", "Đi lấy vật liệu"], ["搬到那邊", "Chuyển sang bên kia"],
+      ["停機", "Dừng máy"], ["換刀", "Thay dao"], ["做完了", "Làm xong rồi"],
+      ["小心危險", "Cẩn thận nguy hiểm"], ["注意安全", "Chú ý an toàn"], ["戴手套/護目鏡", "Đeo găng tay / kính bảo hộ"],
+      ["我不懂", "Tôi không hiểu"], ["等一下", "Đợi một chút"], ["慢一點", "Chậm lại một chút"],
+      ["這樣對嗎？", "Như vậy đúng không?"], ["不對，重做", "Sai rồi, làm lại"], ["好 / OK", "Được / OK"],
+      ["謝謝", "Cảm ơn"], ["辛苦了", "Vất vả rồi"]
+    ];
+    var phrHtml = PHRASES.map(function (p, i) { return '<button class="dbbtn" data-i="' + i + '">' + p[0] + '</button>'; }).join("");
+
     mount.innerHTML =
-      (!idToken ? '<div class="dbbanner">🔒 尚未登入：登入後我才能讀公司資料回答你。</div>' : "")
+      (!idToken ? '<div class="dbbanner">🔒 尚未登入：登入後 ERP 助手才能讀公司資料、中越對話才能即時翻譯（常用句免登入）。</div>' : "")
+      + '<div class="aimode">'
+      + '<button class="aimodebtn on" data-mode="erp">🤖 ERP 助手</button>'
+      + '<button class="aimodebtn" data-mode="bi">🗣️ 中越對話</button>'
+      + '</div>'
+      // ── 🤖 ERP 助手（查公司資料／教學）──
+      + '<div id="erpMode">'
       + '<div class="aichips">'
       + '<button class="dbbtn" data-q="howto">📖 教我用這個網站</button>'
       + '<button class="dbbtn" data-q="short">🧯 本月要補哪些料？</button>'
@@ -1476,42 +1494,79 @@
       + '<button class="dbbtn" data-q="ship">🚚 待出貨清單</button>'
       + '<button class="dbbtn" data-q="low">⚠️ 庫存過低品項</button>'
       + '</div>'
-      + '<div class="aivn"><span class="aivnlabel">🇻🇳 越南語小工具：</span>'
-      + '<button class="dbbtn" data-vn="translate">翻成越南文</button>'
-      + '<button class="dbbtn" data-vn="ad">招募公告</button>'
-      + '<button class="dbbtn" data-vn="safety">安全須知/廠規</button>'
-      + '<button class="dbbtn" data-vn="interview">面試題</button>'
-      + '</div>'
       + '<div class="ailog" id="aiLog"></div>'
       + '<div class="airow"><input id="aiInput" class="dbsearch" placeholder="什麼都能問：報價怎麼用？怎麼建訂單？這個月缺什麼料？"><button class="dbbtn primary" id="aiSend">送出</button></div>'
-      + '<div class="dbfoot">打字問我「網站怎麼用、報價/訂單/庫存怎麼操作、缺料/逾期/營收」都行。啟用免費 AI 後(見說明)可像 ChatGPT 一樣自由聊。</div>';
+      + '<div class="dbfoot">打字問我「網站怎麼用、報價/訂單/庫存怎麼操作、缺料/逾期/營收」都行。啟用免費 AI 後(見說明)可像 ChatGPT 一樣自由聊。</div>'
+      + '</div>'
+      // ── 🗣️ 中越對話（老闆 ⇄ 越南員工，獨立於上面）──
+      + '<div id="biMode" style="display:none">'
+      + '<div class="bihint">點常用句 → 立刻顯示中文＋越南文；或打字後選方向翻譯。<br>Bấm câu thường dùng để hiện cả hai thứ tiếng, hoặc gõ chữ rồi chọn hướng dịch.</div>'
+      + '<div class="biphr">' + phrHtml + '</div>'
+      + '<div class="ailog bilog" id="biLog"></div>'
+      + '<div class="airow"><input id="biInput" class="dbsearch" placeholder="打中文或越南文… / Gõ tiếng Trung hoặc tiếng Việt…"></div>'
+      + '<div class="bidirrow"><button class="dbbtn primary bidir" data-bi="cn2vi">🇹🇼 中 → 越</button><button class="dbbtn primary bidir" data-bi="vi2cn">🇻🇳 越 → 中</button></div>'
+      + '<div class="dbfoot">現場口語溝通用；常用句免登入。即時翻譯為機器翻譯，重要文件仍請人工複核。</div>'
+      + '</div>';
 
-    msg("ai", "嗨！我是九上 ERP 助手 🤖\n・想學怎麼用？點「📖 教我用這個網站」，或直接問「報價怎麼用」「怎麼建訂單」。\n・想查資料？點按鈕或問「這個月缺什麼料 / 哪些逾期 / 營收多少」。\n・🇻🇳 要越南文？在下面打字框輸入中文，按「翻成越南文」；或直接按「招募公告 / 安全須知 / 面試題」自動生成（需已啟用免費 AI）。");
+    // 模式切換（兩系統各自獨立顯示）
+    Array.prototype.forEach.call(mount.querySelectorAll(".aimode [data-mode]"), function (b) {
+      b.onclick = function () {
+        var m = b.getAttribute("data-mode");
+        Array.prototype.forEach.call(mount.querySelectorAll(".aimode [data-mode]"), function (x) { x.classList.toggle("on", x === b); });
+        document.getElementById("erpMode").style.display = (m === "erp") ? "" : "none";
+        document.getElementById("biMode").style.display = (m === "bi") ? "" : "none";
+      };
+    });
+
+    // ── 🤖 ERP 助手 ──
+    msg("ai", "嗨！我是九上 ERP 助手 🤖\n・想學怎麼用？點「📖 教我用這個網站」，或直接問「報價怎麼用」「怎麼建訂單」。\n・想查資料？點按鈕或問「這個月缺什麼料 / 哪些逾期 / 營收多少」。\n・要跟越南員工溝通？上面切到「🗣️ 中越對話」。");
     Array.prototype.forEach.call(mount.querySelectorAll(".aichips [data-q]"), function (b) {
       b.onclick = function () { var t = b.getAttribute("data-q"); msg("user", b.textContent.replace(/^\S+\s/, "")); msg("ai", ans(t)); };
-    });
-    // 🇻🇳 越南語小工具（走現成 Groq；翻譯用下面打字框的內容）
-    Array.prototype.forEach.call(mount.querySelectorAll(".aivn [data-vn]"), function (b) {
-      b.onclick = function () {
-        var t = b.getAttribute("data-vn"), inp = document.getElementById("aiInput");
-        if (t === "translate") {
-          var v = (inp && inp.value || "").trim();
-          if (!v) { alert("請先在下面打字框輸入要翻成越南文的中文，再按這顆。"); return; }
-          inp.value = "";
-          askText("請把以下內容翻成越南文，用詞簡單口語、適合給越南籍移工看，只回越南文：\n" + v);
-        } else if (t === "ad") {
-          askText("幫我寫一則『越南文』的工廠徵才公告：台灣金屬加工廠、徵作業員/品管，語氣親切；含工作內容、工作環境、可配合輪班、薪資面議，聯絡方式先留空白讓我填。最後另附一行繁體中文重點。");
-        } else if (t === "safety") {
-          askText("幫我寫一份『越南文』的工廠安全須知/廠規（金屬加工廠、CNC 機台、堆高機、防護具），條列 8-12 點、簡單好懂，給越南籍移工看。每一點後面用括號附繁體中文對照。");
-        } else if (t === "interview") {
-          askText("幫我出 8 題『越南文』的移工面試問題（金屬加工/作業員/品管，重點：相關經驗、能否輪班、配合度、安全觀念、居留/證件狀況），每題後面附繁體中文對照。");
-        }
-      };
     });
     var input = document.getElementById("aiInput"), send = document.getElementById("aiSend");
     function go() { var v = (input.value || "").trim(); if (!v) return; input.value = ""; if (!idToken) { msg("user", v); var lh = matchHelp(v); msg("ai", lh || "先用右上角 Google 登入，我才能查你的資料；不過網站用法我現在就能教，例如問「報價怎麼用」。"); return; } askText(v); }
     send.onclick = go;
     input.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
+
+    // ── 🗣️ 中越對話（獨立邏輯／獨立對話容器 #biLog）──
+    function biMsg(role, text) {
+      var log = document.getElementById("biLog");
+      var b = document.createElement("div"); b.className = "aimsg " + role; b.textContent = text;
+      log.appendChild(b); log.scrollTop = log.scrollHeight; return b;
+    }
+    function biPair(cn, vi) {
+      var log = document.getElementById("biLog");
+      var b = document.createElement("div"); b.className = "aimsg pair";
+      var c = document.createElement("div"); c.className = "bicn"; c.textContent = cn;
+      var v = document.createElement("div"); v.className = "bivi"; v.textContent = vi;
+      b.appendChild(c); b.appendChild(v);
+      log.appendChild(b); log.scrollTop = log.scrollHeight;
+    }
+    function biTranslate(dir) {
+      var inp = document.getElementById("biInput");
+      var v = (inp && inp.value || "").trim(); if (!v) return; inp.value = "";
+      biMsg("user", v);
+      if (!idToken) { biMsg("ai", "即時翻譯需先用右上角 Google 登入；上面常用句免登入即可用。\nDịch tức thời cần đăng nhập Google trước."); return; }
+      var wait = biMsg("ai", "翻譯中… Đang dịch…");
+      var prompt = (dir === "cn2vi")
+        ? "把以下內容翻成越南文，用詞簡單口語、適合工廠越南籍移工，只回越南文，不要加任何解釋：\n" + v
+        : "把以下越南文翻成繁體中文，口語、簡單，只回中文，不要加任何解釋：\n" + v;
+      dbCall("ai", { question: prompt, context: {} }).then(function (d) {
+        if (d && d.ok && d.text) { wait.textContent = d.text; return; }
+        if (d && d.need_setup) { wait.textContent = "需先啟用免費 AI（見「📖 說明→🤖 AI 助手」，一次就好）。上面常用句可先用。"; return; }
+        if (d && d.error) { wait.textContent = "⚠️ 翻譯失敗：" + d.error; return; }
+        wait.textContent = "暫時無法翻譯（可能未登入或未設定 AI）。";
+      });
+    }
+    biMsg("ai", "這裡讓老闆和越南員工雙向對話 🗣️\n・點上面常用句 → 立刻同時顯示中文＋越南文，把手機拿給對方看。\n・要講別的話 → 下面打字，按「中 → 越」或「越 → 中」。");
+    Array.prototype.forEach.call(mount.querySelectorAll(".biphr [data-i]"), function (b) {
+      b.onclick = function () { var p = PHRASES[+b.getAttribute("data-i")]; biPair(p[0], p[1]); };
+    });
+    Array.prototype.forEach.call(mount.querySelectorAll(".bidir"), function (b) {
+      b.onclick = function () { biTranslate(b.getAttribute("data-bi")); };
+    });
+    var biInput = document.getElementById("biInput");
+    biInput.addEventListener("keydown", function (e) { if (e.key === "Enter") biTranslate("cn2vi"); });
     pullAll();
   }
 

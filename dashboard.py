@@ -168,7 +168,7 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
         "看缺料建議"))
     cards.append(_hcard(
         "assistant.html", "🤖", "AI 助手",
-        '<div class="mnote">問一句就答：缺料、逾期、營收、待出貨、低庫存</div>',
+        '<div class="mnote">問一句就答：缺料、逾期、營收…＋🗣️ 中越對話（老闆⇄越南員工）</div>',
         "問問看"))
     # 九上資料庫快捷卡（進站內「資料庫操作中心」db.html；免開試算表就能增刪改查）
     cards.append(
@@ -541,13 +541,13 @@ def render_help_html() -> str:
       </details>
 
       <details class="acc" id="f-ai">
-        <summary>🤖 AI 助手 <span class="sm">— 問一句就答</span><span class="chev">▾</span></summary>
+        <summary>🤖 AI 助手 <span class="sm">— 問一句就答 ＋ 🗣️ 中越對話</span><span class="chev">▾</span></summary>
         <div class="acc-body">
           <p>登入後，點按鈕或打字就能問公司資料：</p>
           <ul>
             <li><b>快速問答</b>（免設定、免費、即時）：本月要補哪些料、哪些訂單逾期、本月營收概況、待出貨清單、庫存過低品項。</li>
             <li><b>自由提問</b>：直接打一句話問，什麼都能聊（需啟用免費 AI，見下方）。</li>
-            <li><b>🇻🇳 越南語小工具</b>：在打字框輸入中文按「翻成越南文」；或一鍵生成越南語「招募公告／安全須知廠規／面試題」，管越南移工超實用（需啟用免費 AI）。</li>
+            <li><b>🗣️ 中越對話</b>（頁面上方可切換的獨立模式）：讓老闆與越南員工雙向溝通——點<b>常用句</b>立刻同時顯示中文＋越南文（免登入、免設定、即時，把手機拿給對方看即可）；要講別的話就打字，按「中 → 越」或「越 → 中」翻譯（需啟用免費 AI）。</li>
           </ul>
           <h3>（選用）啟用「自由提問」：一次性設定（用免費 Groq）</h3>
           <ol>
