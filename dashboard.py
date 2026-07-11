@@ -123,8 +123,8 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
                 f'<div class="hfbody"><div class="hft">{title}</div><div class="hfl">{note}</div></div>'
                 f'<div class="hfcta">{cta} →</div></a>')
     feat = (
-        _feat("orders.html", "📦", "訂單管理",
-              "建客戶訂單、狀態看板，一眼看營收／待出貨／逾期。", "管理訂單")
+        _feat("assistant.html", "🤖", "AI 助手",
+              "問一句就答：逾期、營收、待出貨…＋🗣️ 中越對話（老闆⇄越南員工）。", "問問看")
         + _feat("https://mail.google.com", "📧", "每日早報信箱",
                 "每天自動收 ERP 早報：營收、待出貨、逾期、原料行情。", "開啟信箱", ext=True)
     )
@@ -136,9 +136,9 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
         return (f'<a class="hq"{idattr} href="{href}"{tgt}>'
                 f'<span class="hqi">{icon}</span><span class="hqt">{label}</span></a>')
     quick_items = [
+        _q("orders.html", "📦", "訂單管理"),
         _q("metals.html", "🔩", "原料行情"),
         _q("quote.html", "🧮", "報價試算"),
-        _q("assistant.html", "🤖", "AI 助手"),
     ]
     if cust_total is not None:
         quick_items.append(_q("customers.html", "🎯", "客戶開發"))
