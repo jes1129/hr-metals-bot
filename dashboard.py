@@ -328,6 +328,12 @@ def render_help_html() -> str:
   .help .demo .stbtn.on {{ background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }}
   .help kbd {{ background: var(--chip-bg); border: 1px solid var(--chip-border); border-bottom-width: 2px;
     border-radius: 6px; padding: 1px 7px; font-size: .85rem; color: var(--text); }}
+  /* 更新頻率表 */
+  .help .ftabwrap {{ overflow-x: auto; margin: 10px 0; }}
+  .help .ftab {{ width: 100%; border-collapse: collapse; font-size: .95rem; min-width: 460px; }}
+  .help .ftab th, .help .ftab td {{ text-align: left; padding: 9px 11px; border-bottom: 1px solid var(--line); color: var(--text); }}
+  .help .ftab th {{ background: var(--accent-soft); font-weight: 700; white-space: nowrap; }}
+  .help .ftab tr:last-child td {{ border-bottom: 0; }}
 </style>
 </head>
 <body>
@@ -343,9 +349,10 @@ def render_help_html() -> str:
       <p>上面一排分成幾類：<b>🏠 首頁</b>總覽、<b>📈 情報</b>（原料/供應商/客戶，點開是下拉選單）、以及營運工具 <b>🧮 報價 · 📦 訂單 · 🤖 助手 · 🗂️ 資料庫</b>，最後是 <b>📖 說明</b>（本頁）。</p>
       <p class="muted">👇 點下面任一顆，直接跳到該功能的詳細說明：</p>
       <div class="jump">
-        <a href="#start">🚀 新手上路</a><a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a>
-        <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a>
-        <a href="#f-orders">📦 訂單</a><a href="#f-ai">🤖 助手</a><a href="#f-notebook">🧠 NotebookLM</a><a href="#f-email">📧 信箱</a><a href="#db">🔐 資料庫</a><a href="#faq">❓ 常見問題</a>
+        <a href="#start">🚀 新手上路</a><a href="#f-login">🔐 登入</a><a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a>
+        <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a><a href="#f-orders">📦 訂單</a>
+        <a href="#f-ai">🤖 助手</a><a href="#f-vn">🗣️ 中越對話</a><a href="#f-notebook">🧠 NotebookLM</a><a href="#f-email">📧 早報信</a>
+        <a href="#db">🗂️ 資料庫/試算表</a><a href="#freq">⏱️ 更新頻率/費用</a><a href="#faq">❓ 常見問題</a>
       </div>
     </div>
 
@@ -366,11 +373,31 @@ def render_help_html() -> str:
       <h2>每一項功能詳細說明</h2>
       <p class="muted">點每一條標題可以展開／收合詳細說明。</p>
 
-      <details class="acc" id="f-home" open>
+      <details class="acc" id="f-login" open>
+        <summary>🔐 登入 <span class="sm">— 第一件事，資料才會存起來</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p><b>這是什麼：</b>用公司的 Google 帳號登入。登入後你做的收藏、報價、訂單才會存進公司試算表，換手機、換電腦都看得到同一份、不會不見。</p>
+          <p><b>怎麼用：</b></p>
+          <ul class="steps">
+            <li>看畫面<b>右上角</b>那顆「使用 Google 帳戶登入」，點它。</li>
+            <li>跳出視窗，選<b>公司的 Google 帳號</b>登入。</li>
+            <li>右上角出現你的<b>名字</b>，就成功了。</li>
+          </ul>
+          <p><b>小撇步：</b>登入後切換分頁<b>不會</b>登出；大約一小時要再登一次是 Google 的安全設計，正常。真的登出了再點一次那顆按鈕就好，資料都還在。</p>
+        </div>
+      </details>
+
+      <details class="acc" id="f-home">
         <summary>🏠 首頁 <span class="sm">— 每天先看這頁</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>每天打開先看這頁。上方有問候與「今日數字」（待出貨、逾期、本月訂單），下面兩張大卡是最常用的 AI 助手與每日早報，其餘功能收在「快速前往」的小圖示。<b>點卡片</b>就進到那個功能。</p>
-          <p>還有一張「🗂️ 九上資料庫」卡片，點下去直接打開公司的 Google 試算表，看所有存下來的收藏、備註、報價。</p>
+          <p><b>這是什麼：</b>每天打開的第一頁，一眼看今天重點。</p>
+          <p><b>怎麼看：</b></p>
+          <ul>
+            <li>最上面是問候＋<b>今日數字</b>：<b>待出貨</b>幾筆、<b>逾期未出</b>幾筆（會標紅）、<b>本月訂單</b>幾筆（登入後才有數字）。</li>
+            <li>下面兩張大卡＝最常用的 <b>🤖 AI 助手</b> 和 <b>📧 每日早報</b>，點就進去。</li>
+            <li>再下面「快速前往」小圖示＝其他功能（原料、報價、供應商、客戶、資料庫、說明⋯），點一下就到。</li>
+          </ul>
+          <p><b>小撇步：</b>只想輕鬆用？每天看一眼首頁「逾期未出」有沒有紅字，就大概知道今天要不要盯。</p>
           <a class="gobtn" href="index.html">前往首頁 →</a>
         </div>
       </details>
@@ -378,13 +405,9 @@ def render_help_html() -> str:
       <details class="acc" id="f-metals">
         <summary>🔩 原料 <span class="sm">— 銅／鋁 價格</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>追蹤銅、鋁的國際價格（已換算成台幣）。每種金屬一張面板，有<b>現價、今日漲跌、走勢圖</b>。</p>
-          <ul>
-            <li>上方可切<b>單位</b>（每公噸／每磅）。</li>
-            <li>可切<b>期間</b>（近 7 天／30 天／90 天／一年）看漲跌幅。</li>
-            <li>下面附<b>相關新聞</b>，了解漲跌原因。</li>
-          </ul>
-          <p class="muted">買方視角：漲＝進料成本變高要留意；跌／區間內＝安心。</p>
+          <p><b>這是什麼：</b>盯銅、鋁的國際價格（已換算成台幣），幫你判斷進料成本。</p>
+          <p><b>怎麼看：</b>每種金屬一張卡，有<b>現價、今天漲跌、走勢圖</b>。上方可切<b>單位</b>（每公噸／每磅）與<b>期間</b>（近 7／30／90 天、一年）看漲跌幅；最下面附<b>相關新聞</b>，了解漲跌原因。</p>
+          <p><b>小撇步：</b>紅色↑＝變貴、進料成本要留意；綠色↓或平平＝安心。系統只給你價格，不設警報，由你自己判斷。</p>
           <a class="gobtn" href="metals.html">前往原料 →</a>
         </div>
       </details>
@@ -392,13 +415,9 @@ def render_help_html() -> str:
       <details class="acc" id="f-sup">
         <summary>🏭 供應商 <span class="sm">— 找金屬加工廠</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>幫你找金屬加工供應商（CNC、表面處理、材料、螺絲沖壓、鑄造、模具⋯）。</p>
-          <ul>
-            <li><b>類別下拉</b>篩選你要的能力。</li>
-            <li>勾<b>只看神岡周邊</b>看附近的（<b>⭐近</b>＝神岡周邊，溝通打樣快）。</li>
-            <li>切<b>地圖</b>檢視看位置分佈。</li>
-            <li>每一列可<b>收藏／標狀態／寫備註</b>（需登入）。</li>
-          </ul>
+          <p><b>這是什麼：</b>幫你找金屬加工供應商（CNC、表面處理、材料、螺絲沖壓、鑄造、模具⋯）。</p>
+          <p><b>怎麼用：</b>用<b>類別下拉</b>篩你要的能力；勾<b>只看神岡周邊</b>看附近的（<b>⭐近</b>＝溝通打樣快）；切<b>地圖</b>看位置分佈。看到不錯的，點<b>星星⭐收藏</b>、標<b>狀態</b>、寫<b>備註</b>（要先登入）。</p>
+          <p><b>小撇步：</b>頁面為了速度只放最相關的前 600 家；完整名單到首頁「🗂️ 九上資料庫」看全部。</p>
           <a class="gobtn" href="suppliers.html">前往供應商 →</a>
         </div>
       </details>
@@ -406,27 +425,25 @@ def render_help_html() -> str:
       <details class="acc" id="f-cust">
         <summary>🎯 客戶 <span class="sm">— 找潛在買主</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>找可能會買精密金屬零件的<b>潛在客戶</b>（光學、醫療、半導體、自動化、自行車、汽車⋯），用來主動開發。</p>
-          <ul>
-            <li><b>產業下拉</b>篩選。</li>
-            <li><b>搜尋</b>公司名。</li>
-            <li>每列可<b>收藏／標記／備註</b>（需登入）。</li>
-          </ul>
+          <p><b>這是什麼：</b>找可能會買精密金屬零件的<b>潛在客戶</b>（光學、醫療、半導體、自動化、自行車、汽車⋯），用來主動開發。</p>
+          <p><b>怎麼用：</b>用<b>產業下拉</b>篩、用<b>搜尋</b>找公司名；有興趣的一樣可<b>收藏／標記／備註</b>（需登入）。</p>
+          <p><b>小撇步：</b>先鎖定「離你近、產業對」的幾家開始聯絡，比亂槍打鳥有效。</p>
           <a class="gobtn" href="customers.html">前往客戶 →</a>
         </div>
       </details>
 
       <details class="acc" id="f-quote">
-        <summary>🧮 報價 <span class="sm">— 快速估價</span><span class="chev">▾</span></summary>
+        <summary>🧮 報價 <span class="sm">— 30 秒估價</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>快速估報價的四個步驟：</p>
-          <ol>
-            <li>選<b>材質</b>（會自動帶入最新原料價）。</li>
-            <li>填<b>重量</b>；不知道重量？填長寬高按「計算」自動換算。</li>
-            <li>看<b>建議報價</b>。</li>
-            <li>按<b>存這筆</b>記進報價歷史（登入後同步到試算表）。</li>
-          </ol>
-          <p class="muted">👇 下面「試玩看看」可以直接體驗報價怎麼算。</p>
+          <p><b>這是什麼：</b>客人問價時，30 秒估出一個報價。</p>
+          <p><b>怎麼用：</b></p>
+          <ul class="steps">
+            <li>選<b>材質</b>（銅／鋁，會自動帶入當天最新料價）。</li>
+            <li>填<b>重量</b>；不知道重量就填長寬高按「計算」自動換算。</li>
+            <li>看系統算出的<b>建議報價</b>。</li>
+            <li>按<b>存這筆</b>記進報價歷史（登入後同步試算表，之後可在訂單頁「從報價轉單」）。</li>
+          </ul>
+          <p><b>小撇步：</b>下面「🧮 試玩看看」可以現場拉一拉玩一次，馬上就懂。</p>
           <a class="gobtn" href="quote.html">前往報價 →</a>
         </div>
       </details>
@@ -434,28 +451,24 @@ def render_help_html() -> str:
       <details class="acc" id="f-orders">
         <summary>📦 訂單 · 進度儀表板 <span class="sm">— 建單、狀態看板</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>把接到的單記進來，一眼看每張單的進度與待辦（畫面不顯示金額）。</p>
+          <p><b>這是什麼：</b>把接到的單記進來，用看板追每張單的進度。<b>畫面不顯示金額</b>（避免員工看到營收）。</p>
+          <p><b>怎麼用：</b></p>
           <ul>
-            <li><b>上方 KPI 卡</b>：本月訂單數、待出貨、逾期未出（逾期會標紅）。</li>
-            <li><b>狀態看板</b>：報價 → 接單 → 生產 → 出貨 → 結案。每張訂單卡下方的下拉選單改狀態，就會移到對應欄位；點卡片可編輯或刪除。</li>
-            <li><b>訂單狀態分佈圖</b>：看各狀態各有幾張單。</li>
-            <li><b>＋ 新增訂單</b>：填客戶、品名、數量、單價（金額留空會自動＝數量×單價）、交期。金額只存檔、不顯示在看板。</li>
-            <li><b>🧮 從報價轉單</b>：一鍵把最新一筆報價帶成新訂單。</li>
+            <li>上方三張卡：<b>本月訂單</b>、<b>待出貨</b>、<b>逾期未出</b>（逾期會標紅）。</li>
+            <li>按<b>＋ 新增訂單</b>填客戶／品名／數量／交期；或按<b>🧮 從報價轉單</b>一鍵帶入最新一筆報價。</li>
+            <li>看板五欄：<b>報價 → 接單 → 生產 → 出貨 → 結案</b>。每張卡下方的下拉改狀態，卡片就移到對應欄；點卡片可編輯或刪除。</li>
           </ul>
-          <p class="muted">訂單和資料庫是同一份試算表；要批次整理可到「🗂️ 資料庫」的「訂單」分頁。</p>
+          <p><b>小撇步：</b>單價／金額還是可以填、會存起來記帳，只是不顯示在看板。要看金額到「🗂️ 資料庫 → 訂單」分頁。</p>
           <a class="gobtn" href="orders.html">前往訂單儀表板 →</a>
         </div>
       </details>
 
       <details class="acc" id="f-ai">
-        <summary>🤖 AI 助手 <span class="sm">— 問一句就答 ＋ 🗣️ 中越對話</span><span class="chev">▾</span></summary>
+        <summary>🤖 AI 助手 <span class="sm">— 用問的查資料</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>登入後，點按鈕或打字就能問公司資料：</p>
-          <ul>
-            <li><b>快速問答</b>（免設定、免費、即時）：教我用這個網站、哪些訂單逾期、本月概況、待出貨清單。</li>
-            <li><b>自由提問</b>：直接打一句話問，什麼都能聊（需啟用免費 AI，見下方）。</li>
-            <li><b>🗣️ 中越對話</b>（頁面上方可切換的獨立模式）：讓老闆與越南員工雙向溝通——點<b>常用句</b>立刻同時顯示中文＋越南文（免登入、免設定、即時，把手機拿給對方看即可）；要講別的話就打字或用 🎤語音，按「翻譯」自動判斷中↔越（打字翻譯需啟用免費 AI）。</li>
-          </ul>
+          <p><b>這是什麼：</b>用問的就能查公司資料、也能教你怎麼用網站。</p>
+          <p><b>怎麼用：</b>登入後，點上面的快速鈕（<b>教我用網站、哪些訂單逾期、本月概況、待出貨</b>），或直接<b>打字問</b>。</p>
+          <p><b>小撇步：</b>想讓它像 ChatGPT 什麼都能聊，要一次性啟用免費 AI（下面步驟，工程師幫忙一次就好）；不設定也能用上面的快速問答。</p>
           <h3>（選用）啟用「自由提問」：一次性設定（用免費 Groq）</h3>
           <ol>
             <li>去 <b>console.groq.com</b> 用 Google 登入，建立免費 API 金鑰（免綁卡，複製起來）。</li>
@@ -463,40 +476,77 @@ def render_help_html() -> str:
             <li>下方 <b>「指令碼屬性」→ 新增屬性</b>：名稱填 <b>GROQ_API_KEY</b>、值貼上金鑰 → 儲存。</li>
             <li>回程式碼把最新版 <code>google-apps-script.gs</code> 貼上、重新部署（新版本）即可。</li>
           </ol>
-          <p class="muted">不設定也沒關係——快速問答與「教我用網站」本來就能用。</p>
           <a class="gobtn" href="assistant.html">前往 AI 助手 →</a>
+        </div>
+      </details>
+
+      <details class="acc" id="f-vn">
+        <summary>🗣️ 中越對話 <span class="sm">— 跟越南員工溝通</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p><b>這是什麼：</b>讓老闆和越南員工<b>雙向溝通</b>。在「🤖 助手」頁的最上方，切到「🗣️ 中越對話」就是。</p>
+          <p><b>怎麼用（超簡單）：</b></p>
+          <ul>
+            <li><b>常用句</b>：點「停機／換刀／小心／休息⋯」任一顆，畫面立刻<b>同時顯示中文＋越南文</b>，把手機拿給對方看就懂。<b>免登入、免設定、即時。</b></li>
+            <li><b>🎤 語音</b>：手機沒有越南文鍵盤？按「🎤 Nói tiếng Việt」直接<b>用嘴巴講越南文</b>，它自動辨識再翻成中文（講中文也可以）。</li>
+            <li><b>打字翻譯</b>：打一句話按「翻譯」，自動判斷中↔越。</li>
+          </ul>
+          <p><b>小撇步：</b>常用句永遠免費、沒網路也能用；語音／打字翻譯需登入＋啟用免費 AI，語音建議用 <b>Android 版 Chrome</b>（iPhone Safari 多半不支援，會提示改打字）。</p>
+          <a class="gobtn" href="assistant.html">前往 中越對話 →</a>
         </div>
       </details>
 
       <details class="acc" id="f-notebook">
         <summary>🧠 NotebookLM 知識庫 <span class="sm">— 進階／選用</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p><b>NotebookLM</b> 是 Google 的免費 AI 筆記工具。我們每天自動把公司的 ERP 現況（訂單、待出貨、逾期、報價、往來重點）寫成一份 Google 文件；你把這份文件、加上公司自己的文件（SOP、報價政策、產品規格、合約…）放進 NotebookLM，它就變成一個<b>公司專屬 AI 知識庫</b>：</p>
-          <ul>
-            <li>🔎 <b>問答附出處</b>：問「這個月要補什麼料？」「跟大雅精密往來如何？」「我們報價怎麼抓？」。</li>
-            <li>🎧 <b>音檔導覽</b>：把資料變成兩人對談的 Podcast，巡廠/開車用聽的。</li>
-            <li>📋 <b>自動生成</b>：FAQ、教育訓練大綱、簡報、重點摘要。</li>
+          <p><b>這是什麼（白話）：</b>NotebookLM 是 Google 免費的「AI 問答筆記本」。我們每天自動幫你寫好一份「公司近況文件」，你把它放進 NotebookLM，它就變成一個<b>只懂你公司</b>的 AI——可以用問的，還能生成語音摘要用聽的。</p>
+          <p><b>怎麼用：</b></p>
+          <ul class="steps">
+            <li>點下面「開啟 NotebookLM →」（會開新分頁）。</li>
+            <li><b>第一次</b>：在裡面按「+ 新增來源／Add source」，把我們那份 Google 文件加進去（工程師幫你設好，加一次就好）。</li>
+            <li>之後想問就打字問它：「這個月往來重點？」「跟大雅精密進度到哪？」，它會<b>附出處</b>回答。</li>
+            <li>想用聽的：按「Audio Overview／生成語音摘要」，把近況變成兩人對談，巡廠、開車用聽的。</li>
           </ul>
-          <div class="tip">💡 重要：文件<b>不會自動</b>跑進 NotebookLM——<b>第一次要手動「加來源」一次</b>；之後系統改寫<b>同一份</b>文件，你在 NotebookLM 該來源按「同步」就更新，不必重加。</div>
-          <p class="muted">它負責「文件知識庫＋問答/音檔」，跟網站的「即時運算/儀表板」互補。設定步驟（貼 <code>notebooklm-export.gs</code>、開每日更新、加來源）由工程師協助一次即可。</p>
+          <div class="tip">💡 文件<b>不會自己</b>跑進去——第一次要手動加來源一次；之後我們改寫<b>同一份</b>文件，你在該來源按「同步」就更新，不用重加。</div>
+          <div class="tip">💰 免費。<b>但「語音摘要」每天能生成的次數有限，需要時再生成、不必每天</b>；純打字問答日常用不會超過。</div>
           <a class="gobtn" id="nbGo" href="https://notebooklm.google.com" target="_blank" rel="noopener">開啟 NotebookLM →</a>
         </div>
       </details>
 
       <details class="acc" id="f-email">
-        <summary>📧 信箱通知 <span class="sm">— 每日自動寄早報給你</span><span class="chev">▾</span></summary>
+        <summary>📧 每日早報信 <span class="sm">— 每天早上自動寄給你</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p>系統每天早上用公司 Gmail 帳號，自動把 ERP 現況寄到你信箱，不用開網站就收到重點：</p>
-          <ul>
-            <li><b>每日 ERP 早報</b>：待出貨、逾期未出貨、最近報價，加原料行情。</li>
-            <li><b>警示</b>：有訂單逾期時，信件主旨會帶 <b>⚠️</b>，一眼看出今天要注意什麼。</li>
-          </ul>
-          <div class="tip">💡 一次性設定（工程師協助）：貼 <code>email-notify.gs</code>、在指令碼屬性填 <b>NOTIFY_EMAILS</b>（收件人 email）、執行 <code>installEmailTrigger</code> 開每日自動。</div>
+          <p><b>這是什麼：</b>不用開網站，每天早上系統自動把「今天要注意的事」寄到你的信箱。</p>
+          <p><b>怎麼用：</b>什麼都不用做——每天早上打開 <b>Gmail</b>，就看到一封「<b>九上 ERP 早報</b>」。內容有：待出貨、逾期未出、最近報價、原料行情。<b>有訂單逾期時，主旨會帶 ⚠️</b>，一眼就知道今天要盯什麼。</p>
+          <p><b>小撇步：</b>這封信只寄到你設定的信箱，<b>員工看不到</b>。收不到請工程師確認收件人設定（一次性）。</p>
+          <div class="tip">💰 免費。一天一封，離 Gmail 每天 100 封的上限差得很遠。</div>
           <a class="gobtn" href="https://mail.google.com" target="_blank" rel="noopener">開啟 Gmail →</a>
         </div>
       </details>
     </div>
     <script>(function(){{var u=(window.APP_CONFIG||{{}}).NOTEBOOK_URL;var g=document.getElementById("nbGo");if(g&&u)g.href=u;}})();</script>
+
+    <div class="q" id="freq">
+      <h2>⏱️ 各功能多久更新一次？會不會花錢？</h2>
+      <p>大部分資料是<b>系統自動</b>按排程更新，你什麼都不用做；你自己輸入的（訂單／報價／名單）則是<b>一存就進試算表、即時</b>。</p>
+      <div class="ftabwrap"><table class="ftab">
+        <tr><th>功能</th><th>多久更新一次</th><th>建議</th></tr>
+        <tr><td>🔩 原料價 銅／鋁 ＋ 相關新聞</td><td>每天 2 次（早上 10 點、晚上 10 點）</td><td>剛好，維持</td></tr>
+        <tr><td>🏭 供應商名單</td><td>每月 1 號</td><td>資料變動慢，維持</td></tr>
+        <tr><td>🎯 客戶名單</td><td>每月 1 號</td><td>維持</td></tr>
+        <tr><td>📧 每日早報信</td><td>每天早上約 7 點</td><td>維持</td></tr>
+        <tr><td>🧠 NotebookLM 近況文件</td><td>每天早上約 7 點</td><td>維持（免費）</td></tr>
+        <tr><td>📦 訂單 · 🧮 報價 · 🗂️ 名單／收藏</td><td>即時（你一存就同步）</td><td>—</td></tr>
+        <tr><td>🤖 AI 問答 · 🗣️ 中越翻譯</td><td>即時（你一問就算）</td><td>—</td></tr>
+      </table></div>
+      <h3>💰 會不會被收費？<b>不會。</b></h3>
+      <p>整套跑在<b>免費額度</b>上（GitHub＋Google＋免費 AI），關機也會自己在雲端更新，<b>不會跟你收錢</b>。唯一要知道的是免費額度的「<b>每日上限</b>」——超過只是<b>當天暫時擋一下</b>，不是收費：</p>
+      <ul>
+        <li>🧠 <b>NotebookLM</b>：每天自動更新的只是「寫一份文件」（免費、無限）。你手動生成的<b>「語音摘要」每天次數有限——需要時再生成、別每天狂產</b>。</li>
+        <li>🤖 <b>AI 問答／翻譯</b>：免費有每分鐘上限；日常問幾句遠低於，短時間狂刷才會暫時擋，等幾分鐘就好。</li>
+        <li>📧 <b>每日早報</b>：一天一封，離 Gmail 每天 100 封上限差很遠。</li>
+      </ul>
+      <div class="tip">💡 一句話：<b>正常使用完全免費、不會超量</b>；唯一要節制的是 NotebookLM 的「語音摘要」別每天狂生成。</div>
+    </div>
 
     <div class="q">
       <h2>🧮 試玩看看：報價怎麼算</h2>
@@ -522,17 +572,18 @@ def render_help_html() -> str:
     </div>
 
     <div class="q" id="db">
-      <h2>🔐 資料庫怎麼用（重點）</h2>
-      <p>「資料庫」就是把你在網站上做的<b>收藏、標記、報價</b>統統存進公司自己的 <b>Google 試算表</b>，
-      這樣換手機、換電腦都看得到同一份，不會不見。</p>
+      <h2>🗂️ 資料庫 ＋ Google 試算表（你的資料存在哪）</h2>
+      <p><b>這是什麼：</b>你在網站上做的<b>收藏、標記、備註、報價、訂單</b>，全部存進公司自己的一份 <b>Google 試算表</b>。所以換手機、換電腦打開，看到的都是同一份、不會不見。（前提是有<b>登入</b>，見上面「🔐 登入」。）</p>
 
-      <h3>第一步：用 Google 登入</h3>
+      <h3>🗂️ 平常這樣用：站內「資料庫」就好，不用開試算表</h3>
+      <p>上面導覽列的「🗂️ 資料庫」是<b>站內操作中心</b>——不必打開 Google 試算表，直接在網站上就能管理所有資料（下面詳述）。</p>
+
+      <h3>📊 想看原始的 Google 試算表？（通常用不到）</h3>
       <ul class="steps">
-        <li>點右上角的「使用 Google 帳戶登入」按鈕。</li>
-        <li>選公司的 Google 帳號登入。</li>
-        <li>登入後右上角會顯示 👤 名字，就成功了。</li>
+        <li>到<b>首頁</b>點「🗂️ 九上資料庫」卡片，或站內「🗂️ 資料庫」底部的「開啟原始試算表」。</li>
+        <li>會開一個<b>新分頁</b>，就是一般的 Google 試算表，最下面有分頁（訂單、名單…）。</li>
+        <li>看看就好、通常不用手動改；要改資料用站內「🗂️ 資料庫」比較安全好操作。</li>
       </ul>
-      <div class="tip">💡 登入之後<b>切換分頁不會登出</b>，大約一小時後才需要再登入一次（這是 Google 的安全設計，正常）。</div>
 
       <h3>登入後能做什麼（下面可以試玩）</h3>
       <div class="demo">
@@ -561,7 +612,7 @@ def render_help_html() -> str:
       <h3>🗂️ 資料庫操作中心（免開試算表）</h3>
       <p>上方分頁的「🗂️ 資料庫」是<b>站內操作中心</b>——不必打開 Google 試算表，直接在網站上就能管理資料：</p>
       <ul>
-        <li><b>三個資料表</b>：我的名單/待辦、收藏與標記、報價歷史，點分頁切換。</li>
+        <li><b>四個資料表</b>：我的名單/待辦、收藏與標記、報價歷史、訂單，點分頁切換。</li>
         <li><b>新增／編輯／刪除</b>：點「＋ 新增」或每列的 ✏️／🗑️，跳出小表單填一填就好。</li>
         <li><b>搜尋／篩選／排序</b>：上方搜尋框打字即時過濾、點欄位標題排序、用下拉篩狀態。</li>
         <li><b>⬇ 匯出 CSV</b>：一鍵下載成 Excel 可開的檔案。</li>
@@ -580,7 +631,7 @@ def render_help_html() -> str:
       </details>
       <details class="acc">
         <summary>看不到最新資料？<span class="chev">▾</span></summary>
-        <div class="acc-body"><p>按 <kbd>Ctrl</kbd> + <kbd>F5</kbd>（Mac 是 <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>）強制重新整理一次即可。原料價一天更新兩次，其他名單每天更新。</p></div>
+        <div class="acc-body"><p>按 <kbd>Ctrl</kbd> + <kbd>F5</kbd>（Mac 是 <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>）強制重新整理一次即可。原料價<b>一天更新兩次</b>；供應商／客戶名單<b>每月更新一次</b>；訂單／報價／名單是你一存就即時同步。詳見上面「⏱️ 各功能多久更新一次」。</p></div>
       </details>
       <details class="acc">
         <summary>名單好像只顯示一部分？<span class="chev">▾</span></summary>
@@ -588,7 +639,7 @@ def render_help_html() -> str:
       </details>
       <details class="acc">
         <summary>要錢嗎？<span class="chev">▾</span></summary>
-        <div class="acc-body"><p>不用。整套都跑在免費服務上（GitHub + Google），關機也會自己在雲端更新。</p></div>
+        <div class="acc-body"><p><b>不用。</b>整套跑在免費服務上（GitHub＋Google＋免費 AI），關機也會自己在雲端更新，不會跟你收錢。唯一要節制的是 NotebookLM 的「語音摘要」別每天狂生成（有每日免費上限）。詳見上面「⏱️ 各功能多久更新一次？會不會花錢？」。</p></div>
       </details>
       <details class="acc">
         <summary>右上角🌙是什麼？<span class="chev">▾</span></summary>
