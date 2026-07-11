@@ -515,8 +515,8 @@ def render_help_html() -> str:
       <details class="acc" id="f-email">
         <summary>📧 每日早報信 <span class="sm">— 每天早上自動寄給你</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p><b>這是什麼：</b>不用開網站，每天早上系統自動把「今天要注意的事」寄到你的信箱。</p>
-          <p><b>怎麼用：</b>什麼都不用做——每天早上打開 <b>Gmail</b>，就看到一封「<b>九上 ERP 早報</b>」。內容有：待出貨、逾期未出、最近報價、原料行情。<b>有訂單逾期時，主旨會帶 ⚠️</b>，一眼就知道今天要盯什麼。</p>
+          <p><b>這是什麼：</b>不用開網站，<b>平日</b>早上系統自動把「今天要注意的事」寄到你的信箱（週末工廠休就不寄）。</p>
+          <p><b>怎麼用：</b>什麼都不用做——平日早上打開 <b>Gmail</b>，就看到一封「<b>九上 ERP 早報</b>」。內容有：待出貨、逾期未出、最近報價、原料行情。<b>有訂單逾期時，主旨會帶 ⚠️</b>，一眼就知道今天要盯什麼。</p>
           <p><b>小撇步：</b>這封信只寄到你設定的信箱，<b>員工看不到</b>。收不到請工程師確認收件人設定（一次性）。</p>
           <div class="tip">💰 免費。一天一封，離 Gmail 每天 100 封的上限差得很遠。</div>
           <a class="gobtn" href="https://mail.google.com" target="_blank" rel="noopener">開啟 Gmail →</a>
@@ -533,8 +533,8 @@ def render_help_html() -> str:
         <tr><td>🔩 原料價 銅／鋁 ＋ 相關新聞</td><td>每天 2 次（早上 10 點、晚上 10 點）</td><td>剛好，維持</td></tr>
         <tr><td>🏭 供應商名單</td><td>每月 1 號</td><td>資料變動慢，維持</td></tr>
         <tr><td>🎯 客戶名單</td><td>每月 1 號</td><td>維持</td></tr>
-        <tr><td>📧 每日早報信</td><td>每天早上約 7 點</td><td>維持</td></tr>
-        <tr><td>🧠 NotebookLM 近況文件</td><td>每天早上約 7 點</td><td>維持（免費）</td></tr>
+        <tr><td>📧 每日早報信</td><td>平日早上約 9 點（週末不寄）</td><td>維持</td></tr>
+        <tr><td>🧠 NotebookLM 近況文件</td><td>平日早上約 9 點（週末不更新）</td><td>維持（免費）</td></tr>
         <tr><td>📦 訂單 · 🧮 報價 · 🗂️ 名單／收藏</td><td>即時（你一存就同步）</td><td>—</td></tr>
         <tr><td>🤖 AI 問答 · 🗣️ 中越翻譯</td><td>即時（你一問就算）</td><td>—</td></tr>
       </table></div>

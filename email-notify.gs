@@ -44,6 +44,9 @@ function metalsSignalText_() {
 }
 
 function sendDailyDigest() {
+  // 只在平日(週一~週五)寄送；週末工廠休不打擾（以台北時區判斷）
+  var dow = Utilities.formatDate(new Date(), "Asia/Taipei", "u");  // 1=一 … 6=六 7=日
+  if (dow === "6" || dow === "7") return "週末不寄送";
   var c = erpAlertCounts_();
   var mmdd = Utilities.formatDate(new Date(), "Asia/Taipei", "M/d");
   var warn = [];
@@ -56,13 +59,13 @@ function sendDailyDigest() {
     head += "\n";
   }
   var body = head + buildBriefText_() + "\n\n" + metalsSignalText_()
-    + "\n\n（此信每天自動寄送；到網站看即時儀表板。）";
+    + "\n\n（此信平日每天自動寄送；到網站看即時儀表板。）";
   GmailApp.sendEmail(getNotifyEmails_(), subject, body);
   return subject;
 }
 
 function installEmailTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === "sendDailyDigest") ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger("sendDailyDigest").timeBased().everyDays(1).atHour(7).create();
-  try { SpreadsheetApp.getUi().alert("已開啟每日 ERP 早報 email（每天上午約 7 點）✅"); } catch (e) {}
+  ScriptApp.newTrigger("sendDailyDigest").timeBased().everyDays(1).atHour(9).create();  // 每天早上約 9 點觸發；函式內會跳過週末
+  try { SpreadsheetApp.getUi().alert("已開啟每日 ERP 早報 email（平日上午約 9 點）✅"); } catch (e) {}
 }

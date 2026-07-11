@@ -41,12 +41,15 @@ function installDailyTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === "updateNotebookDoc") ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger("updateNotebookDoc").timeBased().everyDays(1).atHour(7).create();
-  try { SpreadsheetApp.getUi().alert("已開啟每日自動更新（每天上午約 7 點）✅"); } catch (e) {}
+  ScriptApp.newTrigger("updateNotebookDoc").timeBased().everyDays(1).atHour(9).create();  // 每天早上約 9 點觸發；函式內會跳過週末
+  try { SpreadsheetApp.getUi().alert("已開啟自動更新（平日上午約 9 點）✅"); } catch (e) {}
 }
 
 // ---- 主流程：算摘要 → 寫進固定的 Google 文件 ----
 function updateNotebookDoc() {
+  // 只在平日(週一~週五)更新；週末不動（以台北時區判斷）
+  var dow = Utilities.formatDate(new Date(), "Asia/Taipei", "u");  // 1=一 … 6=六 7=日
+  if (dow === "6" || dow === "7") return "週末不更新";
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty("NOTEBOOK_DOC_ID");
   var doc = null;
