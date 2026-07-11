@@ -304,7 +304,7 @@
         return { ts: p.ts, val: p.usd == null ? null : convVal(p.usd, p.rate, uk) };
       });
       drawSeries(cont, pts, {
-        ma: MA_N,
+        ma: 0,
         hlines: [],
         fmt: function (v) { return unitFmt(v, uk); }
       });

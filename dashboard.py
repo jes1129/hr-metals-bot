@@ -795,7 +795,7 @@ def render_html(history: dict, daily: dict = None, news: list = None) -> str:
         <span class="chip">期間低 <b class="plo">—</b></span>
       </div>
       <div class="chart" data-chart="{key}">{fb}</div>
-      <div class="legend"><span class="lg-line"></span>每日收盤（Yahoo）　<span class="lg-ma"></span>MA{config.MA_WINDOW} 均線</div>
+      <div class="legend"><span class="lg-line"></span>每日收盤（Yahoo）</div>
     </section>"""
         )
 
