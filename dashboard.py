@@ -304,13 +304,13 @@ def render_help_html() -> str:
   .help details.acc > summary .sm {{ font-weight: 400; color: var(--muted); font-size: .9rem; }}
   .help .acc-body {{ padding: 2px 18px 16px; }}
   .help .gobtn {{ display: inline-block; margin-top: 8px; text-decoration: none; font-size: .92rem;
-    padding: 8px 16px; border-radius: 10px; background: var(--accent); color: #fff; }}
+    padding: 8px 16px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); }}
   .help .gobtn:hover {{ filter: brightness(1.08); }}
   /* 編號步驟 */
   .help .steps {{ counter-reset: s; list-style: none; padding-left: 0; margin: 8px 0; }}
   .help .steps li {{ counter-increment: s; position: relative; padding: 6px 0 6px 38px; }}
   .help .steps li::before {{ content: counter(s); position: absolute; left: 0; top: 5px;
-    width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff;
+    width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
     text-align: center; line-height: 26px; font-size: .85rem; font-weight: 600; }}
   /* 互動示範元件 */
   .help .demo {{ border: 1px dashed var(--chip-border); border-radius: 12px; padding: 16px; margin: 12px 0; background: var(--line2); }}
@@ -325,7 +325,7 @@ def render_help_html() -> str:
   .help .demo .star {{ cursor: pointer; font-size: 1.5rem; user-select: none; }}
   .help .demo .stbtn {{ padding: 6px 10px; border-radius: 8px; border: 1px solid var(--chip-border);
     background: var(--card); color: var(--text); cursor: pointer; font-size: .9rem; }}
-  .help .demo .stbtn.on {{ background: var(--accent); color: #fff; border-color: var(--accent); }}
+  .help .demo .stbtn.on {{ background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }}
   .help kbd {{ background: var(--chip-bg); border: 1px solid var(--chip-border); border-bottom-width: 2px;
     border-radius: 6px; padding: 1px 7px; font-size: .85rem; color: var(--text); }}
 </style>

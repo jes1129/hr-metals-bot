@@ -424,7 +424,7 @@
       SUP.slice(0, 600).forEach(function (s) {
         var ll = _latlng(s.area || s.address); if (!ll) return;
         var lat = ll[0] + (Math.random() - 0.5) * 0.02, lng = ll[1] + (Math.random() - 0.5) * 0.02;
-        var color = s.is_near ? "#c0392b" : "#2c7be5";
+        var color = s.is_near ? "#c0392b" : "#2f6fb0";
         L.circleMarker([lat, lng], { radius: 5, color: color, weight: 1, fillOpacity: .7 })
           .addTo(map)
           .bindPopup("<b>" + esc(s.name) + "</b><br>" + esc(s.category) + " · " + esc(s.area) +
