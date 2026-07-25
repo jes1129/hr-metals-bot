@@ -206,21 +206,6 @@
     "score": 11
   },
   {
-    "name": "久允螺絲有限公司",
-    "url": "https://www.104.com.tw/company/1a2x6blj9g",
-    "area": "台中市東區",
-    "industry": "台中市東區綜合商品批發代理業",
-    "capital": "2900萬",
-    "employees": "20",
-    "intro": "台中市東區綜合商品批發代理業",
-    "source": "both",
-    "address": "臺中市東　區東信里十甲東路２９０號",
-    "category": "螺絲 / 沖壓 / 板金",
-    "near": 2,
-    "is_near": false,
-    "score": 10
-  },
-  {
     "name": "春錫機械工業股份有限公司",
     "url": "https://www.104.com.tw/company/oap8fu8",
     "area": "台中市太平區",
@@ -420,20 +405,6 @@
     "score": 7
   },
   {
-    "name": "金美企業有限公司",
-    "url": "https://www.104.com.tw/company/1a2x6bna4s",
-    "area": "彰化縣彰化市",
-    "industry": "縣彰化市金屬表面處理及熱處理業",
-    "capital": "",
-    "employees": "",
-    "intro": "縣彰化市金屬表面處理及熱處理業",
-    "source": "104",
-    "category": "表面處理",
-    "near": 1,
-    "is_near": false,
-    "score": 7
-  },
-  {
     "name": "連華股份有限公司",
     "url": "https://www.104.com.tw/company/1a2x6bl9zn",
     "area": "南投縣南投市",
@@ -441,6 +412,20 @@
     "capital": "2000萬",
     "employees": "49",
     "intro": "縣南投市金屬表面處理及熱處理業",
+    "source": "104",
+    "category": "表面處理",
+    "near": 1,
+    "is_near": false,
+    "score": 7
+  },
+  {
+    "name": "金美企業有限公司",
+    "url": "https://www.104.com.tw/company/1a2x6bna4s",
+    "area": "彰化縣彰化市",
+    "industry": "縣彰化市金屬表面處理及熱處理業",
+    "capital": "",
+    "employees": "",
+    "intro": "縣彰化市金屬表面處理及熱處理業",
     "source": "104",
     "category": "表面處理",
     "near": 1,
@@ -1640,20 +1625,6 @@
     "score": 5
   },
   {
-    "name": "大成不銹鋼工業股份有限公司",
-    "url": "https://www.104.com.tw/company/a93rnj4",
-    "area": "台南市仁德區",
-    "industry": "市仁德區電力機械器材製造修配業",
-    "capital": "220億",
-    "employees": "950",
-    "intro": "市仁德區電力機械器材製造修配業",
-    "source": "104",
-    "category": "其他金屬加工",
-    "near": 1,
-    "is_near": false,
-    "score": 5
-  },
-  {
     "name": "緻揚實業股份有限公司",
     "url": "https://www.104.com.tw/company/1a2x6bicib",
     "area": "高雄市鳥松區",
@@ -1661,6 +1632,20 @@
     "capital": "1500萬",
     "employees": "5",
     "intro": "高雄市鳥松區其他商品批發業",
+    "source": "104",
+    "category": "其他金屬加工",
+    "near": 1,
+    "is_near": false,
+    "score": 5
+  },
+  {
+    "name": "大成不銹鋼工業股份有限公司",
+    "url": "https://www.104.com.tw/company/a93rnj4",
+    "area": "台南市仁德區",
+    "industry": "市仁德區電力機械器材製造修配業",
+    "capital": "220億",
+    "employees": "950",
+    "intro": "市仁德區電力機械器材製造修配業",
     "source": "104",
     "category": "其他金屬加工",
     "near": 1,
@@ -1696,20 +1681,6 @@
     "score": 5
   },
   {
-    "name": "春雨工廠股份有限公司",
-    "url": "https://www.104.com.tw/company/14igbs0w",
-    "area": "高雄市岡山區",
-    "industry": "高雄市岡山區其他金屬相關製造業",
-    "capital": "28億",
-    "employees": "600",
-    "intro": "高雄市岡山區其他金屬相關製造業",
-    "source": "104",
-    "category": "其他金屬加工",
-    "near": 1,
-    "is_near": false,
-    "score": 5
-  },
-  {
     "name": "鴻錡興業股份有限公司",
     "url": "https://www.104.com.tw/company/b85me6o",
     "area": "嘉義縣太保市",
@@ -1717,6 +1688,20 @@
     "capital": "1億",
     "employees": "60",
     "intro": "嘉義縣太保市其他金屬相關製造業",
+    "source": "104",
+    "category": "其他金屬加工",
+    "near": 1,
+    "is_near": false,
+    "score": 5
+  },
+  {
+    "name": "春雨工廠股份有限公司",
+    "url": "https://www.104.com.tw/company/14igbs0w",
+    "area": "高雄市岡山區",
+    "industry": "高雄市岡山區其他金屬相關製造業",
+    "capital": "28億",
+    "employees": "600",
+    "intro": "高雄市岡山區其他金屬相關製造業",
     "source": "104",
     "category": "其他金屬加工",
     "near": 1,
@@ -1766,20 +1751,6 @@
     "score": 5
   },
   {
-    "name": "東莞冠坤電子有限公司",
-    "url": "https://www.104.com.tw/company/1a2x6blnbv",
-    "area": "新北市中和區",
-    "industry": "東省東莞市其他電子零組件相關業",
-    "capital": "4億",
-    "employees": "1500",
-    "intro": "東省東莞市其他電子零組件相關業",
-    "source": "104",
-    "category": "其他金屬加工",
-    "near": 1,
-    "is_near": false,
-    "score": 5
-  },
-  {
     "name": "翊創國際企業股份有限公司",
     "url": "https://www.104.com.tw/company/1a2x6bnnm4",
     "area": "高雄市岡山區",
@@ -1787,6 +1758,20 @@
     "capital": "",
     "employees": "",
     "intro": "高雄市岡山區其他金屬相關製造業",
+    "source": "104",
+    "category": "其他金屬加工",
+    "near": 1,
+    "is_near": false,
+    "score": 5
+  },
+  {
+    "name": "東莞冠坤電子有限公司",
+    "url": "https://www.104.com.tw/company/1a2x6blnbv",
+    "area": "新北市中和區",
+    "industry": "東省東莞市其他電子零組件相關業",
+    "capital": "4億",
+    "employees": "1500",
+    "intro": "東省東莞市其他電子零組件相關業",
     "source": "104",
     "category": "其他金屬加工",
     "near": 1,
@@ -1976,6 +1961,20 @@
     "score": 5
   },
   {
+    "name": "世鎧精密股份有限公司",
+    "url": "https://www.104.com.tw/company/13stjzzk",
+    "area": "高雄市岡山區",
+    "industry": "高雄市岡山區其他金屬相關製造業",
+    "capital": "5億",
+    "employees": "300",
+    "intro": "高雄市岡山區其他金屬相關製造業",
+    "source": "104",
+    "category": "其他金屬加工",
+    "near": 1,
+    "is_near": false,
+    "score": 5
+  },
+  {
     "name": "佳世達科技股份有限公司",
     "url": "https://www.104.com.tw/company/5qkelsg",
     "area": "桃園市龜山區",
@@ -2018,20 +2017,6 @@
     "score": 5
   },
   {
-    "name": "新日發精密股份有限公司",
-    "url": "https://www.104.com.tw/company/13teg1ag",
-    "area": "新北市樹林區",
-    "industry": "新北市樹林區其他金屬相關製造業",
-    "capital": "1500萬",
-    "employees": "40",
-    "intro": "新北市樹林區其他金屬相關製造業",
-    "source": "104",
-    "category": "其他金屬加工",
-    "near": 1,
-    "is_near": false,
-    "score": 5
-  },
-  {
     "name": "盛美精密工業股份有限公司",
     "url": "https://www.104.com.tw/company/7i0xuqg",
     "area": "台北市大安區",
@@ -2039,6 +2024,20 @@
     "capital": "",
     "employees": "3000",
     "intro": "市大安區電腦及其週邊設備製造業",
+    "source": "104",
+    "category": "其他金屬加工",
+    "near": 1,
+    "is_near": false,
+    "score": 5
+  },
+  {
+    "name": "新日發精密股份有限公司",
+    "url": "https://www.104.com.tw/company/13teg1ag",
+    "area": "新北市樹林區",
+    "industry": "新北市樹林區其他金屬相關製造業",
+    "capital": "1500萬",
+    "employees": "40",
+    "intro": "新北市樹林區其他金屬相關製造業",
     "source": "104",
     "category": "其他金屬加工",
     "near": 1,
