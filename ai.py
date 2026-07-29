@@ -2,9 +2,11 @@
 """
 ai.py — 共用 AI 摘要分派（market 行情、suppliers 供應商分析共用）。
 
-自動選供應商：有 GEMINI_API_KEY → Google Gemini（免費）優先；
-否則有 ANTHROPIC_API_KEY → Claude；兩者皆無回 None（由呼叫端做規則式後備）。
-回傳只含 fields 指定欄位的 dict（皆字串）。
+判斷端三層降級鏈：
+  第一層 ANTHROPIC_API_KEY → Claude（品質最佳，付費）
+  第二層 GROQ_API_KEY      → Groq（免費額度模型）
+  第三層                    → 回 None，由呼叫端做規則式後備
+三層共用同一份輸出契約：回傳只含 fields 指定欄位的 dict（皆字串）。
 """
 import json
 import os
@@ -30,44 +32,52 @@ def _detail(exc) -> str:
 
 def summarize(system: str, payload: dict, fields):
     """system＝角色/任務說明；payload＝資料 dict；fields＝要求的輸出欄位名。"""
-    gemini_key = os.environ.get(config.ENV_GEMINI_KEY)
     anthropic_key = os.environ.get(config.ENV_ANTHROPIC_KEY)
-    if gemini_key:
-        out = _gemini(gemini_key, system, payload, fields)
-        if out:
-            return out
-    if anthropic_key:
+    groq_key = os.environ.get(config.ENV_GROQ_KEY)
+    if anthropic_key:  # 第一層：Claude（付費）
         out = _anthropic(anthropic_key, system, payload, fields)
         if out:
             return out
-    if not gemini_key and not anthropic_key:
-        print("[ai] 未設 GEMINI_API_KEY / ANTHROPIC_API_KEY，改用規則式後備。")
+    if groq_key:  # 第二層：Groq（免費額度）
+        out = _groq(groq_key, system, payload, fields)
+        if out:
+            return out
+    # 無論是「未設金鑰」或「設了但呼叫失敗」，一律留下降級紀錄——否則事後
+    # 只能從產物裡的「（未啟用 AI）」標記反推，日誌上看不出降級發生過。
+    print("[ai] 前兩層皆不可用，改用第三層規則式後備。")
     return None
 
 
-def _gemini(key: str, system: str, payload: dict, fields):
+def _groq(key: str, system: str, payload: dict, fields):
+    """Groq（OpenAI 相容介面）。免費額度寬鬆，作為第二層——第一層 Claude 無金鑰或失敗時接手。"""
     import httpx
 
-    prompt = (
+    instruction = (
         system
         + "\n\n只輸出一個 JSON 物件，鍵為 " + " / ".join(fields)
-        + "，值皆為繁體中文字串。\n\n資料：\n"
-        + json.dumps(payload, ensure_ascii=False)
+        + "，值皆為字串。**務必使用繁體中文（台灣用語），不得出現簡體字。**"
     )
-    url = ("https://generativelanguage.googleapis.com/v1beta/models/"
-           f"{config.GEMINI_MODEL}:generateContent")
-    body = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.4},
-    }
     try:
-        r = httpx.post(url, params={"key": key}, json=body, timeout=60)
+        r = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}"},
+            json={
+                "model": config.GROQ_MODEL,
+                "messages": [
+                    {"role": "system", "content": instruction},
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                ],
+                "response_format": {"type": "json_object"},
+                "temperature": 0.4,
+            },
+            timeout=60,
+        )
         r.raise_for_status()
-        text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        print("[ai] 使用 Gemini。")
+        text = r.json()["choices"][0]["message"]["content"]
+        print(f"[ai] 使用 Groq（{config.GROQ_MODEL}）。")
         return _clean(json.loads(text), fields)
     except Exception as e:  # noqa: BLE001
-        print(f"[ai] Gemini 失敗：{e}{_detail(e)}")
+        print(f"[ai] Groq 失敗：{e}{_detail(e)}")
         return None
 
 

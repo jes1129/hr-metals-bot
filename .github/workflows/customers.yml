@@ -32,8 +32,8 @@ jobs:
       - name: 執行客戶開發雷達
         env:
           METALS_DATA_DIR: data
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 第一層，付費
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}           # 第二層，免費額度
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python run_customers.py
 

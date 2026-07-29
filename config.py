@@ -192,12 +192,14 @@ CUSTOMER_KEEP = 1500
 # =============================================================================
 AI_MODEL = "claude-opus-4-8"   # 候選人評分模型；省成本可改 "claude-haiku-4-5"
 
-# AI 供應商自動偵測（market.py 行情分析用）：
-#   有 GEMINI_API_KEY  → 用 Google Gemini（免費額度，免綁卡，推薦）
-#   有 ANTHROPIC_API_KEY → 用 Claude（品質最好，需付費）
-#   兩者皆無 → 退化為純統計摘要
-# Gemini 免費金鑰申請：https://aistudio.google.com/apikey
-GEMINI_MODEL = "gemini-2.0-flash"   # 免費額度模型；2.5-flash 於 2026-07-25 實測回 404（本金鑰無此模型），改回 2.0-flash（429 為當日配額，隔日重置）
+# 判斷端三層降級鏈：
+#   第一層 ANTHROPIC_API_KEY → Claude（品質最好，需付費）
+#   第二層 GROQ_API_KEY      → Groq（免費額度寬鬆，免綁卡）
+#   第三層                    → 規則式後備（見各模組 _fallback，不連網、不需金鑰）
+# Groq 免費金鑰申請：https://console.groq.com/keys
+# 註：Gemini 已移出降級鏈——2.5-flash 於 2026-07-25 回 404（本金鑰無存取權），
+#     2.0-flash 於 07-25、07-29 兩次皆回 429 quota exceeded，免費額度不可用。
+GROQ_MODEL = "llama-3.3-70b-versatile"   # 第二層免費額度模型（OpenAI 相容介面）
 BATCH_SIZE = 10          # 每批 10 位候選人發一次請求
 SCORE_THRESHOLD = 8      # 8 分以上才推送（指南第 3 頁「每日輸出」）
 
@@ -269,8 +271,8 @@ JOB_SKILLS = [
 # =============================================================================
 # Secrets 對應的環境變數名稱（值存在 Modal Secret，不寫在這裡）
 # =============================================================================
-ENV_ANTHROPIC_KEY = "ANTHROPIC_API_KEY"
-ENV_GEMINI_KEY = "GEMINI_API_KEY"
+ENV_ANTHROPIC_KEY = "ANTHROPIC_API_KEY"   # 第一層
+ENV_GROQ_KEY = "GROQ_API_KEY"             # 第二層
 ENV_DISCORD_WEBHOOK = "DISCORD_WEBHOOK_URL"
 ENV_104_ACCOUNT = "LOGIN_104_ACCOUNT"
 ENV_104_PASSWORD = "LOGIN_104_PASSWORD"

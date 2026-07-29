@@ -103,7 +103,7 @@ python main.py --mock          # 產生 dashboard_preview.html，用瀏覽器開
 
 ### 交接給客戶時
 
-程式碼零個資。客戶只需：① 收下這個 repo（或 fork 到客戶 GitHub）② 設客戶自己的 `GEMINI_API_KEY`（AI 分析用）③ 照上面用**客戶自己的 Google 帳號**做一次設定。之後整套都在客戶名下，跟你無關。
+程式碼零個資。客戶只需：① 收下這個 repo（或 fork 到客戶 GitHub）② 設客戶自己的 `ANTHROPIC_API_KEY`（第一層，付費）或 `GROQ_API_KEY`（第二層，免費）——**兩者都不設也能跑**，判斷端會落入第三層規則式後備，名單與儀表板照常產出 ③ 照上面用**客戶自己的 Google 帳號**做一次設定。之後整套都在客戶名下，跟你無關。
 
 ### 日曆／Gmail
 
