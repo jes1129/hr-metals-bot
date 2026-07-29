@@ -197,7 +197,7 @@ AI_MODEL = "claude-opus-4-8"   # 候選人評分模型；省成本可改 "claude
 #   有 ANTHROPIC_API_KEY → 用 Claude（品質最好，需付費）
 #   兩者皆無 → 退化為純統計摘要
 # Gemini 免費金鑰申請：https://aistudio.google.com/apikey
-GEMINI_MODEL = "gemini-2.5-flash"   # 免費額度模型；2.0-flash 於 2026-07 實測回 429，改用 2.5-flash
+GEMINI_MODEL = "gemini-2.0-flash"   # 免費額度模型；2.5-flash 於 2026-07-25 實測回 404（本金鑰無此模型），改回 2.0-flash（429 為當日配額，隔日重置）
 BATCH_SIZE = 10          # 每批 10 位候選人發一次請求
 SCORE_THRESHOLD = 8      # 8 分以上才推送（指南第 3 頁「每日輸出」）
 
