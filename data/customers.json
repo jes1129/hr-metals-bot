@@ -143,6 +143,19 @@
     "score": 4
   },
   {
+    "name": "誠美材料科技股份有限公司",
+    "url": "https://www.104.com.tw/company/crlmg34",
+    "area": "台南市善化區",
+    "industry": "台南市善化區光電產業",
+    "capital": "57億",
+    "employees": "1100",
+    "intro": "台南市善化區光電產業",
+    "source": "both",
+    "address": "臺南市善化區南關里木柵港西路１３號",
+    "category": "光學 / 鏡頭",
+    "score": 4
+  },
+  {
     "name": "明基三豐醫療器材股份有限公司",
     "url": "https://www.104.com.tw/company/ap3cms0",
     "area": "台北市內湖區",
@@ -472,8 +485,8 @@
     "url": "https://www.104.com.tw/company/5wngyqo",
     "area": "苗栗縣竹南鎮",
     "industry": "苗栗縣竹南鎮半導體製造業",
-    "capital": "10億",
-    "employees": "840",
+    "capital": "15億",
+    "employees": "860",
     "intro": "苗栗縣竹南鎮半導體製造業",
     "source": "both",
     "address": "苗栗縣竹南鎮頂埔里科中路１６號",
@@ -764,6 +777,19 @@
     "source": "both",
     "address": "桃園市蘆竹區福祿里六福路３６號",
     "category": "醫療器材",
+    "score": 4
+  },
+  {
+    "name": "福永生物科技股份有限公司",
+    "url": "https://www.104.com.tw/company/10s41ym0",
+    "area": "新竹縣寶山鄉",
+    "industry": "新竹縣寶山鄉精密儀器相關製造業",
+    "capital": "3億",
+    "employees": "120",
+    "intro": "新竹縣寶山鄉精密儀器相關製造業",
+    "source": "both",
+    "address": "新竹縣寶山鄉雙溪村新竹科學工業園區研發三路８號",
+    "category": "儀器 / 量測",
     "score": 4
   },
   {
@@ -1143,18 +1169,6 @@
     "score": 4
   },
   {
-    "name": "佳凌科技股份有限公司",
-    "url": "https://www.104.com.tw/company/wjpd2ao",
-    "area": "台中市潭子區",
-    "industry": "台中市潭子區光電產業",
-    "capital": "14億",
-    "employees": "600",
-    "intro": "台中市潭子區光電產業",
-    "source": "104",
-    "category": "光學 / 鏡頭",
-    "score": 4
-  },
-  {
     "name": "3.0",
     "url": "https://reviews.104.com.tw/company/7sl9nts/reviews",
     "area": "苗栗縣竹南鎮",
@@ -1408,18 +1422,6 @@
     "score": 4
   },
   {
-    "name": "升詠醫療器材有限公司",
-    "url": "https://www.104.com.tw/company/1a2x6blwbz",
-    "area": "高雄市左營區",
-    "industry": "高雄市左營區其他商品批發業",
-    "capital": "",
-    "employees": "",
-    "intro": "高雄市左營區其他商品批發業",
-    "source": "104",
-    "category": "醫療器材",
-    "score": 4
-  },
-  {
     "name": "德興醫療器材",
     "url": "https://www.104.com.tw/company/1a2x6bnr9c",
     "area": "台中市豐原區",
@@ -1468,13 +1470,25 @@
     "score": 4
   },
   {
-    "name": "寶楷醫療器材有限公司",
-    "url": "https://www.104.com.tw/company/18qauc6w",
+    "name": "進得麗醫療器材股份有限公司",
+    "url": "https://www.104.com.tw/company/1a2x6bmcm5",
     "area": "新北市土城區",
     "industry": "化妝品及清潔用品批發業",
-    "capital": "500萬",
-    "employees": "5",
+    "capital": "600萬",
+    "employees": "",
     "intro": "化妝品及清潔用品批發業",
+    "source": "104",
+    "category": "醫療器材",
+    "score": 4
+  },
+  {
+    "name": "升詠醫療器材有限公司",
+    "url": "https://www.104.com.tw/company/1a2x6blwbz",
+    "area": "高雄市左營區",
+    "industry": "高雄市左營區其他商品批發業",
+    "capital": "",
+    "employees": "",
+    "intro": "高雄市左營區其他商品批發業",
     "source": "104",
     "category": "醫療器材",
     "score": 4
@@ -1605,7 +1619,7 @@
     "area": "新竹市",
     "industry": "新竹市半導體製造業",
     "capital": "2億",
-    "employees": "75",
+    "employees": "100",
     "intro": "新竹市半導體製造業",
     "source": "104",
     "category": "半導體 / 自動化",
@@ -1746,6 +1760,18 @@
     "score": 4
   },
   {
+    "name": "上藝集成科技有限公司",
+    "url": "https://www.104.com.tw/company/1a2x6bnszo",
+    "area": "苗栗縣竹南鎮",
+    "industry": "苗栗縣竹南鎮其他半導體相關業",
+    "capital": "",
+    "employees": "",
+    "intro": "苗栗縣竹南鎮其他半導體相關業",
+    "source": "104",
+    "category": "半導體 / 自動化",
+    "score": 4
+  },
+  {
     "name": "艾爾斯半導體股份有限公司",
     "url": "https://www.104.com.tw/company/1a2x6biv5s",
     "area": "台南市新市區",
@@ -1807,18 +1833,6 @@
     "score": 4
   },
   {
-    "name": "崇濬科技股份有限公司",
-    "url": "https://www.104.com.tw/company/bhh4yw0",
-    "area": "苗栗縣竹南鎮",
-    "industry": "苗栗縣竹南鎮其他半導體相關業",
-    "capital": "1500萬",
-    "employees": "180",
-    "intro": "苗栗縣竹南鎮其他半導體相關業",
-    "source": "104",
-    "category": "半導體 / 自動化",
-    "score": 4
-  },
-  {
     "name": "瑞昱半導體股份有限公司",
     "url": "https://www.104.com.tw/company/aexwm9k",
     "area": "新竹市",
@@ -1826,6 +1840,18 @@
     "capital": "51億",
     "employees": "7300",
     "intro": "新竹市半導體製造業",
+    "source": "104",
+    "category": "半導體 / 自動化",
+    "score": 4
+  },
+  {
+    "name": "崇濬科技股份有限公司",
+    "url": "https://www.104.com.tw/company/bhh4yw0",
+    "area": "苗栗縣竹南鎮",
+    "industry": "苗栗縣竹南鎮其他半導體相關業",
+    "capital": "1500萬",
+    "employees": "180",
+    "intro": "苗栗縣竹南鎮其他半導體相關業",
     "source": "104",
     "category": "半導體 / 自動化",
     "score": 4
@@ -1850,18 +1876,6 @@
     "capital": "1000萬",
     "employees": "60",
     "intro": "桃園市八德區其他半導體相關業",
-    "source": "104",
-    "category": "半導體 / 自動化",
-    "score": 4
-  },
-  {
-    "name": "上藝集成科技有限公司",
-    "url": "https://www.104.com.tw/company/1a2x6bnszo",
-    "area": "苗栗縣竹南鎮",
-    "industry": "苗栗縣竹南鎮其他半導體相關業",
-    "capital": "",
-    "employees": "",
-    "intro": "苗栗縣竹南鎮其他半導體相關業",
     "source": "104",
     "category": "半導體 / 自動化",
     "score": 4
@@ -1939,18 +1953,6 @@
     "score": 4
   },
   {
-    "name": "格鉅自動化設備有限公司",
-    "url": "https://www.104.com.tw/company/1a2x6bleda",
-    "area": "新北市深坑區",
-    "industry": "新北市深坑區自動控制相關業",
-    "capital": "",
-    "employees": "",
-    "intro": "新北市深坑區自動控制相關業",
-    "source": "104",
-    "category": "半導體 / 自動化",
-    "score": 4
-  },
-  {
     "name": "杰億自動化設備有限公司",
     "url": "https://www.104.com.tw/company/1a2x6bjtuc",
     "area": "新竹縣竹北市",
@@ -1958,6 +1960,18 @@
     "capital": "",
     "employees": "",
     "intro": "新竹縣竹北市自動控制相關業",
+    "source": "104",
+    "category": "半導體 / 自動化",
+    "score": 4
+  },
+  {
+    "name": "格鉅自動化設備有限公司",
+    "url": "https://www.104.com.tw/company/1a2x6bleda",
+    "area": "新北市深坑區",
+    "industry": "新北市深坑區自動控制相關業",
+    "capital": "",
+    "employees": "",
+    "intro": "新北市深坑區自動控制相關業",
     "source": "104",
     "category": "半導體 / 自動化",
     "score": 4
@@ -2140,6 +2154,18 @@
     "intro": "新北市中和區其他半導體相關業",
     "source": "104",
     "category": "半導體 / 自動化",
+    "score": 4
+  },
+  {
+    "name": "惢立德有限公司",
+    "url": "https://www.104.com.tw/company/1a2x6blk1t",
+    "area": "台中市西區",
+    "industry": "台中市西區自行車及其零件製造業",
+    "capital": "",
+    "employees": "4",
+    "intro": "台中市西區自行車及其零件製造業",
+    "source": "104",
+    "category": "自行車 / 運動",
     "score": 4
   },
   {
@@ -2371,6 +2397,18 @@
     "score": 4
   },
   {
+    "name": "帆宣系統科技股份有限公司",
+    "url": "https://www.104.com.tw/company/amsb7y8",
+    "area": "台北市南港區",
+    "industry": "台北市南港區半導體製造業",
+    "capital": "18億",
+    "employees": "700",
+    "intro": "台北市南港區半導體製造業",
+    "source": "104",
+    "category": "半導體 / 自動化",
+    "score": 4
+  },
+  {
     "name": "光方未來股份有限公司",
     "url": "https://www.104.com.tw/company/1a2x6bnhnd",
     "area": "新竹縣竹北市",
@@ -2479,6 +2517,18 @@
     "score": 4
   },
   {
+    "name": "台灣安東帕有限公司",
+    "url": "https://www.104.com.tw/company/1a2x6bkmxe",
+    "area": "台北市南港區",
+    "industry": "台北市南港區精密儀器相關製造業",
+    "capital": "4000萬",
+    "employees": "30",
+    "intro": "台北市南港區精密儀器相關製造業",
+    "source": "104",
+    "category": "儀器 / 量測",
+    "score": 4
+  },
+  {
     "name": "台灣海克斯康測量儀器股份有限公司",
     "url": "https://www.104.com.tw/company/9r3vvo0",
     "area": "台北市中山區",
@@ -2498,42 +2548,6 @@
     "capital": "700萬",
     "employees": "9",
     "intro": "台中市西區機械器具批發業",
-    "source": "104",
-    "category": "工具機 / 機械",
-    "score": 4
-  },
-  {
-    "name": "台灣安東帕有限公司",
-    "url": "https://www.104.com.tw/company/1a2x6bkmxe",
-    "area": "台北市南港區",
-    "industry": "台北市南港區精密儀器相關製造業",
-    "capital": "4000萬",
-    "employees": "30",
-    "intro": "台北市南港區精密儀器相關製造業",
-    "source": "104",
-    "category": "儀器 / 量測",
-    "score": 4
-  },
-  {
-    "name": "帆宣系統科技股份有限公司",
-    "url": "https://www.104.com.tw/company/amsb7y8",
-    "area": "台北市南港區",
-    "industry": "台北市南港區半導體製造業",
-    "capital": "18億",
-    "employees": "700",
-    "intro": "台北市南港區半導體製造業",
-    "source": "104",
-    "category": "半導體 / 自動化",
-    "score": 4
-  },
-  {
-    "name": "中美科學股份有限公司",
-    "url": "https://www.104.com.tw/company/8j812m0",
-    "area": "台北市內湖區",
-    "industry": "台北市內湖區機械器具批發業",
-    "capital": "9000萬",
-    "employees": "35",
-    "intro": "台北市內湖區機械器具批發業",
     "source": "104",
     "category": "工具機 / 機械",
     "score": 4
@@ -3111,18 +3125,6 @@
     "score": 2
   },
   {
-    "name": "松上電子股份有限公司",
-    "url": "https://www.104.com.tw/company/ajg9yd4",
-    "area": "新北市土城區",
-    "industry": "北市土城區消費性電子產品製造業",
-    "capital": "10億",
-    "employees": "3000",
-    "intro": "北市土城區消費性電子產品製造業",
-    "source": "104",
-    "category": "其他潛在客戶",
-    "score": 2
-  },
-  {
     "name": "日商愛伯股份有限公司台灣分公司",
     "url": "https://www.104.com.tw/company/wicc59c",
     "area": "新北市中和區",
@@ -3130,6 +3132,18 @@
     "capital": "24億",
     "employees": "5667",
     "intro": "北市中和區其他電子零組件相關業",
+    "source": "104",
+    "category": "其他潛在客戶",
+    "score": 2
+  },
+  {
+    "name": "松上電子股份有限公司",
+    "url": "https://www.104.com.tw/company/ajg9yd4",
+    "area": "新北市土城區",
+    "industry": "北市土城區消費性電子產品製造業",
+    "capital": "10億",
+    "employees": "3000",
+    "intro": "北市土城區消費性電子產品製造業",
     "source": "104",
     "category": "其他潛在客戶",
     "score": 2
@@ -3435,18 +3449,6 @@
     "score": 2
   },
   {
-    "name": "定穎投資控股股份有限公司",
-    "url": "https://www.104.com.tw/company/1a2x6bmohe",
-    "area": "桃園市蘆竹區",
-    "industry": "蘆竹區印刷電路板製造業",
-    "capital": "27億",
-    "employees": "6000",
-    "intro": "蘆竹區印刷電路板製造業",
-    "source": "104",
-    "category": "其他潛在客戶",
-    "score": 2
-  },
-  {
     "name": "金像電子股份有限公司",
     "url": "https://www.104.com.tw/company/e7y1qlc",
     "area": "桃園市中壢區",
@@ -3531,18 +3533,6 @@
     "score": 2
   },
   {
-    "name": "久豐生技有限公司",
-    "url": "https://www.104.com.tw/company/1a2x6bin33",
-    "area": "高雄市前鎮區",
-    "industry": "高雄市前鎮區綜合商品批發代理業",
-    "capital": "",
-    "employees": "",
-    "intro": "高雄市前鎮區綜合商品批發代理業",
-    "source": "104",
-    "category": "其他潛在客戶",
-    "score": 2
-  },
-  {
     "name": "國立成功大學_核心設施中心",
     "url": "https://www.104.com.tw/company/vr1trz0",
     "area": "台南市東區",
@@ -3598,6 +3588,18 @@
     "capital": "14億",
     "employees": "400",
     "intro": "北市土城區其他電子零組件相關業",
+    "source": "104",
+    "category": "其他潛在客戶",
+    "score": 2
+  },
+  {
+    "name": "磐儀科技股份有限公司",
+    "url": "https://www.104.com.tw/company/12syxbco",
+    "area": "新北市中和區",
+    "industry": "市中和區電腦及其週邊設備製造業",
+    "capital": "9億",
+    "employees": "210",
+    "intro": "市中和區電腦及其週邊設備製造業",
     "source": "104",
     "category": "其他潛在客戶",
     "score": 2
@@ -3699,18 +3701,6 @@
     "score": 2
   },
   {
-    "name": "連展投控集團_連展投資控股股份有限公司",
-    "url": "https://www.104.com.tw/company/1a2x6bmw5g",
-    "area": "新北市新店區",
-    "industry": "新北市新店區其他投資理財相關業",
-    "capital": "21億",
-    "employees": "4000",
-    "intro": "新北市新店區其他投資理財相關業",
-    "source": "104",
-    "category": "其他潛在客戶",
-    "score": 2
-  },
-  {
     "name": "信邦電子股份有限公司",
     "url": "https://www.104.com.tw/company/atcr6i8",
     "area": "新北市汐止區",
@@ -3718,6 +3708,18 @@
     "capital": "24億",
     "employees": "6000",
     "intro": "市汐止區電腦及其週邊設備製造業",
+    "source": "104",
+    "category": "其他潛在客戶",
+    "score": 2
+  },
+  {
+    "name": "連展投控集團_連展投資控股股份有限公司",
+    "url": "https://www.104.com.tw/company/1a2x6bmw5g",
+    "area": "新北市新店區",
+    "industry": "新北市新店區其他投資理財相關業",
+    "capital": "21億",
+    "employees": "4000",
+    "intro": "新北市新店區其他投資理財相關業",
     "source": "104",
     "category": "其他潛在客戶",
     "score": 2
@@ -3759,18 +3761,6 @@
     "score": 2
   },
   {
-    "name": "慶陞工業股份有限公司",
-    "url": "https://www.104.com.tw/company/a60zp68",
-    "area": "桃園市平鎮區",
-    "industry": "園市平鎮區其他電子零組件相關業",
-    "capital": "3億",
-    "employees": "310",
-    "intro": "園市平鎮區其他電子零組件相關業",
-    "source": "104",
-    "category": "其他潛在客戶",
-    "score": 2
-  },
-  {
     "name": "良維科技股份有限公司",
     "url": "https://www.104.com.tw/company/56uon6g",
     "area": "台北市中山區",
@@ -3778,6 +3768,18 @@
     "capital": "14億",
     "employees": "4000",
     "intro": "市中山區電腦及其週邊設備製造業",
+    "source": "104",
+    "category": "其他潛在客戶",
+    "score": 2
+  },
+  {
+    "name": "慶陞工業股份有限公司",
+    "url": "https://www.104.com.tw/company/a60zp68",
+    "area": "桃園市平鎮區",
+    "industry": "園市平鎮區其他電子零組件相關業",
+    "capital": "3億",
+    "employees": "310",
+    "intro": "園市平鎮區其他電子零組件相關業",
     "source": "104",
     "category": "其他潛在客戶",
     "score": 2
@@ -3807,18 +3809,6 @@
     "score": 2
   },
   {
-    "name": "禾凌科技股份有限公司",
-    "url": "https://www.104.com.tw/company/cmkomeg",
-    "area": "桃園市八德區",
-    "industry": "市八德區電腦及其週邊設備製造業",
-    "capital": "",
-    "employees": "70",
-    "intro": "市八德區電腦及其週邊設備製造業",
-    "source": "104",
-    "category": "其他潛在客戶",
-    "score": 2
-  },
-  {
     "name": "嘉基科技股份有限公司",
     "url": "https://www.104.com.tw/company/1a2x6bi162",
     "area": "新北市中和區",
@@ -3831,6 +3821,30 @@
     "score": 2
   },
   {
+    "name": "英至科技股份有限公司",
+    "url": "https://www.104.com.tw/company/b5qw46g",
+    "area": "桃園市中壢區",
+    "industry": "桃園市中壢區其他相關製造業",
+    "capital": "500萬",
+    "employees": "",
+    "intro": "桃園市中壢區其他相關製造業",
+    "source": "104",
+    "category": "其他潛在客戶",
+    "score": 2
+  },
+  {
+    "name": "禾凌科技股份有限公司",
+    "url": "https://www.104.com.tw/company/cmkomeg",
+    "area": "桃園市八德區",
+    "industry": "市八德區電腦及其週邊設備製造業",
+    "capital": "",
+    "employees": "70",
+    "intro": "市八德區電腦及其週邊設備製造業",
+    "source": "104",
+    "category": "其他潛在客戶",
+    "score": 2
+  },
+  {
     "name": "實盈股份有限公司",
     "url": "https://www.104.com.tw/company/27ky7b4",
     "area": "新北市汐止區",
@@ -3838,18 +3852,6 @@
     "capital": "12億",
     "employees": "700",
     "intro": "市汐止區電腦及其週邊設備製造業",
-    "source": "104",
-    "category": "其他潛在客戶",
-    "score": 2
-  },
-  {
-    "name": "艾恩特精密工業股份有限公司",
-    "url": "https://www.104.com.tw/company/7r08t1s",
-    "area": "台北市內湖區",
-    "industry": "北市內湖區其他電子零組件相關業",
-    "capital": "6億",
-    "employees": "500",
-    "intro": "北市內湖區其他電子零組件相關業",
     "source": "104",
     "category": "其他潛在客戶",
     "score": 2
@@ -6316,6 +6318,20 @@
     "url": "",
     "intro": "紡織機械設備製造",
     "address": "嘉義市西　區大溪里大溪路３８８號",
+    "source": "gov",
+    "category": "工具機 / 機械",
+    "score": 3
+  },
+  {
+    "name": "台灣新泥機械有限公司",
+    "ban": "86050680",
+    "area": "嘉義市",
+    "industry": "居家修繕用品零售",
+    "capital": "6000000",
+    "employees": "",
+    "url": "",
+    "intro": "居家修繕用品零售",
+    "address": "嘉義市西　區大溪里１２鄰育人路４３８巷２９８號",
     "source": "gov",
     "category": "工具機 / 機械",
     "score": 3
@@ -16307,7 +16323,7 @@
     "ban": "19976557",
     "area": "屏東縣長治鄉",
     "industry": "未分類其他通用機械設備製造",
-    "capital": "50000",
+    "capital": "4000000",
     "employees": "",
     "url": "",
     "intro": "未分類其他通用機械設備製造",
@@ -17871,7 +17887,7 @@
     "score": 3
   },
   {
-    "name": "航翊科技股份有限公司",
+    "name": "航翊科技股份有限公���",
     "ban": "16562408",
     "area": "彰化縣北斗鎮",
     "industry": "其他汽車零件製造",
@@ -20444,20 +20460,6 @@
     "address": "彰化縣員林市三條里員水路２段１２２巷１２號",
     "source": "gov",
     "category": "工具機 / 機械",
-    "score": 3
-  },
-  {
-    "name": "聯鴻機械工業股份有限公司",
-    "ban": "16850652",
-    "area": "彰化縣員林市",
-    "industry": "其他醫療器材及用品製造",
-    "capital": "8000000",
-    "employees": "",
-    "url": "",
-    "intro": "其他醫療器材及用品製造",
-    "address": "彰化縣員林市三條里７鄰三條街１９９號２樓",
-    "source": "gov",
-    "category": "醫療器材",
     "score": 3
   }
 ]
