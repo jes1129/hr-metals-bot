@@ -101,6 +101,12 @@ def _parse_company(card: dict) -> dict:
     mi = re.search(r"([一-鿿]{2,14}業)資本額", text) or re.search(r"[區鄉鎮市]([一-鿿]{2,14}業)", text)
     if mi:
         industry = mi.group(1)
+        # {2,14} 為貪婪匹配，且字元範圍涵蓋「台中市龍井區」等字，故可能把地區一併吃進來
+        # （如「台中市龍井區鋼鐵基本工業」）。逐級比對 area 的後綴，命中即剝除還原純行業別。
+        for i in range(len(area)):
+            if industry.startswith(area[i:]):
+                industry = industry[len(area) - i:]
+                break
     cap = ""
     mc = re.search(r"資本額([0-9][0-9,\.]*\s*[億萬]?)", text)
     if mc:
@@ -121,7 +127,7 @@ async def fetch_104() -> list:
     async with browser.real_chrome(headless=True) as (page, _ctx):
         await browser.warm_up(page, "https://www.104.com.tw/")
         for kw in config.SUPPLIER_QUERIES:
-            for pg in range(1, 3):  # 每關鍵字前 2 頁
+            for pg in range(1, config.SUPPLIER_MAX_PAGES + 1):
                 try:
                     await page.goto(_company_url(kw, pg),
                                     wait_until="domcontentloaded", timeout=60000)
@@ -253,10 +259,11 @@ def merge(rows_104: list, rows_gov: list) -> list:
         r["category"] = categorize(blob)
         r["near"] = near_rank(r.get("area", "") + r.get("address", ""))
         r["is_near"] = r["near"] >= 3  # 神岡本地或相鄰 → 神岡周邊
-        r["score"] = (r["near"] * 3                                    # 越近分越高（神岡最高）
-                      + (2 if r["category"] != "其他金屬加工" else 0)   # 有明確能力分類優先
-                      + (2 if r.get("url") else 0)
-                      + (1 if r.get("ban") else 0))
+        w = config.SUPPLIER_SCORE                                      # 權重見 config，毋須動此處
+        r["score"] = (r["near"] * w["near"]                            # 越近分越高（神岡最高）
+                      + (w["category"] if r["category"] != "其他金屬加工" else 0)
+                      + (w["url"] if r.get("url") else 0)
+                      + (w["ban"] if r.get("ban") else 0))
         merged.append(r)
     merged.sort(key=lambda x: (x["score"], x["source"] == "both"), reverse=True)
     return merged
@@ -310,7 +317,7 @@ def ai_report(stats: dict, sup: list) -> dict:
     sample = [
         {"name": s["name"], "category": s["category"], "area": s["area"],
          "capital": s.get("capital", ""), "source": s["source"]}
-        for s in sup[:40]
+        for s in sup[:config.AI_SAMPLE_SIZE]
     ]
     out = ai.summarize(system, {"統計": stats, "供應商樣本": sample}, _FIELDS)
     return out or _fallback(stats)

@@ -151,6 +151,14 @@ GOV_HARD_CAP = 80000         # 政府列硬上限（安全閥，避免異常吃�
 GOV_END_GAP = 40000
 # 合併後最終保留家數（已依 score 排序，神岡→相鄰→有分類→有連結者在前），控制檔案與頁面大小。
 SUPPLIER_KEEP = 1500
+SUPPLIER_MAX_PAGES = 2       # 每個搜尋關鍵字抓 104 的前幾頁（頁數越多越慢、也越容易被擋）
+# 規則式漏斗的評分權重。改這裡就能改變「哪種供應商排前面」，毋須動程式碼。
+SUPPLIER_SCORE = {
+    "near": 3,               # 地理鄰近級數（1~4）× 此值 —— 神岡最高
+    "category": 2,           # 有明確能力分類（非「其他金屬加工」）
+    "url": 2,                # 有可聯絡網址
+    "ban": 1,                # 有政府稅籍統一編號
+}
 
 SUPPLIERS_FILE = "suppliers.json"
 
@@ -184,6 +192,13 @@ CUSTOMER_GOV_KEYWORDS = [
 ]
 CUSTOMERS_FILE = "customers.json"
 CUSTOMER_KEEP = 1500
+CUSTOMER_MAX_PAGES = 2       # 同 SUPPLIER_MAX_PAGES
+# 客戶開發為全台範圍，故無地理鄰近加權；其餘權重與供應商雷達同義。
+CUSTOMER_SCORE = {
+    "category": 2,           # 有明確產業分類（非「其他潛在客戶」）
+    "url": 2,                # 有可聯絡網址
+    "ban": 1,                # 有政府稅籍統一編號
+}
 
 # =============================================================================
 # AI 評分（直連 Anthropic 官方 API）
@@ -192,14 +207,17 @@ CUSTOMER_KEEP = 1500
 # =============================================================================
 AI_MODEL = "claude-opus-4-8"   # 候選人評分模型；省成本可改 "claude-haiku-4-5"
 
-# 判斷端三層降級鏈：
-#   第一層 ANTHROPIC_API_KEY → Claude（品質最好，需付費）
-#   第二層 GROQ_API_KEY      → Groq（免費額度寬鬆，免綁卡）
+# 判斷端三層降級鏈（成本優先：先免費、後付費、再規則式）：
+#   第一層 GROQ_API_KEY      → Groq（免費額度寬鬆，免綁卡）
+#   第二層 ANTHROPIC_API_KEY → Claude（品質最好，需付費；免費層不可用時接手）
 #   第三層                    → 規則式後備（見各模組 _fallback，不連網、不需金鑰）
 # Groq 免費金鑰申請：https://console.groq.com/keys
 # 註：Gemini 已移出降級鏈——2.5-flash 於 2026-07-25 回 404（本金鑰無存取權），
 #     2.0-flash 於 07-25、07-29 兩次皆回 429 quota exceeded，免費額度不可用。
-GROQ_MODEL = "llama-3.3-70b-versatile"   # 第二層免費額度模型（OpenAI 相容介面）
+GROQ_MODEL = "llama-3.3-70b-versatile"   # 第一層免費額度模型（OpenAI 相容介面）
+# 送入判斷端後段的樣本筆數。統計數字代表全體，樣本供模型寫得具體；
+# 調高會提升具體性但也拉長輸入長度與成本。
+AI_SAMPLE_SIZE = 40
 BATCH_SIZE = 10          # 每批 10 位候選人發一次請求
 SCORE_THRESHOLD = 8      # 8 分以上才推送（指南第 3 頁「每日輸出」）
 
@@ -271,8 +289,8 @@ JOB_SKILLS = [
 # =============================================================================
 # Secrets 對應的環境變數名稱（值存在 Modal Secret，不寫在這裡）
 # =============================================================================
-ENV_ANTHROPIC_KEY = "ANTHROPIC_API_KEY"   # 第一層
-ENV_GROQ_KEY = "GROQ_API_KEY"             # 第二層
+ENV_ANTHROPIC_KEY = "ANTHROPIC_API_KEY"   # 第二層（付費）
+ENV_GROQ_KEY = "GROQ_API_KEY"             # 第一層（免費額度）
 ENV_DISCORD_WEBHOOK = "DISCORD_WEBHOOK_URL"
 ENV_104_ACCOUNT = "LOGIN_104_ACCOUNT"
 ENV_104_PASSWORD = "LOGIN_104_PASSWORD"

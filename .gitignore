@@ -9,6 +9,10 @@ dashboard_preview.html
 # 內部指南 PDF 不進 repo（公開時避免外流）
 *.pdf
 
+# 論文投稿工作區：放在 docs/ 便於本機作業，但不得進 repo，
+# 否則會被排程的 git add -A docs 掃進去並發布到 GitHub Pages。
+docs/論文比賽/
+
 # 使用者貼進來的截圖等圖片，不進 repo
 *.jpg
 *.jpeg

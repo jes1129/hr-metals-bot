@@ -2,9 +2,9 @@
 """
 ai.py — 共用 AI 摘要分派（market 行情、suppliers 供應商分析共用）。
 
-判斷端三層降級鏈：
-  第一層 ANTHROPIC_API_KEY → Claude（品質最佳，付費）
-  第二層 GROQ_API_KEY      → Groq（免費額度模型）
+判斷端三層降級鏈（成本優先：先免費、後付費、再規則式）：
+  第一層 GROQ_API_KEY      → Groq（免費額度模型）
+  第二層 ANTHROPIC_API_KEY → Claude（品質最佳，付費；免費層不可用時接手）
   第三層                    → 回 None，由呼叫端做規則式後備
 三層共用同一份輸出契約：回傳只含 fields 指定欄位的 dict（皆字串）。
 """
@@ -32,14 +32,14 @@ def _detail(exc) -> str:
 
 def summarize(system: str, payload: dict, fields):
     """system＝角色/任務說明；payload＝資料 dict；fields＝要求的輸出欄位名。"""
-    anthropic_key = os.environ.get(config.ENV_ANTHROPIC_KEY)
     groq_key = os.environ.get(config.ENV_GROQ_KEY)
-    if anthropic_key:  # 第一層：Claude（付費）
-        out = _anthropic(anthropic_key, system, payload, fields)
+    anthropic_key = os.environ.get(config.ENV_ANTHROPIC_KEY)
+    if groq_key:  # 第一層：Groq（免費額度）
+        out = _groq(groq_key, system, payload, fields)
         if out:
             return out
-    if groq_key:  # 第二層：Groq（免費額度）
-        out = _groq(groq_key, system, payload, fields)
+    if anthropic_key:  # 第二層：Claude（付費）
+        out = _anthropic(anthropic_key, system, payload, fields)
         if out:
             return out
     # 無論是「未設金鑰」或「設了但呼叫失敗」，一律留下降級紀錄——否則事後
@@ -49,7 +49,7 @@ def summarize(system: str, payload: dict, fields):
 
 
 def _groq(key: str, system: str, payload: dict, fields):
-    """Groq（OpenAI 相容介面）。免費額度寬鬆，作為第二層——第一層 Claude 無金鑰或失敗時接手。"""
+    """Groq（OpenAI 相容介面）。免費額度寬鬆，作為第一層——優先使用以維持零經常性成本。"""
     import httpx
 
     instruction = (

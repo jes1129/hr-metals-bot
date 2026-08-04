@@ -39,14 +39,17 @@ jobs:
         run: python run_metals.py
 
       - name: 提交歷史
-        continue-on-error: true   # 與手動推送撞車時，提交失敗也不擋部署（產物已在下一步上傳）
+        # 註：本步驟不設 continue-on-error——先前設了之後，git add 失敗被靜默吞掉，
+        # 排程連續三週回報成功卻沒有任何產出。推送撞車已由各行的 || 個別處理。
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git stash --include-untracked || true
           git pull --rebase origin main || git rebase --abort || true
           git stash pop || true
-          git add data/prices.json data/daily.json docs/index.html docs/metals.html docs/quote.html docs/help.html docs/db.html docs/orders.html docs/mrp.html docs/assistant.html docs/signals.json
+          # 以 -A 收整個目錄，避免清單中任一檔案不存在就讓 git add 回 128、
+          # 連帶使後面的 commit/push 被 bash -e 中斷（曾導致資料三週未更新而排程仍報成功）。
+          git add -A data docs
           git commit -m "更新銅鋁報價 $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]" || echo "無變更"
           git push origin HEAD:main || echo "push 跳過（與其他推送撞車，不影響本次部署）"
 

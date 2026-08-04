@@ -54,7 +54,7 @@ async def fetch_104() -> list:
     async with browser.real_chrome(headless=True) as (page, _ctx):
         await browser.warm_up(page, "https://www.104.com.tw/")
         for kw in config.CUSTOMER_QUERIES:
-            for pg in range(1, 3):
+            for pg in range(1, config.CUSTOMER_MAX_PAGES + 1):
                 try:
                     await page.goto(suppliers._company_url(kw, pg),
                                     wait_until="domcontentloaded", timeout=60000)
@@ -159,8 +159,10 @@ def merge(rows_104: list, rows_gov: list) -> list:
     for r in by_name.values():
         blob = f"{r['name']} {r.get('industry','')} {r.get('intro','')}"
         r["category"] = categorize(blob)
-        r["score"] = ((2 if r["category"] != "其他潛在客戶" else 0)
-                      + (2 if r.get("url") else 0) + (1 if r.get("ban") else 0))
+        w = config.CUSTOMER_SCORE                                      # 權重見 config，毋須動此處
+        r["score"] = ((w["category"] if r["category"] != "其他潛在客戶" else 0)
+                      + (w["url"] if r.get("url") else 0)
+                      + (w["ban"] if r.get("ban") else 0))
         merged.append(r)
     merged.sort(key=lambda x: (x["score"], x["source"] == "both"), reverse=True)
     return merged
@@ -202,7 +204,7 @@ def ai_report(stats: dict, cus: list) -> dict:
         "risk（提醒：資料為公開推估、需查證需求真偽）。"
     )
     sample = [{"name": c["name"], "category": c["category"], "area": c["area"], "source": c["source"]}
-              for c in cus[:40]]
+              for c in cus[:config.AI_SAMPLE_SIZE]]
     return ai.summarize(system, {"統計": stats, "客戶樣本": sample}, _FIELDS) or _fallback(stats)
 
 
