@@ -258,7 +258,7 @@ def merge(rows_104: list, rows_gov: list) -> list:
         blob = f"{r['name']} {r.get('industry','')} {r.get('intro','')}"
         r["category"] = categorize(blob)
         r["near"] = near_rank(r.get("area", "") + r.get("address", ""))
-        r["is_near"] = r["near"] >= 3  # 神岡本地或相鄰 → 神岡周邊
+        r["is_near"] = r["near"] >= config.SUPPLIER_NEAR_THRESHOLD
         w = config.SUPPLIER_SCORE                                      # 權重見 config，毋須動此處
         r["score"] = (r["near"] * w["near"]                            # 越近分越高（神岡最高）
                       + (w["category"] if r["category"] != "其他金屬加工" else 0)
