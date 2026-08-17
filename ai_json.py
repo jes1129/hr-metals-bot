@@ -23,16 +23,24 @@ import config
 _JSON_ONLY = "\n\n只輸出 JSON，不要任何說明文字，不要程式碼框。"
 
 
-def _detail(exc) -> str:
-    """把 HTTP 回應內容一併記下——只印狀態碼的話，配額類型（每分鐘限流／
-    當日用盡／免費層關閉）看不出來，降級成因就只能事後猜。"""
+def _detail(exc, model=None) -> str:
+    """把回應內容與模型名稱一併記下。
+
+    只印狀態碼的話，降級成因只能事後猜。而模型名稱特別重要——實測
+    2026-08-17 遇到 Groq 回 404，原因是 llama-3.3-70b-versatile 已下架；
+    若日誌沒印模型名，這個 404 會被誤判為網址或金鑰問題。
+    """
+    bits = []
+    if model:
+        bits.append(f"模型={model}")
     resp = getattr(exc, "response", None)
-    if resp is None:
-        return ""
-    try:
-        return " ｜ 回應：" + resp.text[:300].replace("\n", " ")
-    except Exception:  # noqa: BLE001
-        return ""
+    if resp is not None:
+        try:
+            body = (resp.text or "").strip()
+            bits.append("回應=" + (body[:300].replace("\n", " ") if body else "（空）"))
+        except Exception:  # noqa: BLE001
+            bits.append("回應=無法讀取")
+    return ("　｜　" + "；".join(bits)) if bits else ""
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +112,7 @@ def _groq(key, system, payload, temperature, max_tokens):
         print("[ai_json] 使用 Groq（" + config.GROQ_MODEL + "）。")
         return json.loads(text)
     except Exception as e:  # noqa: BLE001
-        print("[ai_json] Groq 失敗：" + str(e) + _detail(e))
+        print("[ai_json] Groq 失敗：" + str(e) + _detail(e, config.GROQ_MODEL))
         return None
 
 
@@ -129,5 +137,5 @@ def _anthropic(key, system, payload, temperature, max_tokens):
         print("[ai_json] 使用 Claude。")
         return json.loads(text)
     except Exception as e:  # noqa: BLE001
-        print("[ai_json] Claude 失敗：" + str(e) + _detail(e))
+        print("[ai_json] Claude 失敗：" + str(e) + _detail(e, config.AI_MODEL))
         return None
