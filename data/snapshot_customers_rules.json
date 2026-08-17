@@ -1,0 +1,46 @@
+{
+ "rules": {
+  "city": "臺中市",
+  "whitelist": [
+   "26",
+   "27",
+   "28",
+   "30",
+   "31"
+  ],
+  "exclude_codes": [
+   "08",
+   "09",
+   "10",
+   "11",
+   "12",
+   "13",
+   "14",
+   "15",
+   "16",
+   "17",
+   "18",
+   "19",
+   "20",
+   "21",
+   "22",
+   "23"
+  ],
+  "capabilities": null,
+  "exclude_machine_builders": false,
+  "near_matters": false,
+  "machine_builder_codes": [
+   "291",
+   "293"
+  ],
+  "gov_exclude_words": [
+   "塑膠",
+   "橡膠",
+   "蔬果",
+   "非金屬",
+   "食品"
+  ],
+  "near_threshold": 3
+ },
+ "version": "https://serv.gcis.nat.gov.tw/RDownLoad/Data/statistical/%E7%94%9F%E7%94%A2%E4%B8%AD%E5%B7%A5%E5%BB%A0%E6%B8%85%E5%86%8A.zip"
+}
