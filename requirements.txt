@@ -1,7 +1,8 @@
-# 本地開發 / 部署用。Modal Image 內另於 main.py 以 pip_install 安裝執行期依賴。
-modal
-playwright==1.48.0
-playwright-stealth
+# 執行期依賴。跑在 GitHub Actions（免自建伺服器），不需要瀏覽器。
+#
+# 已移除：
+#   playwright / playwright-stealth  104 資料源已移除，不再需要真實瀏覽器與指紋偽裝
+#                                    （CI 裡最慢的一步「安裝 Chrome」隨之省掉）
+#   modal / fastapi                  早期部署於 Modal，現已改為 GitHub Actions
 httpx
 anthropic
-fastapi[standard]

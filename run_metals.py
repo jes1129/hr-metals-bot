@@ -113,15 +113,13 @@ def main():
         json.dump(_build_signals(history), f, ensure_ascii=False)
 
     # 首頁總覽數字（跨 data 檔，可能落後數小時，可接受）
-    jobs = _read(os.path.join(DATA_DIR, "jobs.json"), [])
-    jobs_total = jobs[-1]["total"] if jobs else 0
     sup = _read(os.path.join(DATA_DIR, "suppliers.json"), [])
     sup_total, sup_near = len(sup), sum(1 for s in sup if s.get("is_near"))
     cust = _read(os.path.join(DATA_DIR, "customers.json"), None)
     cust_total = len(cust) if isinstance(cust, list) else None
 
     with open(os.path.join("docs", "index.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_home(history, jobs_total, sup_total, sup_near, cust_total))
+        f.write(dashboard.render_home(history, sup_total, sup_near, cust_total))
     print("[run_metals] 已更新 docs/metals.html 與 docs/index.html（首頁）")
 
 

@@ -112,7 +112,7 @@ def _hcard(href: str, emoji: str, title: str, lines: str, cta: str) -> str:
     )
 
 
-def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None) -> str:
+def render_home(history: dict, sup_total, sup_near, cust_total=None) -> str:
     # 大焦點：最常用的兩張主卡（訂單、每日早報）
     def _feat(href, icon, title, note, cta, ext=False, cid=""):
         idattr = f' id="{cid}"' if cid else ""
@@ -123,8 +123,8 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
                 f'<div class="hfcta">{cta} →</div></a>')
     feat = (
         _feat("assistant.html", "🤖", "AI 助手",
-              "問一句就答：逾期、待出貨、本月概況…＋🗣️ 中越對話（老闆⇄越南員工）。", "問問看")
-        + _feat("https://mail.google.com", "📧", "每日早報信箱",
+              "問一句就答：逾期、待出貨、本月概況…＋中越對話（老闆⇄越南員工）。", "問問看")
+        + _feat("https://mail.google.com", "", "每日早報信箱",
                 "每天自動收 ERP 早報：待出貨、逾期、原料行情。", "開啟信箱", ext=True)
     )
 
@@ -164,15 +164,15 @@ def render_home(history: dict, jobs_total, sup_total, sup_near, cust_total=None)
     <div class="topbar">{_nav("home")}{_THEME_BTN}</div>
     <div class="hero">
       <div class="eyebrow">九上科技 · 智慧儀表板</div>
-      <h1>{greeting}，老闆 👋</h1>
+      <h1>{greeting}，老闆</h1>
       <div class="sub">今天 {date_s}　·　這裡是今日重點 · 更新於 {now}</div>
     </div>
     <div class="stats">
-      <div class="stat"><div class="stat-k">🚚 待出貨</div><div class="stat-v" id="stShip">—</div></div>
-      <div class="stat" id="stOverCard"><div class="stat-k">⏰ 逾期未出貨</div><div class="stat-v" id="stOver">—</div></div>
+      <div class="stat"><div class="stat-k">待出貨</div><div class="stat-v" id="stShip">—</div></div>
+      <div class="stat" id="stOverCard"><div class="stat-k">逾期未出貨</div><div class="stat-v" id="stOver">—</div></div>
       <div class="stat"><div class="stat-k">📦 本月訂單</div><div class="stat-v" id="stCnt">—</div></div>
     </div>
-    <div class="stats-hint" id="stHint">🔒 登入後這裡會帶入你的即時數字（待出貨、逾期、本月訂單數）</div>
+    <div class="stats-hint" id="stHint">登入後這裡會帶入你的即時數字（待出貨、逾期、本月訂單數）</div>
     <div class="hfeat">{feat}</div>
     <div class="hqlabel">快速前往</div>
     <div class="hquick">{quick}</div>
@@ -254,7 +254,7 @@ def render_assistant_html() -> str:
     <div class="topbar">{_nav("ai")}{_THEME_BTN}</div>
     <div class="eyebrow">九上科技 · 智慧儀表板</div>
     <h1>🤖 AI 助手</h1>
-    <div class="sub">問一句就答：逾期、待出貨、本月概況 · 快速問答免設定、免費 · ＋🗣️ 中越對話 · 更新於 {now}</div>
+    <div class="sub">問一句就答：逾期、待出貨、本月概況 · 快速問答免設定、免費 · ＋中越對話 · 更新於 {now}</div>
     <div id="aiView" class="aiview">
       <div class="dbloading">載入中…（若一直沒出現，請先用右上角「使用 Google 帳戶登入」）</div>
     </div>
@@ -347,26 +347,26 @@ def render_help_html() -> str:
       <h2>這是什麼？</h2>
       <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情、找供應商、開發客戶；一邊管報價、訂單，還有 AI 助手（含中越對話）。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
       <p>上面一排分成幾類：<b>🏠 首頁</b>總覽、<b>📈 情報</b>（原料/供應商/客戶，點開是下拉選單）、以及營運工具 <b>🧮 報價 · 📦 訂單 · 🤖 助手 · 🗂️ 資料庫</b>，最後是 <b>📖 說明</b>（本頁）。</p>
-      <p class="muted">👇 點下面任一顆，直接跳到該功能的詳細說明：</p>
+      <p class="muted">點下面任一顆，直接跳到該功能的詳細說明：</p>
       <div class="jump">
-        <a href="#start">🚀 新手上路</a><a href="#f-login">🔐 登入</a><a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a>
+        <a href="#start">新手上路</a><a href="#f-login">登入</a><a href="#f-home">🏠 首頁</a><a href="#f-metals">🔩 原料</a>
         <a href="#f-sup">🏭 供應商</a><a href="#f-cust">🎯 客戶</a><a href="#f-quote">🧮 報價</a><a href="#f-orders">📦 訂單</a>
-        <a href="#f-ai">🤖 助手</a><a href="#f-vn">🗣️ 中越對話</a><a href="#f-notebook">🧠 NotebookLM</a><a href="#f-email">📧 早報信</a>
-        <a href="#db">🗂️ 資料庫/試算表</a><a href="#freq">⏱️ 更新頻率/費用</a><a href="#faq">❓ 常見問題</a>
+        <a href="#f-ai">🤖 助手</a><a href="#f-vn">中越對話</a><a href="#f-notebook">🧠 NotebookLM</a><a href="#f-email">早報信</a>
+        <a href="#db">🗂️ 資料庫/試算表</a><a href="#freq">更新頻率/費用</a><a href="#faq">常見問題</a>
       </div>
     </div>
 
     <div class="q" id="start">
-      <h2>🚀 新手上路：建議使用順序</h2>
+      <h2>新手上路：建議使用順序</h2>
       <p>第一次用不知道從哪開始？照這個順序做一遍，就通了：</p>
       <ul class="steps">
         <li><b>用 Google 登入</b>（右上角）——這樣資料才會存進公司試算表、換裝置也看得到。</li>
         <li><b>看情報</b>：📈 情報裡的原料行情、供應商、客戶，平常參考用。</li>
         <li><b>報價</b>：客人詢價 → 🧮 報價算一算 → 存起來。</li>
         <li><b>轉訂單</b>：接到單 → 📦 訂單「從報價轉單」或「＋新增訂單」，用看板追進度。</li>
-        <li><b>問 AI</b>：🤖 助手點按鈕或打字，隨時問「哪些逾期 / 本月概況 / 待出貨」；要跟越南員工溝通就切「🗣️ 中越對話」。</li>
+        <li><b>問 AI</b>：🤖 助手點按鈕或打字，隨時問「哪些逾期 / 本月概況 / 待出貨」；要跟越南員工溝通就切「中越對話」。</li>
       </ul>
-      <div class="tip">💡 只想輕鬆用？每天開<b>首頁</b>看重點卡片、需要時點 🤖 <b>助手</b>問一句，就很夠了。</div>
+      <div class="tip">只想輕鬆用？每天開<b>首頁</b>看重點卡片、需要時點 🤖 <b>助手</b>問一句，就很夠了。</div>
     </div>
 
     <div class="q">
@@ -374,7 +374,7 @@ def render_help_html() -> str:
       <p class="muted">點每一條標題可以展開／收合詳細說明。</p>
 
       <details class="acc" id="f-login" open>
-        <summary>🔐 登入 <span class="sm">— 第一件事，資料才會存起來</span><span class="chev">▾</span></summary>
+        <summary>登入 <span class="sm">— 第一件事，資料才會存起來</span><span class="chev">▾</span></summary>
         <div class="acc-body">
           <p><b>這是什麼：</b>用公司的 Google 帳號登入。登入後你做的收藏、報價、訂單才會存進公司試算表，換手機、換電腦都看得到同一份、不會不見。</p>
           <p><b>怎麼用：</b></p>
@@ -394,7 +394,7 @@ def render_help_html() -> str:
           <p><b>怎麼看：</b></p>
           <ul>
             <li>最上面是問候＋<b>今日數字</b>：<b>待出貨</b>幾筆、<b>逾期未出</b>幾筆（會標紅）、<b>本月訂單</b>幾筆（登入後才有數字）。</li>
-            <li>下面兩張大卡＝最常用的 <b>🤖 AI 助手</b> 和 <b>📧 每日早報</b>，點就進去。</li>
+            <li>下面兩張大卡＝最常用的 <b>🤖 AI 助手</b> 和 <b>每日早報</b>，點就進去。</li>
             <li>再下面「快速前往」小圖示＝其他功能（原料、報價、供應商、客戶、資料庫、說明⋯），點一下就到。</li>
           </ul>
           <p><b>小撇步：</b>只想輕鬆用？每天看一眼首頁「逾期未出」有沒有紅字，就大概知道今天要不要盯。</p>
@@ -481,9 +481,9 @@ def render_help_html() -> str:
       </details>
 
       <details class="acc" id="f-vn">
-        <summary>🗣️ 中越對話 <span class="sm">— 跟越南員工溝通</span><span class="chev">▾</span></summary>
+        <summary>中越對話 <span class="sm">— 跟越南員工溝通</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p><b>這是什麼：</b>讓老闆和越南員工<b>雙向溝通</b>。在「🤖 助手」頁的最上方，切到「🗣️ 中越對話」就是。</p>
+          <p><b>這是什麼：</b>讓老闆和越南員工<b>雙向溝通</b>。在「🤖 助手」頁的最上方，切到「中越對話」就是。</p>
           <p><b>怎麼用（超簡單）：</b></p>
           <ul>
             <li><b>常用句</b>：點「停機／換刀／小心／休息⋯」任一顆，畫面立刻<b>同時顯示中文＋越南文</b>，把手機拿給對方看就懂。<b>免登入、免設定、即時。</b></li>
@@ -506,19 +506,19 @@ def render_help_html() -> str:
             <li>之後想問就打字問它：「這個月往來重點？」「跟大雅精密進度到哪？」，它會<b>附出處</b>回答。</li>
             <li>想用聽的：按「Audio Overview／生成語音摘要」，把近況變成兩人對談，巡廠、開車用聽的。</li>
           </ul>
-          <div class="tip">💡 文件<b>不會自己</b>跑進去——第一次要手動加來源一次；之後我們改寫<b>同一份</b>文件，你在該來源按「同步」就更新，不用重加。</div>
-          <div class="tip">💰 免費。<b>但「語音摘要」每天能生成的次數有限，需要時再生成、不必每天</b>；純打字問答日常用不會超過。</div>
+          <div class="tip">文件<b>不會自己</b>跑進去——第一次要手動加來源一次；之後我們改寫<b>同一份</b>文件，你在該來源按「同步」就更新，不用重加。</div>
+          <div class="tip">免費。<b>但「語音摘要」每天能生成的次數有限，需要時再生成、不必每天</b>；純打字問答日常用不會超過。</div>
           <a class="gobtn" id="nbGo" href="https://notebooklm.google.com" target="_blank" rel="noopener">開啟 NotebookLM →</a>
         </div>
       </details>
 
       <details class="acc" id="f-email">
-        <summary>📧 每日早報信 <span class="sm">— 每天早上自動寄給你</span><span class="chev">▾</span></summary>
+        <summary>每日早報信 <span class="sm">— 每天早上自動寄給你</span><span class="chev">▾</span></summary>
         <div class="acc-body">
           <p><b>這是什麼：</b>不用開網站，<b>平日</b>早上系統自動把「今天要注意的事」寄到你的信箱（週末工廠休就不寄）。</p>
           <p><b>怎麼用：</b>什麼都不用做——平日早上打開 <b>Gmail</b>，就看到一封「<b>九上 ERP 早報</b>」。內容有：待出貨、逾期未出、最近報價、原料行情。<b>有訂單逾期時，主旨會帶 ⚠️</b>，一眼就知道今天要盯什麼。</p>
           <p><b>小撇步：</b>這封信只寄到你設定的信箱，<b>員工看不到</b>。收不到請工程師確認收件人設定（一次性）。</p>
-          <div class="tip">💰 免費。一天一封，離 Gmail 每天 100 封的上限差得很遠。</div>
+          <div class="tip">免費。一天一封，離 Gmail 每天 100 封的上限差得很遠。</div>
           <a class="gobtn" href="https://mail.google.com" target="_blank" rel="noopener">開啟 Gmail →</a>
         </div>
       </details>
@@ -526,26 +526,26 @@ def render_help_html() -> str:
     <script>(function(){{var u=(window.APP_CONFIG||{{}}).NOTEBOOK_URL;var g=document.getElementById("nbGo");if(g&&u)g.href=u;}})();</script>
 
     <div class="q" id="freq">
-      <h2>⏱️ 各功能多久更新一次？會不會花錢？</h2>
+      <h2>各功能多久更新一次？會不會花錢？</h2>
       <p>大部分資料是<b>系統自動</b>按排程更新，你什麼都不用做；你自己輸入的（訂單／報價／名單）則是<b>一存就進試算表、即時</b>。</p>
       <div class="ftabwrap"><table class="ftab">
         <tr><th>功能</th><th>多久更新一次</th><th>建議</th></tr>
         <tr><td>🔩 原料價 銅／鋁 ＋ 相關新聞</td><td>每天 2 次（早上 10 點、晚上 10 點）</td><td>剛好，維持</td></tr>
         <tr><td>🏭 供應商名單</td><td>每月 1 號</td><td>資料變動慢，維持</td></tr>
         <tr><td>🎯 客戶名單</td><td>每月 1 號</td><td>維持</td></tr>
-        <tr><td>📧 每日早報信</td><td>平日早上約 9 點（週末不寄）</td><td>維持</td></tr>
+        <tr><td>每日早報信</td><td>平日早上約 9 點（週末不寄）</td><td>維持</td></tr>
         <tr><td>🧠 NotebookLM 近況文件</td><td>平日早上約 9 點（週末不更新）</td><td>維持（免費）</td></tr>
         <tr><td>📦 訂單 · 🧮 報價 · 🗂️ 名單／收藏</td><td>即時（你一存就同步）</td><td>—</td></tr>
-        <tr><td>🤖 AI 問答 · 🗣️ 中越翻譯</td><td>即時（你一問就算）</td><td>—</td></tr>
+        <tr><td>🤖 AI 問答 · 中越翻譯</td><td>即時（你一問就算）</td><td>—</td></tr>
       </table></div>
-      <h3>💰 會不會被收費？<b>不會。</b></h3>
+      <h3>會不會被收費？<b>不會。</b></h3>
       <p>整套跑在<b>免費額度</b>上（GitHub＋Google＋免費 AI），關機也會自己在雲端更新，<b>不會跟你收錢</b>。唯一要知道的是免費額度的「<b>每日上限</b>」——超過只是<b>當天暫時擋一下</b>，不是收費：</p>
       <ul>
         <li>🧠 <b>NotebookLM</b>：每天自動更新的只是「寫一份文件」（免費、無限）。你手動生成的<b>「語音摘要」每天次數有限——需要時再生成、別每天狂產</b>。</li>
         <li>🤖 <b>AI 問答／翻譯</b>：免費有每分鐘上限；日常問幾句遠低於，短時間狂刷才會暫時擋，等幾分鐘就好。</li>
-        <li>📧 <b>每日早報</b>：一天一封，離 Gmail 每天 100 封上限差很遠。</li>
+        <li><b>每日早報</b>：一天一封，離 Gmail 每天 100 封上限差很遠。</li>
       </ul>
-      <div class="tip">💡 一句話：<b>正常使用完全免費、不會超量</b>；唯一要節制的是 NotebookLM 的「語音摘要」別每天狂生成。</div>
+      <div class="tip">一句話：<b>正常使用完全免費、不會超量</b>；唯一要節制的是 NotebookLM 的「語音摘要」別每天狂生成。</div>
     </div>
 
     <div class="q">
@@ -573,12 +573,12 @@ def render_help_html() -> str:
 
     <div class="q" id="db">
       <h2>🗂️ 資料庫 ＋ Google 試算表（你的資料存在哪）</h2>
-      <p><b>這是什麼：</b>你在網站上做的<b>收藏、標記、備註、報價、訂單</b>，全部存進公司自己的一份 <b>Google 試算表</b>。所以換手機、換電腦打開，看到的都是同一份、不會不見。（前提是有<b>登入</b>，見上面「🔐 登入」。）</p>
+      <p><b>這是什麼：</b>你在網站上做的<b>收藏、標記、備註、報價、訂單</b>，全部存進公司自己的一份 <b>Google 試算表</b>。所以換手機、換電腦打開，看到的都是同一份、不會不見。（前提是有<b>登入</b>，見上面「登入」。）</p>
 
       <h3>🗂️ 平常這樣用：站內「資料庫」就好，不用開試算表</h3>
       <p>上面導覽列的「🗂️ 資料庫」是<b>站內操作中心</b>——不必打開 Google 試算表，直接在網站上就能管理所有資料（下面詳述）。</p>
 
-      <h3>📊 想看原始的 Google 試算表？（通常用不到）</h3>
+      <h3>想看原始的 Google 試算表？（通常用不到）</h3>
       <ul class="steps">
         <li>到<b>首頁</b>點「🗂️ 九上資料庫」卡片，或站內「🗂️ 資料庫」底部的「開啟原始試算表」。</li>
         <li>會開一個<b>新分頁</b>，就是一般的 Google 試算表，最下面有分頁（訂單、名單…）。</li>
@@ -603,8 +603,8 @@ def render_help_html() -> str:
       <ul>
         <li><b>⭐ 收藏</b>：點名單上的星星收藏；勾「只看收藏」就只顯示收藏的。</li>
         <li><b>狀態</b>：每列可標「已聯絡／合作中／不合適」。</li>
-        <li><b>📝 備註</b>：想記什麼就打在備註欄。</li>
-        <li><b>📅 排提醒</b>：一鍵開 Google 日曆，預填好「拜訪某公司」事件。</li>
+        <li><b>備註</b>：想記什麼就打在備註欄。</li>
+        <li><b>排提醒</b>：一鍵開 Google 日曆，預填好「拜訪某公司」事件。</li>
         <li><b>🧮 報價歷史</b>：報價頁按「存這筆」，紀錄會存進試算表。</li>
       </ul>
       <p>以上全部會同步到公司的 Google 試算表。</p>
@@ -619,19 +619,19 @@ def render_help_html() -> str:
         <li><b>可視化</b>：上方有筆數與各狀態統計、分佈長條圖。</li>
         <li><b>新手</b>：第一次用可按「載入範例資料」看看長怎樣，之後再清掉。</li>
       </ul>
-      <div class="tip">💡 手機上表格會自動變成一張張卡片，好點好讀。需要看原始試算表時，操作中心底部也有「開啟原始試算表」連結。</div>
+      <div class="tip">手機上表格會自動變成一張張卡片，好點好讀。需要看原始試算表時，操作中心底部也有「開啟原始試算表」連結。</div>
       <a class="gobtn" href="db.html">前往資料庫操作中心 →</a>
     </div>
 
     <div class="q" id="faq">
-      <h2>❓ 常見問題</h2>
+      <h2>常見問題</h2>
       <details class="acc" open>
         <summary>登出了怎麼辦？<span class="chev">▾</span></summary>
         <div class="acc-body"><p>再點一次右上角「使用 Google 帳戶登入」就好。收藏／備註都還在（存在試算表裡，不會不見）。</p></div>
       </details>
       <details class="acc">
         <summary>看不到最新資料？<span class="chev">▾</span></summary>
-        <div class="acc-body"><p>按 <kbd>Ctrl</kbd> + <kbd>F5</kbd>（Mac 是 <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>）強制重新整理一次即可。原料價<b>一天更新兩次</b>；供應商／客戶名單<b>每月更新一次</b>；訂單／報價／名單是你一存就即時同步。詳見上面「⏱️ 各功能多久更新一次」。</p></div>
+        <div class="acc-body"><p>按 <kbd>Ctrl</kbd> + <kbd>F5</kbd>（Mac 是 <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>）強制重新整理一次即可。原料價<b>一天更新兩次</b>；供應商／客戶名單<b>每月更新一次</b>；訂單／報價／名單是你一存就即時同步。詳見上面「各功能多久更新一次」。</p></div>
       </details>
       <details class="acc">
         <summary>名單好像只顯示一部分？<span class="chev">▾</span></summary>
@@ -639,7 +639,7 @@ def render_help_html() -> str:
       </details>
       <details class="acc">
         <summary>要錢嗎？<span class="chev">▾</span></summary>
-        <div class="acc-body"><p><b>不用。</b>整套跑在免費服務上（GitHub＋Google＋免費 AI），關機也會自己在雲端更新，不會跟你收錢。唯一要節制的是 NotebookLM 的「語音摘要」別每天狂生成（有每日免費上限）。詳見上面「⏱️ 各功能多久更新一次？會不會花錢？」。</p></div>
+        <div class="acc-body"><p><b>不用。</b>整套跑在免費服務上（GitHub＋Google＋免費 AI），關機也會自己在雲端更新，不會跟你收錢。唯一要節制的是 NotebookLM 的「語音摘要」別每天狂生成（有每日免費上限）。詳見上面「各功能多久更新一次？會不會花錢？」。</p></div>
       </details>
       <details class="acc">
         <summary>右上角🌙是什麼？<span class="chev">▾</span></summary>
@@ -769,7 +769,7 @@ def render_html(history: dict, daily: dict = None, news: list = None) -> str:
         _items = '<div class="mnote" style="padding:14px 4px">（新聞每日自動更新，稍後顯示）</div>'
     news_panel = (
         '<section class="mpanel newspanel">'
-        '<div class="mhead"><div><span class="mname">📰 原料相關新聞</span>'
+        '<div class="mhead"><div><span class="mname">原料相關新聞</span>'
         '<span class="men">了解為什麼會漲跌</span></div></div>'
         f'<div class="newslist">{_items}</div></section>'
     )
@@ -909,25 +909,25 @@ def render_suppliers_html(profile: dict, stats: dict, summary: dict, suppliers: 
     <div class="ai">
       <h2>🏭 {html.escape(summary.get('headline',''))}</h2>
       <div class="row"><div class="lbl">🎯 優先推薦</div><div class="txt">{html.escape(summary.get('recommend',''))}</div></div>
-      <div class="row"><div class="lbl">🔍 評估重點</div><div class="txt">{html.escape(summary.get('evaluate',''))}</div></div>
-      <div class="row"><div class="lbl">💬 詢價 / 打樣</div><div class="txt">{html.escape(summary.get('quote',''))}</div></div>
-      <div class="row"><div class="lbl">⚠️ 風險提醒</div><div class="txt">{html.escape(summary.get('risk',''))}</div></div>
+      <div class="row"><div class="lbl">評估重點</div><div class="txt">{html.escape(summary.get('evaluate',''))}</div></div>
+      <div class="row"><div class="lbl">詢價 / 打樣</div><div class="txt">{html.escape(summary.get('quote',''))}</div></div>
+      <div class="row"><div class="lbl">風險提醒</div><div class="txt">{html.escape(summary.get('risk',''))}</div></div>
     </div>
 
     <div class="grid2">
       <div class="panel"><h3>🗂️ 能力類別分布</h3>{cat_bars}</div>
-      <div class="panel"><h3>📍 供應商所在地</h3>{area_bars}</div>
+      <div class="panel"><h3>供應商所在地</h3>{area_bars}</div>
     </div>
 
     <div class="panel">
-      <h3>🔎 供應商名錄（顯示前 {shown} 家 · 共 {total} 家）</h3>
+      <h3>供應商名錄（顯示前 {shown} 家 · 共 {total} 家）</h3>
       <div class="toolbar" style="padding:0 16px 12px">
         <input id="supSearch" placeholder="搜尋公司 / 地區關鍵字…">
         <select id="supCat"><option value="">全部能力類別</option></select>
         <label class="prionly"><input type="checkbox" id="supNear"> 只看 ⭐ 神岡周邊</label>
         <label class="prionly"><input type="checkbox" id="supFav"> 只看我收藏的</label>
         <select id="supStatus"><option value="">狀態：全部</option><option>已聯絡</option><option>合作中</option><option>不合適</option></select>
-        <div class="btnbar viewbar"><button data-view="list" class="on">📋 清單</button><button data-view="map">🗺️ 地圖</button></div>
+        <div class="btnbar viewbar"><button data-view="list" class="on">清單</button><button data-view="map">地圖</button></div>
         <span class="count" id="supCount"></span>
       </div>
       <div id="supMap" class="supmap" style="display:none"></div>
@@ -1012,10 +1012,10 @@ def render_quote_html(history: dict) -> str:
       <div class="qr"><div class="qk">總成本（料＋工）</div><div class="qv" id="qTotal">—</div></div>
       <div class="qr big"><div class="qk">建議報價</div><div class="qv" id="qQuote">—</div></div>
     </div>
-    <div style="text-align:center;margin:14px 0 18px"><button id="qSave" class="gbtn" style="font-size:14px;padding:9px 18px">💾 存這筆報價</button></div>
+    <div style="text-align:center;margin:14px 0 18px"><button id="qSave" class="gbtn" style="font-size:14px;padding:9px 18px">存這筆報價</button></div>
 
     <div class="panel">
-      <h3>🧾 報價歷史</h3>
+      <h3>報價歷史</h3>
       <div id="qHistory" style="padding:8px 16px 14px"></div>
     </div>
     <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。報價歷史存在瀏覽器（設定 Google 後改存公司試算表、可同步）。</div>
@@ -1091,18 +1091,18 @@ def render_customers_html(profile: dict, stats: dict, summary: dict, customers: 
     <div class="ai">
       <h2>🎯 {html.escape(summary.get('headline',''))}</h2>
       <div class="row"><div class="lbl">🎯 優先鎖定</div><div class="txt">{html.escape(summary.get('target',''))}</div></div>
-      <div class="row"><div class="lbl">📨 如何切入</div><div class="txt">{html.escape(summary.get('approach',''))}</div></div>
-      <div class="row"><div class="lbl">💪 我方賣點</div><div class="txt">{html.escape(summary.get('pitch',''))}</div></div>
-      <div class="row"><div class="lbl">⚠️ 提醒</div><div class="txt">{html.escape(summary.get('risk',''))}</div></div>
+      <div class="row"><div class="lbl">如何切入</div><div class="txt">{html.escape(summary.get('approach',''))}</div></div>
+      <div class="row"><div class="lbl">我方賣點</div><div class="txt">{html.escape(summary.get('pitch',''))}</div></div>
+      <div class="row"><div class="lbl">提醒</div><div class="txt">{html.escape(summary.get('risk',''))}</div></div>
     </div>
 
     <div class="grid2">
       <div class="panel"><h3>🗂️ 目標產業分布</h3>{cat_bars}</div>
-      <div class="panel"><h3>📍 客戶所在地</h3>{area_bars}</div>
+      <div class="panel"><h3>客戶所在地</h3>{area_bars}</div>
     </div>
 
     <div class="panel">
-      <h3>🔎 客戶名錄（顯示前 {shown} 家 · 共 {total} 家）</h3>
+      <h3>客戶名錄（顯示前 {shown} 家 · 共 {total} 家）</h3>
       <div class="toolbar" style="padding:0 16px 12px">
         <input id="custSearch" placeholder="搜尋公司 / 地區關鍵字…">
         <select id="custCat"><option value="">全部產業</option></select>

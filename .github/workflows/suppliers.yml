@@ -24,24 +24,25 @@ jobs:
         with:
           python-version: "3.11"
 
+      # 104 資料源已移除，不再需要瀏覽器——CI 裡最慢的一步（安裝 Chrome）省掉了
       - name: 安裝依賴
-        run: |
-          pip install playwright playwright-stealth httpx anthropic
-          python -m playwright install --with-deps chrome
+        run: pip install httpx anthropic
 
       - name: 執行供應商雷達
         env:
           METALS_DATA_DIR: data
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 第一層，付費
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}           # 第二層，免費額度
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}           # 第一層，免費額度
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 第二層，付費
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python run_suppliers.py
+        run: python run_radar.py suppliers
 
-      - name: 提交名單與儀表板
+      # 快照就是狀態留存機制：每個 commit 即一份快照，下期據此比對變化。
+      # 原始檔（工廠名錄 6 MB ＋ 稅籍 186 MB）跑完即丟，不進版本控制。
+      - name: 提交快照與儀表板
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/suppliers.json docs/suppliers.html || true
+          git add data/snapshot_suppliers_*.json data/runs.json docs/suppliers.html || true
           git commit -m "更新供應商名單 $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]" || echo "無變更"
           git pull --rebase origin main || true
           git push origin HEAD:main

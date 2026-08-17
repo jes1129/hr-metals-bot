@@ -6,6 +6,9 @@ venv/
 dashboard_preview.html
 .modal.toml
 
+# 開放資料下載快取（登記工廠名錄等），數 MB 二進位檔不進 repo
+.cache/
+
 # 內部指南 PDF 不進 repo（公開時避免外流）
 *.pdf
 

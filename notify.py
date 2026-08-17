@@ -13,6 +13,21 @@ import config
 DISCORD_LIMIT = 2000  # Discord 單則訊息字數上限
 
 
+def _safe_print(text: str):
+    """印到主控台而不會因編碼而中斷。
+
+    Windows 主控台預設 cp950，遇到 emoji（如 🏭）會拋 UnicodeEncodeError。
+    這裡是「沒有 webhook 時印出內容預覽」的路徑——本身不影響產出，
+    卻會讓呼叫端誤判為推播失敗，故必須容錯。
+    GitHub Actions 為 UTF-8，不會走到 except。
+    """
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        enc = (getattr(__import__("sys").stdout, "encoding", None) or "utf-8")
+        print(text.encode(enc, "replace").decode(enc, "replace"))
+
+
 def _webhook_url():
     return os.environ.get(config.ENV_DISCORD_WEBHOOK)
 
@@ -70,7 +85,7 @@ def send_embeds(embeds: list, content: str = None) -> bool:
     if not url:
         print("[notify] 缺少 DISCORD_WEBHOOK_URL，略過推送。")
         titles = "、".join(e.get("title", "") for e in embeds)
-        print(f"[notify] embed 預覽（{len(embeds)} 張）：{titles}")
+        _safe_print(f"[notify] embed 預覽（{len(embeds)} 張）：{titles}")
         return False
 
     import httpx  # 延遲匯入（本地可能未裝）
