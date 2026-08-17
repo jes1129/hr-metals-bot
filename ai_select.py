@@ -87,6 +87,9 @@ def _apply(chunk: list, items: list) -> list:
 # ---------------------------------------------------------------------------
 # 驗證層（第三軸：輸出品質）
 # ---------------------------------------------------------------------------
+_CITE_WINDOW = 4        # 視為「引用」的最短片段長度（中文四字已足以指認欄位）
+
+
 def verify(scored: list) -> tuple:
     """檢查理由是否有資料依據。回傳 (通過的 list, 被剔除數)。
 
@@ -94,6 +97,11 @@ def verify(scored: list) -> tuple:
     理由中必須出現輸入資料實際存在的字串片段，否則剔除該筆。
 
     這是本機的確定性檢查，不呼叫模型也不消耗額度。
+
+    註：理由短於 _CITE_WINDOW 時，改以整句比對。原本的寫法會讓三字以內的
+    理由**永遠**通不過（滑動窗口塞不進去，一次都比不到），那是索引的副作用
+    而不是我們的判斷。這種理由本來就沒有資訊量，但要因為「查無依據」被剔除，
+    不能因為長度計算而被剔除。
     """
     ok, dropped = [], 0
     for r in scored:
@@ -101,8 +109,11 @@ def verify(scored: list) -> tuple:
                              " ".join(r.get("tax_names", [])),
                              r.get("area", "")] + r.get("caps", []))
         reason = r.get("ai_reason", "")
-        cited = any(reason[i:i + 4] in haystack
-                    for i in range(max(len(reason) - 3, 0)))
+        if len(reason) < _CITE_WINDOW:
+            cited = bool(reason) and reason in haystack
+        else:
+            cited = any(reason[i:i + _CITE_WINDOW] in haystack
+                        for i in range(len(reason) - _CITE_WINDOW + 1))
         if cited:
             ok.append(r)
         else:
@@ -110,6 +121,49 @@ def verify(scored: list) -> tuple:
     if dropped:
         print(f"[ai_select] 驗證層剔除 {dropped} 筆（理由無資料依據）")
     return ok, dropped
+
+
+# ---------------------------------------------------------------------------
+# 單一供應商的分批評分
+# ---------------------------------------------------------------------------
+_LAYER_OF = {"gemini": "free", "groq": "free", "paid": "paid"}
+
+
+def _score_with(provider: str, system: str, pool: list, run=None) -> tuple:
+    """用**這一家**供應商的額度切批並評分。回傳 (評分結果, 失敗批數, 總批數)。
+
+    批次大小、批次間隔、輸出上限三項全部取自該供應商——不是全域設定。
+    實測差異很大：Gemini 每批 25 家、不必等；Groq 每批 8 家、批次間要等
+    滿一分鐘（TPM 8,000 是每分鐘制）。
+    """
+    p = ai_json.plan(provider)
+    batch = max(p["batch"], 1)
+    total = (len(pool) + batch - 1) // batch
+    print(f"[ai_select] 供應商 {provider}：{len(pool)} 家分 {total} 批，"
+          f"每批 {batch} 家，批次間隔 {p['sleep']} 秒")
+
+    scored, failed = [], 0
+    for i in range(0, len(pool), batch):
+        chunk = pool[i:i + batch]
+        no = i // batch + 1
+        if no > 1 and p["sleep"]:
+            # 只有按分鐘計額度的供應商需要等（Groq）；Gemini 的 sleep 為 0
+            print(f"[ai_select] 等待 {p['sleep']} 秒（該供應商為每分鐘額度制）…")
+            time.sleep(p["sleep"])
+
+        # max_tokens 在 Groq 會被預扣進 TPM，故上限也由供應商決定
+        out, _l = ai_json.call_one(
+            provider, system, {"候選廠商": [_slim(c) for c in chunk]},
+            max_tokens=p["max_tokens"])
+        if not out or not isinstance(out.get("ranked"), list):
+            failed += 1
+            print(f"[ai_select] 第 {no}/{total} 批失敗")
+            continue
+        got = _apply(chunk, out["ranked"])
+        scored.extend(got)
+        print(f"[ai_select] 第 {no}/{total} 批：{len(chunk)} 家 → "
+              f"有效評分 {len(got)} 筆")
+    return scored, failed, total
 
 
 # ---------------------------------------------------------------------------
@@ -133,34 +187,26 @@ def select(profile: dict, radar: dict, cands: list, top_n=None, run=None) -> tup
     pool = cands[:config.AI_POOL]
     system = prompts.radar_rank_system(profile, radar, top_n)
 
-    # 批次大小是「供應商」的性質，不是全域偏好——Gemini 每批 50 家，
-    # Groq 只有 15 家。寫死一個數字就只能遷就最小的那一家。
-    p = ai_json.plan()
-    batch = max(p["batch"], 1)
-    total = (len(pool) + batch - 1) // batch
-    print(f"[ai_select] 供應商 {p['provider']}：{len(pool)} 家分 {total} 批，"
-          f"每批 {batch} 家，批次間隔 {p['sleep']} 秒")
-
-    scored, layer, failed = [], None, 0
-    for i in range(0, len(pool), batch):
-        chunk = pool[i:i + batch]
-        no = i // batch + 1
-        if no > 1 and p["sleep"]:
-            # 只有按分鐘計額度的供應商需要等（Groq）；Gemini 的 sleep 為 0
-            print(f"[ai_select] 等待 {p['sleep']} 秒（該供應商為每分鐘額度制）…")
-            time.sleep(p["sleep"])
-
-        # max_tokens 在 Groq 會被預扣進 TPM，故上限也由供應商決定
-        out, l = ai_json.call(system, {"候選廠商": [_slim(c) for c in chunk]},
-                              max_tokens=p["max_tokens"])
-        if not out or not isinstance(out.get("ranked"), list):
-            failed += 1
-            print(f"[ai_select] 第 {no}/{total} 批失敗")
-            continue
-        got = _apply(chunk, out["ranked"])
-        scored.extend(got)
-        layer = layer or l
-        print(f"[ai_select] 第 {no}/{total} 批：{len(chunk)} 家 → 有效評分 {len(got)} 筆（{l}）")
+    scored, layer, failed, total, used = [], None, 0, 0, None
+    for provider in ai_json.providers():
+        remain = [c for c in pool if c["ban"] not in {r["ban"] for r in scored}]
+        if not remain:
+            break
+        got_here, f, t = _score_with(provider, system, remain, run)
+        if got_here:
+            scored.extend(got_here)
+            layer = layer or _LAYER_OF.get(provider, "free")
+            used = used or provider
+        failed += f
+        total += t
+        if len(scored) >= len(pool):
+            break
+        # 還有沒評到的 → 換下一家供應商，**並照那家的額度重新切批次**。
+        # 這正是實測發現的缺陷：原本批次只在開頭決定一次（照 Gemini 的 50 家），
+        # 換成 Groq 後每批都超過它 8,000 的 TPM，備援從來不可能成功。
+        if provider != ai_json.providers()[-1]:
+            print(f"[ai_select] {provider} 未評完（{len(scored)}/{len(pool)} 家）"
+                  f"→ 換下一家供應商並重切批次")
 
     if not scored:
         return fallback(f"全部 {total} 批皆失敗或無有效評分")
@@ -180,5 +226,6 @@ def select(profile: dict, radar: dict, cands: list, top_n=None, run=None) -> tup
         have = {r["ban"] for r in scored}
         scored += [c for c in cands if c["ban"] not in have][:top_n - len(scored)]
 
-    print(f"[ai_select] 完成：規則前 {len(pool)} 家 → AI 評分 → 全域前 {top_n} 家")
+    print(f"[ai_select] 完成：規則前 {len(pool)} 家 → AI（{used}）評分 "
+          f"{len(scored)} 筆 → 全域前 {top_n} 家")
     return scored[:top_n], layer

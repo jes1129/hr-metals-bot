@@ -21,10 +21,83 @@
 """
 import json
 import os
+import time
 
 import config
 
 _JSON_ONLY = "\n\n只輸出 JSON，不要任何說明文字，不要程式碼框。"
+
+
+def _status(exc):
+    """取 HTTP 狀態碼，取不到回 None。"""
+    resp = getattr(exc, "response", None)
+    return getattr(resp, "status_code", None) if resp is not None else None
+
+
+# 可重試 vs 不可重試——這個區分是實測換來的，不是猜的。
+#   503「需求過高」：Google 的錯誤訊息自己寫「Spikes are usually temporary」
+#   429 額度用盡：等一下就會恢復
+#   413 請求過大：**重試一百次也一樣**，要改的是請求本身
+#   404 模型下架：永久，重試無意義
+_RETRY_STATUS = {429, 500, 502, 503, 504}
+
+
+def _salvage(text: str, key: str) -> dict:
+    """從被截斷的 JSON 裡救出已經完整的物件。
+
+    為什麼需要這個：實測 2026-08-17 正式執行時，Gemini 回了 HTTP 200，但 JSON
+    在第 6,058 字被截斷（輸出撞到上限）。當時的行為是整批 50 家全部丟掉——
+    可是前面四十幾家的評分是**完好的**，只有最後一筆斷在半句話。
+
+    這是本機的確定性處理，不呼叫模型、不消耗額度，把「整批失敗」變成
+    「少幾筆」。以逐字掃描判斷括號深度與字串狀態，故不會被理由文字裡的
+    引號或大括號騙過去。
+    """
+    i = text.find("[", text.find(f'"{key}"'))
+    if i < 0:
+        return {}
+    items, depth, start, in_str, esc = [], 0, -1, False, False
+    for j in range(i + 1, len(text)):
+        c = text[j]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "{":
+            if depth == 0:
+                start = j
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0 and start >= 0:
+                items.append(text[start:j + 1])
+                start = -1
+        elif c == "]" and depth == 0:
+            break
+    out = []
+    for s in items:
+        try:
+            out.append(json.loads(s))
+        except Exception:  # noqa: BLE001
+            pass                      # 斷在半途的那一筆，跳過即可
+    if out:
+        print(f"[ai_json] 回應被截斷，已救回 {len(out)} 筆完整結果")
+    return {key: out} if out else {}
+
+
+def _parse(text: str, salvage_key="ranked"):
+    """先正常解析；失敗才嘗試搶救被截斷的內容。"""
+    try:
+        return json.loads(text)
+    except Exception:  # noqa: BLE001
+        got = _salvage(text, salvage_key)
+        return got or None
 
 
 def _detail(exc, model=None) -> str:
@@ -63,21 +136,44 @@ _CHAIN = (
 )
 
 
-def plan() -> dict:
-    """回傳「實際會用到的那一家」的處理量設定（batch／sleep／max_tokens）。
+def providers() -> list:
+    """回傳目前有金鑰、可依序嘗試的供應商名稱。
 
-    為什麼批次大小不能是一個全域數字：實測 Gemini 每批 50 家、Groq 每批只有
-    15 家（TPM 僅 8,000）。寫成全域就只能遷就最小的那一家，等於白白浪費
-    Gemini 三倍以上的處理量。故由此函式依「哪把金鑰在」決定。
-
-    誠實限制：這是**呼叫前**的預測。若 Gemini 中途失效改用 Groq，批次大小
-    已經定了，那幾批就會超出 Groq 的額度而失敗——但那幾批失敗後仍有內建備援
-    接手，名單不會消失。要完全避免須做動態重切批，複雜度不值得。
+    呼叫端據此**逐家重切批次**——這是實測換來的修正。原本只在開頭決定一次
+    批次大小（照首選的 Gemini 切成 50 家），Gemini 一失敗就換 Groq，但 Groq
+    的額度只吃得下 8 家，於是每一批都回 413。**備援名義上存在，實際上
+    從來不可能成功。** 批次大小必須跟著供應商一起換。
     """
-    for name, env, _fn, _layer in _CHAIN:
-        if _key(env):
-            return dict(config.AI_PROVIDERS[name], provider=name)
-    return dict(config.AI_PROVIDERS["groq"], provider="none")
+    return [n for n, env, _f, _l in _CHAIN if _key(env)]
+
+
+def plan(provider=None) -> dict:
+    """回傳某一家供應商的處理量設定（batch／sleep／max_tokens）。
+
+    為什麼批次大小不能是一個全域數字：實測 Gemini 每批 25 家、Groq 每批只有
+    8 家（TPM 僅 8,000）。寫成全域就只能遷就最小的那一家，等於白白浪費
+    Gemini 三倍的處理量。不給 provider 時回傳降級鏈第一家的設定。
+    """
+    name = provider
+    if not name:
+        avail = providers()
+        name = avail[0] if avail else "none"
+    return dict(config.AI_PROVIDERS.get(name, config.AI_PROVIDERS["groq"]),
+                provider=name)
+
+
+def call_one(provider: str, system: str, payload: dict,
+             temperature=0.0, max_tokens=4000):
+    """只打指定的那一家。供呼叫端自行控制「換供應商就重切批次」的流程。"""
+    for name, env, fn, layer in _CHAIN:
+        if name != provider:
+            continue
+        key = _key(env)
+        if not key:
+            return None, None
+        out = globals()[fn](key, system, payload, temperature, max_tokens)
+        return (out, layer) if out is not None else (None, None)
+    return None, None
 
 
 def _run_chain(order, system, payload, temperature, max_tokens):
@@ -99,7 +195,11 @@ def _run_chain(order, system, payload, temperature, max_tokens):
 
 
 def call(system: str, payload: dict, temperature=0.0, max_tokens=4000):
-    """成本優先：Gemini → Groq → 付費層 → (None, None)。回傳 (parsed, layer)。"""
+    """成本優先：Gemini → Groq → 付費層 → (None, None)。回傳 (parsed, layer)。
+
+    注意：這條路徑**不重切批次**，適合單一請求（如評語）。分批處理請改用
+    `providers()` ＋ `call_one()`，否則換供應商後批次大小會不合（見 providers）。
+    """
     return _run_chain(_CHAIN, system, payload, temperature, max_tokens)
 
 
@@ -133,40 +233,53 @@ def _gemini(key, system, payload, temperature, max_tokens):
     import httpx
 
     model = config.GEMINI_MODEL
-    try:
-        r = httpx.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{model}:generateContent",
-            params={"key": key},
-            json={
-                "systemInstruction": {"parts": [{"text": system + _JSON_ONLY}]},
-                "contents": [{"role": "user", "parts": [
-                    {"text": json.dumps(payload, ensure_ascii=False)}]}],
-                "generationConfig": {
-                    "temperature": temperature,
-                    "responseMimeType": "application/json",
-                    "maxOutputTokens": max_tokens,
-                },
-            },
-            timeout=180,
-        )
-        r.raise_for_status()
-        d = r.json()
-        # 回應可能分成多個 part，必須全部串起來才是完整的 JSON
-        text = "".join(p.get("text", "")
-                       for c in d.get("candidates", [])
-                       for p in c.get("content", {}).get("parts", []))
-        if not text.strip():
-            # 有回應但沒內容——最常見是輸出被 maxOutputTokens 截斷，
-            # 或整段被安全機制擋掉。兩者都要看得出來，否則只會顯示「解析失敗」。
-            fin = (d.get("candidates") or [{}])[0].get("finishReason", "未知")
-            print(f"[ai_json] Gemini 回應無內容（finishReason={fin}）")
+    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+           f"{model}:generateContent")
+    body = {
+        "systemInstruction": {"parts": [{"text": system + _JSON_ONLY}]},
+        "contents": [{"role": "user", "parts": [
+            {"text": json.dumps(payload, ensure_ascii=False)}]}],
+        "generationConfig": {
+            "temperature": temperature,
+            "responseMimeType": "application/json",
+            "maxOutputTokens": max_tokens,
+        },
+    }
+    for attempt in range(config.AI_RETRY + 1):
+        try:
+            r = httpx.post(url, params={"key": key}, json=body, timeout=180)
+            r.raise_for_status()
+            d = r.json()
+            # 回應可能分成多個 part，必須全部串起來才是完整的 JSON
+            text = "".join(p.get("text", "")
+                           for c in d.get("candidates", [])
+                           for p in c.get("content", {}).get("parts", []))
+            if not text.strip():
+                # 有回應但沒內容——最常見是輸出被 maxOutputTokens 吃完
+                # （★ Gemini 3.x 的思考 tokens 也算在裡面），或被安全機制擋掉。
+                # 印出 finishReason，否則只會看到「解析失敗」而查錯方向。
+                fin = (d.get("candidates") or [{}])[0].get("finishReason", "未知")
+                print(f"[ai_json] Gemini 回應無內容（finishReason={fin}）")
+                return None
+            out = _parse(text)
+            if out is None:
+                print(f"[ai_json] Gemini 回應無法解析（{len(text)} 字，"
+                      f"且無可搶救的完整結果）")
+                return None
+            print("[ai_json] 使用 Gemini（" + model + "）。")
+            return out
+        except Exception as e:  # noqa: BLE001
+            code = _status(e)
+            last = attempt >= config.AI_RETRY
+            if code in _RETRY_STATUS and not last:
+                wait = config.AI_RETRY_WAIT * (attempt + 1)
+                print(f"[ai_json] Gemini 暫時性失敗（HTTP {code}），"
+                      f"等 {wait} 秒後重試（第 {attempt + 1} 次）")
+                time.sleep(wait)
+                continue
+            print("[ai_json] Gemini 失敗：" + str(e) + _detail(e, model))
             return None
-        print("[ai_json] 使用 Gemini（" + model + "）。")
-        return json.loads(text)
-    except Exception as e:  # noqa: BLE001
-        print("[ai_json] Gemini 失敗：" + str(e) + _detail(e, model))
-        return None
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -175,30 +288,45 @@ def _gemini(key, system, payload, temperature, max_tokens):
 def _groq(key, system, payload, temperature, max_tokens):
     import httpx
 
-    try:
-        r = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": "Bearer " + key},
-            json={
-                "model": config.GROQ_MODEL,
-                "messages": [
-                    {"role": "system", "content": system + _JSON_ONLY},
-                    {"role": "user",
-                     "content": json.dumps(payload, ensure_ascii=False)},
-                ],
-                "response_format": {"type": "json_object"},
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            },
-            timeout=180,
-        )
-        r.raise_for_status()
-        text = r.json()["choices"][0]["message"]["content"]
-        print("[ai_json] 使用 Groq（" + config.GROQ_MODEL + "）。")
-        return json.loads(text)
-    except Exception as e:  # noqa: BLE001
-        print("[ai_json] Groq 失敗：" + str(e) + _detail(e, config.GROQ_MODEL))
-        return None
+    model = config.GROQ_MODEL
+    body = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system + _JSON_ONLY},
+            {"role": "user",
+             "content": json.dumps(payload, ensure_ascii=False)},
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    for attempt in range(config.AI_RETRY + 1):
+        try:
+            r = httpx.post("https://api.groq.com/openai/v1/chat/completions",
+                           headers={"Authorization": "Bearer " + key},
+                           json=body, timeout=180)
+            r.raise_for_status()
+            text = r.json()["choices"][0]["message"]["content"]
+            out = _parse(text)
+            if out is None:
+                print(f"[ai_json] Groq 回應無法解析（{len(text)} 字）")
+                return None
+            print("[ai_json] 使用 Groq（" + model + "）。")
+            return out
+        except Exception as e:  # noqa: BLE001
+            code = _status(e)
+            last = attempt >= config.AI_RETRY
+            # 413（請求過大）刻意**不重試**——請求本身就超額，重試一百次也一樣。
+            # 該改的是批次大小，而那是呼叫端的事。
+            if code in _RETRY_STATUS and not last:
+                wait = config.AI_RETRY_WAIT * (attempt + 1)
+                print(f"[ai_json] Groq 暫時性失敗（HTTP {code}），"
+                      f"等 {wait} 秒後重試（第 {attempt + 1} 次）")
+                time.sleep(wait)
+                continue
+            print("[ai_json] Groq 失敗：" + str(e) + _detail(e, model))
+            return None
+    return None
 
 
 # ---------------------------------------------------------------------------
