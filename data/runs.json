@@ -108,5 +108,58 @@
    }
   },
   "seconds": 63.3
+ },
+ {
+  "agent": "suppliers",
+  "ts": "2026-08-17T22:42:23+08:00",
+  "stages": {
+   "crossmatch": {
+    "version_changed": true,
+    "factory_total": 100634,
+    "all_factory_bans": 86082,
+    "factory_城市內": 20036,
+    "factory_白名單命中": 12959,
+    "factory_兼營非金屬而剔除": 549,
+    "factory_無有效統編": 1,
+    "factory_去重後": 10771,
+    "tax_pool": 36831,
+    "both": 8574,
+    "only_factory": 2197,
+    "only_tax": 28257,
+    "dropped_no_capability": 2614,
+    "dropped_machine_builder": 4551,
+    "candidates": 1409,
+    "tie_at_top": 1
+   },
+   "changes": {
+    "comparable": true,
+    "new": 0,
+    "gone_closed": 0,
+    "gone_moved": 0,
+    "improved": 0,
+    "partner_alerts": 0
+   },
+   "select": {
+    "top": 50,
+    "layer": "free"
+   }
+  },
+  "layer": "free",
+  "degraded": [
+   {
+    "what": "部分 AI 結果未採用",
+    "why": "失敗 6/7 批；驗證剔除 0 筆"
+   }
+  ],
+  "notified": null,
+  "ok": true,
+  "error": null,
+  "sources": {
+   "factory": {
+    "version": "https://serv.gcis.nat.gov.tw/RDownLoad/Data/statistical/%E7%94%9F%E7%94%A2%E4%B8%AD%E5%B7%A5%E5%BB%A0%E6%B8%85%E5%86%8A.zip",
+    "changed": true
+   }
+  },
+  "seconds": 451.2
  }
 ]
