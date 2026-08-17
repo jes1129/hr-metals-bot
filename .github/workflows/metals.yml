@@ -51,7 +51,20 @@ jobs:
           # 連帶使後面的 commit/push 被 bash -e 中斷（曾導致資料三週未更新而排程仍報成功）。
           git add -A data docs
           git commit -m "更新銅鋁報價 $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]" || echo "無變更"
-          git push origin HEAD:main || echo "push 跳過（與其他推送撞車，不影響本次部署）"
+          # 原本是 `|| echo "push 跳過"`——那會把失敗吞掉，排程仍報成功。
+          # 本檔註解自己記著「曾導致資料三週未更新而排程仍報成功」，即此之故。
+          # 改為重試，且最終失敗大聲失敗。
+          pushed=0
+          for i in 1 2 3 4 5; do
+            if git push origin HEAD:main; then pushed=1; break; fi
+            echo "推送競爭，第 $i 次重試"
+            sleep $((i * 5))
+            git pull --rebase origin main || git rebase --abort || true
+          done
+          if [ "$pushed" != "1" ]; then
+            echo "::error::推送連續 5 次失敗，本期價格未進版本控制"
+            exit 1
+          fi
 
       - name: 上傳 Pages 產物
         uses: actions/upload-pages-artifact@v3

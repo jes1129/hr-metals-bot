@@ -38,51 +38,88 @@ import prompts
 def _slim(rec: dict, full=False) -> dict:
     """送進模型的欄位——只給判斷所需，控制 token 量。
 
-    第一輪 1,400 筆約 4 萬 tokens；第二輪 200 筆給較完整欄位約 1 萬。
+    ★ 中文的 token 密度約為一字一 token，比英文差 3–4 倍。
+      第一輪精簡後每家約 120 tokens；第二輪給完整欄位約 300 tokens。
+      實測教訓：一次送 1,409 家（未精簡）被回 context_length_exceeded。
     """
-    d = {
+    if not full:
+        # 第一輪只判斷「相關／不相關」，用不到地區、資本額、設立年份
+        return {
+            "ban": rec["ban"],
+            "name": rec["name"][:14],
+            "caps": rec.get("caps", []),
+            "product": rec.get("product", "")[:18],
+            "tax": [n[:16] for n in rec.get("tax_names", [])[:2]],
+        }
+    return {
         "ban": rec["ban"],
         "name": rec["name"][:24],
         "caps": rec.get("caps", []),
         "area": rec.get("area", "")[:14],
         "product": rec.get("product", "")[:40],
         "tax": [n[:24] for n in rec.get("tax_names", [])[:4]],
+        "capital": rec.get("capital", ""),
+        "since": rec.get("since", ""),
+        "org": rec.get("org", ""),
+        "near": rec.get("near"),
     }
-    if full:
-        d["capital"] = rec.get("capital", "")
-        d["since"] = rec.get("since", "")
-        d["org"] = rec.get("org", "")
-        d["near"] = rec.get("near")
-    return d
 
 
 # ---------------------------------------------------------------------------
 # 第一輪：快速二分
 # ---------------------------------------------------------------------------
-def round1(profile: dict, radar: dict, cands: list, keep_to: int) -> tuple:
-    """回傳 (保留的候選 list, layer)。失敗回 (None, None) 由呼叫端降級。
+def round1(profile: dict, radar: dict, cands: list, keep_to: int, run=None) -> tuple:
+    """分批快速二分。回傳 (保留的候選 list, layer)。全批皆失敗才回 (None, None)。
 
-    輸入上限 AI_ROUND1_KEEP 在此套用（依規則粗排序取前段）——這是**模型的
-    輸入限制**，不該影響名單本身。若在 crossmatch 就截斷，快照存的會是截斷後
-    的名單，下期在邊界製造假的「新增／消失」。
+    上限 AI_ROUND1_KEEP 在此套用（依規則粗排序取前段）——這是**模型的輸入
+    限制**，不該影響名單本身。若在 crossmatch 就截斷，快照存的會是截斷後的
+    名單，下期在邊界製造假的「新增／消失」。
+
+    **必須分批**：一次送 1,409 家實測被回 context_length_exceeded（中文的
+    token 密度約為英文的 3–4 倍）。
+
+    單批失敗的處理：**保留該批全部**。第一輪的職責是「剔除明顯不相關」，
+    模型做不到時就不剔除——寧可多留給第二輪處理，也不要因一個請求失敗
+    而丟掉整條 AI 路徑。降級會記入執行紀錄。
     """
     if len(cands) > config.AI_ROUND1_KEEP:
-        print(f"[ai_select] 候選 {len(cands):,} 家超過模型輸入上限，"
-              f"取粗排序前 {config.AI_ROUND1_KEEP:,} 家送第一輪")
+        print(f"[ai_select] 候選 {len(cands):,} 家超過第一輪上限，"
+              f"取粗排序前 {config.AI_ROUND1_KEEP:,} 家")
         cands = cands[:config.AI_ROUND1_KEEP]
-    payload = {"候選廠商": [_slim(c) for c in cands]}
-    out, layer = ai_json.call(prompts.radar_screen_system(profile, radar), payload,
-                              max_tokens=8000)
-    if not out or not isinstance(out.get("keep"), list):
-        return None, None
 
-    # 模型只可能「挑選」，不可能「新增」——不在輸入清單中的統編一律丟棄
-    by_ban = {c["ban"]: c for c in cands}
-    kept = [by_ban[b] for b in out["keep"] if b in by_ban]
-    if not kept:
-        print("[ai_select] 第一輪回傳空清單或全部無效 → 視為失敗")
+    system = prompts.radar_screen_system(profile, radar)
+    batch = max(config.AI_ROUND1_BATCH, 1)
+    kept, layer, failed = [], None, 0
+    total_batches = (len(cands) + batch - 1) // batch
+
+    for i in range(0, len(cands), batch):
+        chunk = cands[i:i + batch]
+        no = i // batch + 1
+        out, l = ai_json.call(system, {"候選廠商": [_slim(c) for c in chunk]},
+                              max_tokens=4000)
+        if not out or not isinstance(out.get("keep"), list):
+            failed += 1
+            kept.extend(chunk)          # 剔不掉就不剔——保留該批全部
+            print(f"[ai_select] 第一輪第 {no}/{total_batches} 批失敗 → 該批全數保留")
+            continue
+        layer = layer or l
+        by_ban = {c["ban"]: c for c in chunk}
+        # 模型只可能「挑選」，不可能「新增」——不在輸入清單中的統編一律丟棄
+        picked = [by_ban[b] for b in out["keep"] if b in by_ban]
+        kept.extend(picked)
+        print(f"[ai_select] 第一輪第 {no}/{total_batches} 批："
+              f"{len(chunk)} → {len(picked)} 家（{l}）")
+
+    if failed == total_batches:
+        print("[ai_select] 第一輪全批失敗 → 視為失敗")
         return None, None
-    print(f"[ai_select] 第一輪：{len(cands):,} → {len(kept):,} 家（{layer}）")
+    if failed and run:
+        run.degrade("第一輪部分批次失敗", f"{failed}/{total_batches} 批未經 AI 篩選")
+
+    # 若保留數超過第二輪容量，依規則粗排序取前段
+    kept.sort(key=lambda x: (-x.get("score", 0), x["ban"]))
+    print(f"[ai_select] 第一輪合計：{len(cands):,} → {len(kept):,} 家"
+          f"（{total_batches - failed}/{total_batches} 批成功）")
     return kept[:keep_to], layer
 
 
@@ -172,9 +209,9 @@ def select(profile: dict, radar: dict, cands: list, top_n=None, run=None) -> tup
     if len(cands) <= top_n:
         return fallback(f"候選僅 {len(cands)} 家，未超過 {top_n}，無需 AI 取捨")
 
-    kept, l1 = round1(profile, radar, cands, config.AI_ROUND2_KEEP)
+    kept, l1 = round1(profile, radar, cands, config.AI_ROUND2_KEEP, run=run)
     if kept is None:
-        return fallback("第一輪（快速二分）失敗")
+        return fallback("第一輪（快速二分）全批失敗")
 
     # 難度分流：第一輪收斂比例異常低 → 資訊模糊，直接送付費層
     hard = len(kept) < config.AI_ROUND2_KEEP * 0.3
