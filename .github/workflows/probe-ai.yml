@@ -19,6 +19,11 @@ on:
         description: "只測這些 Groq 模型（逗號分隔，留空=自動挑）"
         required: false
         default: ""
+      real_prompt:
+        description: "用正式流程的提示詞（測思考 tokens 會不會撞上輸出上限）"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read              # 唯讀：不 commit、不部署、不動 data/ 與 docs/
@@ -48,4 +53,5 @@ jobs:
           args="--size ${{ inputs.size }}"
           if [ -n "$PROBE_GEMINI" ]; then args="$args --gemini $PROBE_GEMINI"; fi
           if [ -n "$PROBE_GROQ" ]; then args="$args --groq $PROBE_GROQ"; fi
+          if [ "${{ inputs.real_prompt }}" = "true" ]; then args="$args --real-prompt"; fi
           python scripts/probe_free_models.py $args

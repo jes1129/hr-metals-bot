@@ -3,17 +3,18 @@
 
 處理量由免費層的速率額度決定，不是由設計偏好決定
 --------------------------------------------------
-實測 2026-08-17（Groq 回 413，錯誤內容直接給出限制）：
+額度是拿金鑰實測撞出來的（`scripts/probe_free_models.py`），不是查文件得知：
 
-    service tier `on_demand` tokens per minute (TPM): Limit 8000
+    2026-08-17  Groq   413：tokens per minute (TPM): Limit 8000 → 每批僅 15 家
+    2026-08-17  Gemini gemini-3.6-flash 每批 50 家、50/50 全評、13,600 tokens
 
-真正的瓶頸不是上下文長度（gpt-oss-120b 有 131,072），而是**每分鐘額度**。
-換算後每分鐘只能處理約 20 家（含輸出理由），所以：
+瓶頸不是上下文長度，而是**每分鐘額度**，而且兩家差了三倍以上。
+故每批幾家、要不要等，一律問 `ai_json.plan()`——這裡不假設用的是哪一家。
 
-  ✗ 原設想「AI 從 1,409 家挑 50」需 28 分鐘、28 個請求，任一批 429 即降級
+  ✗ 原設想「AI 從 1,409 家挑 50」在任一免費層都塞不進去
   ✓ 改為「規則收斂到 AI_POOL 家 → AI 分批評分 → 全域前 N 家」
 
-**成本前提直接限制了 AI 能承擔的職責範圍。** 若日後啟用付費層（TPM 高得多），
+**成本前提直接限制了 AI 能承擔的職責範圍。** 若日後啟用付費層（額度高得多），
 把 config.AI_POOL 調大即可放大處理量——分層設計的價值正在於此。
 
 為什麼分批後仍能得到全域排序
@@ -39,9 +40,11 @@ import prompts
 def _slim(rec: dict) -> dict:
     """送進模型的欄位。
 
-    ★ 中文的 token 密度約為一字一 token，比英文差 3–4 倍。
-      每家約 226 字元 ≈ 226 tokens 輸入，加上輸出理由約 150 tokens。
-      20 家/批 ≈ 7,500 tokens，在 8,000 TPM 內。
+    ★ 各家的中文分詞效率差很多，同一份資料的 token 數不同（實測 10 家）：
+        Gemini 3.6-flash    1,313      Groq gpt-oss-20b   1,390
+        Groq compound-mini  2,976
+      在額度極小的免費層，分詞效率直接換算成「能處理幾家」。
+      故欄位一律裁短——每多一個字元，就少評一家。
     """
     return {
         "ban": rec["ban"],
@@ -129,21 +132,27 @@ def select(profile: dict, radar: dict, cands: list, top_n=None, run=None) -> tup
 
     pool = cands[:config.AI_POOL]
     system = prompts.radar_rank_system(profile, radar, top_n)
-    batch = max(config.AI_BATCH, 1)
+
+    # 批次大小是「供應商」的性質，不是全域偏好——Gemini 每批 50 家，
+    # Groq 只有 15 家。寫死一個數字就只能遷就最小的那一家。
+    p = ai_json.plan()
+    batch = max(p["batch"], 1)
     total = (len(pool) + batch - 1) // batch
+    print(f"[ai_select] 供應商 {p['provider']}：{len(pool)} 家分 {total} 批，"
+          f"每批 {batch} 家，批次間隔 {p['sleep']} 秒")
 
     scored, layer, failed = [], None, 0
     for i in range(0, len(pool), batch):
         chunk = pool[i:i + batch]
         no = i // batch + 1
-        if no > 1 and config.AI_BATCH_SLEEP:
-            # TPM 是「每分鐘」額度，連續送就會撞 413
-            print(f"[ai_select] 等待 {config.AI_BATCH_SLEEP} 秒（免費層 TPM 限制）…")
-            time.sleep(config.AI_BATCH_SLEEP)
+        if no > 1 and p["sleep"]:
+            # 只有按分鐘計額度的供應商需要等（Groq）；Gemini 的 sleep 為 0
+            print(f"[ai_select] 等待 {p['sleep']} 秒（該供應商為每分鐘額度制）…")
+            time.sleep(p["sleep"])
 
-        # max_tokens 也計入 TPM，故不可隨意放大
+        # max_tokens 在 Groq 會被預扣進 TPM，故上限也由供應商決定
         out, l = ai_json.call(system, {"候選廠商": [_slim(c) for c in chunk]},
-                              max_tokens=config.AI_BATCH_MAX_TOKENS)
+                              max_tokens=p["max_tokens"])
         if not out or not isinstance(out.get("ranked"), list):
             failed += 1
             print(f"[ai_select] 第 {no}/{total} 批失敗")

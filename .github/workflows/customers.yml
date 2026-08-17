@@ -31,8 +31,10 @@ jobs:
       - name: 執行客戶開發雷達
         env:
           METALS_DATA_DIR: data
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}           # 第一層，免費額度
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 第二層，付費
+          # 第一層放兩個**不同供應商**的免費額度（同 suppliers.yml 的理由）
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}       # 第一層首選，每批 50 家
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}           # 第一層備援，每批 15 家
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 第二層，付費（目前未設定）
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python run_radar.py customers
 

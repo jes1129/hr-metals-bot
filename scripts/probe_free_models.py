@@ -49,6 +49,16 @@ for i, a in enumerate(sys.argv):
         ONLY_GROQ = [x.strip() for x in nxt.split(",") if x.strip()]
 
 
+def _cap(provider: str, default: int) -> int:
+    """取正式設定的輸出上限。設定檔讀不到就用預設值——探測腳本不該因為
+    設定檔改壞而整個跑不起來。"""
+    try:
+        import config
+        return int(config.AI_PROVIDERS[provider]["max_tokens"])
+    except Exception:  # noqa: BLE001
+        return default
+
+
 def hr(t=""):
     print("\n" + "=" * 74)
     if t:
@@ -87,12 +97,33 @@ def sample_payload(n: int) -> dict:
     return {"候選廠商": rows}
 
 
-SYSTEM = (
+_SIMPLE = (
     "你是採購顧問。為輸入中的每一家評分（0-100）並說明理由。"
     "只輸出 JSON 物件："
     '{"ranked":[{"ban":"統編","score":整數,"reason":"一句話，須引用實際欄位"}]}'
     "陣列必須包含輸入中的每一家，不可遺漏。"
 )
+
+
+def _system() -> str:
+    """--real-prompt 時改用正式流程的提示詞。
+
+    這件事必須測：正式提示詞比上面的簡化版長得多、要求的欄位也多，
+    而 Gemini 3.x 把**思考 tokens 也算進 maxOutputTokens**。用簡化提示詞
+    測過就上線，很可能在正式跑時被截斷——而截斷的症狀是「回應無內容」，
+    看起來像解析失敗，會把除錯帶往錯的方向。
+    """
+    if "--real-prompt" not in sys.argv:
+        return _SIMPLE
+    import config
+    import prompts
+    print("  （使用正式提示詞 prompts.radar_rank_system）")
+    return prompts.radar_rank_system(config.SUPPLIER_PROFILE,
+                                     config.RADARS["suppliers"],
+                                     config.DASHBOARD_TOP)
+
+
+SYSTEM = _system()
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +174,8 @@ def probe_gemini(key: str):
             "generationConfig": {
                 "temperature": 0,
                 "responseMimeType": "application/json",
-                "maxOutputTokens": 8192,
+                # 用正式設定的上限，否則測過的與上線跑的不是同一件事
+                "maxOutputTokens": _cap("gemini", 16384),
             },
         }
         try:
@@ -219,7 +251,7 @@ def probe_groq(key: str):
                           "content": json.dumps(sample_payload(SIZE), ensure_ascii=False)}],
             "response_format": {"type": "json_object"},
             "temperature": 0,
-            "max_tokens": 4000,
+            "max_tokens": _cap("groq", 2500),
         }
         try:
             r = httpx.post("https://api.groq.com/openai/v1/chat/completions",
