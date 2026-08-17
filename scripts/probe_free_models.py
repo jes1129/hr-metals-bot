@@ -23,11 +23,13 @@
 用法（需要環境變數提供金鑰）：
     GEMINI_API_KEY=... GROQ_API_KEY=... python scripts/probe_free_models.py
     python scripts/probe_free_models.py --size 20    # 改用 20 家做規模測試
+    python scripts/probe_free_models.py --gemini gemini-3.6-flash,gemini-3.5-flash
 """
 import io
 import json
 import os
 import sys
+import time
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
@@ -35,9 +37,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 SIZE = 10
+ONLY_GEMINI = []     # 指定要測哪些 Gemini 模型（空 = 自動挑 flash 系列）
+ONLY_GROQ = []
 for i, a in enumerate(sys.argv):
-    if a == "--size" and i + 1 < len(sys.argv):
-        SIZE = int(sys.argv[i + 1])
+    nxt = sys.argv[i + 1] if i + 1 < len(sys.argv) else ""
+    if a == "--size" and nxt:
+        SIZE = int(nxt)
+    elif a == "--gemini" and nxt:
+        ONLY_GEMINI = [x.strip() for x in nxt.split(",") if x.strip()]
+    elif a == "--groq" and nxt:
+        ONLY_GROQ = [x.strip() for x in nxt.split(",") if x.strip()]
 
 
 def hr(t=""):
@@ -48,15 +57,34 @@ def hr(t=""):
 
 
 def sample_payload(n: int) -> dict:
-    """用真實形狀的中文廠商資料當測試輸入——中文的 token 密度是關鍵變數。"""
-    one = {
-        "ban": "12345678", "name": "某某精密工業有限公司",
-        "caps": ["代客加工", "表面處理"], "area": "臺中市神岡區社南里",
-        "product": "254金屬加工處理、259其他金屬製品",
-        "tax": ["未分類其他金屬加工處理", "基本金屬表面處理"],
-        "capital": "5000000", "since": "0920121", "org": "有限公司", "near": 4,
-    }
-    return {"候選廠商": [dict(one, ban=f"{10000000 + i}") for i in range(n)]}
+    """用真實形狀的中文廠商資料當測試輸入。
+
+    兩件事刻意做到：
+      1. 中文——token 密度是關鍵變數，各家的分詞器差異很大
+      2. 每家名稱與工法都不同——若全部一模一樣，模型可能合併成一筆回答，
+         就測不出「有沒有漏評」這個真正要測的問題
+    """
+    caps_pool = [["代客加工"], ["表面處理"], ["代客加工", "鍛造"],
+                 ["板金"], ["表面處理", "板金"]]
+    tax_pool = [["未分類其他金屬加工處理"], ["基本金屬表面處理"],
+                ["金屬鍛造業", "未分類其他金屬加工處理"],
+                ["金屬板金製造"], ["電鍍業", "金屬裁剪"]]
+    area_pool = ["臺中市神岡區社南里", "臺中市大雅區秀山里", "臺中市豐原區翁子里",
+                 "臺中市西屯區何厝里", "彰化縣和美鎮塗厝里"]
+    rows = []
+    for i in range(n):
+        rows.append({
+            "ban": f"{10000000 + i * 37}",
+            "name": f"第{i + 1}號精密五金工業有限公司",
+            "caps": caps_pool[i % len(caps_pool)],
+            "area": area_pool[i % len(area_pool)],
+            "product": "254金屬加工處理、259其他金屬製品",
+            "tax": tax_pool[i % len(tax_pool)],
+            "capital": str(1000000 * (i % 9 + 1)),
+            "since": "0920121", "org": "有限公司",
+            "near": 4 - (i % 4),
+        })
+    return {"候選廠商": rows}
 
 
 SYSTEM = (
@@ -95,14 +123,18 @@ def probe_gemini(key: str):
         print(f"  ✗ 列模型例外：{type(e).__name__}: {e}")
         return
 
-    # 挑最可能適用的：flash 系列（快、免費額度較寬）
-    prefer = [n for n in usable if "flash" in n and "thinking" not in n
-              and "image" not in n and "tts" not in n and "live" not in n]
-    prefer.sort(key=lambda n: ("2.5" not in n, "2.0" not in n, n))
+    if ONLY_GEMINI:
+        prefer = ONLY_GEMINI
+    else:
+        # 挑最可能適用的：flash 系列（快、免費額度較寬），排除非文字用途的
+        prefer = [n for n in usable if "flash" in n
+                  and not any(x in n for x in
+                              ("image", "tts", "live", "omni", "banana"))]
+        prefer.sort()
     if not prefer:
         prefer = usable[:3]
 
-    for model in prefer[:3]:
+    for model in prefer:
         hr(f"Gemini {model} — 規模測試（{SIZE} 家中文資料）")
         body = {
             "systemInstruction": {"parts": [{"text": SYSTEM}]},
@@ -115,8 +147,10 @@ def probe_gemini(key: str):
             },
         }
         try:
+            t0 = time.time()
             r = httpx.post(f"{base}/models/{model}:generateContent",
                            params={"key": key}, json=body, timeout=180)
+            secs = time.time() - t0
             if r.status_code != 200:
                 print(f"  ✗ HTTP {r.status_code}")
                 print(f"    {r.text[:420]}")
@@ -132,10 +166,13 @@ def probe_gemini(key: str):
                 ok = "✓"
             except Exception:  # noqa: BLE001
                 got, ok = 0, "✗ JSON 解析失敗"
-            print(f"  {ok} 送 {SIZE} 家 → 回 {got} 筆評分")
+            print(f"  {ok} 送 {SIZE} 家 → 回 {got} 筆評分，耗時 {secs:.1f} 秒")
             print(f"    tokens：輸入 {usage.get('promptTokenCount')} ／ "
                   f"輸出 {usage.get('candidatesTokenCount')} ／ "
                   f"合計 {usage.get('totalTokenCount')}")
+            if usage.get("thoughtsTokenCount"):
+                print(f"    思考 tokens：{usage['thoughtsTokenCount']}"
+                      f"（也計入額度）")
             if got and got < SIZE:
                 print(f"    ⚠️ 少回 {SIZE - got} 筆——指令遵循不完整")
         except Exception as e:  # noqa: BLE001
@@ -166,8 +203,14 @@ def probe_groq(key: str):
     except Exception as e:  # noqa: BLE001
         print(f"  ✗ 例外：{type(e).__name__}: {e}")
 
-    targets = [m for m in models if "gpt-oss" in m or "compound" in m][:3] or models[:2]
-    for model in targets:
+    targets = ONLY_GROQ or [m for m in models
+                            if "gpt-oss" in m or "compound" in m] or models[:2]
+    for idx, model in enumerate(targets):
+        # Groq 的額度是**每分鐘**的，連續測會自己撞自己的 429
+        # （實測 2026-08-17：compound-mini 用掉 3,819 後 gpt-oss-120b 就被擋）
+        if idx:
+            print(f"\n  （等 65 秒讓 Groq 的每分鐘額度重置）")
+            time.sleep(65)
         hr(f"Groq {model} — 規模測試（{SIZE} 家中文資料）")
         body = {
             "model": model,

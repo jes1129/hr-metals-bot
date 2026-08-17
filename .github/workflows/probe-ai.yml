@@ -11,6 +11,14 @@ on:
         description: "每批送幾家廠商（撞額度上限用）"
         required: false
         default: "10"
+      gemini:
+        description: "只測這些 Gemini 模型（逗號分隔，留空=自動挑 flash 系列）"
+        required: false
+        default: ""
+      groq:
+        description: "只測這些 Groq 模型（逗號分隔，留空=自動挑）"
+        required: false
+        default: ""
 
 permissions:
   contents: read              # 唯讀：不 commit、不部署、不動 data/ 與 docs/
@@ -33,4 +41,11 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONIOENCODING: utf-8
-        run: python scripts/probe_free_models.py --size ${{ inputs.size }}
+          PROBE_GEMINI: ${{ inputs.gemini }}
+          PROBE_GROQ: ${{ inputs.groq }}
+        run: |
+          # 用 if 而非 `[ ... ] && ...`：這一步是 bash -e，測試為假會讓整步中止
+          args="--size ${{ inputs.size }}"
+          if [ -n "$PROBE_GEMINI" ]; then args="$args --gemini $PROBE_GEMINI"; fi
+          if [ -n "$PROBE_GROQ" ]; then args="$args --groq $PROBE_GROQ"; fi
+          python scripts/probe_free_models.py $args
