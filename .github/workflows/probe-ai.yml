@@ -1,0 +1,36 @@
+name: 探測免費 AI（唯讀，手動觸發）
+
+# 免費層的失效模式無法從文件推測，只能拿金鑰實測。金鑰只存在 GitHub Secrets，
+# 本機沒有，所以探測必須在 Actions 裡跑。
+#
+# 這個工作流刻意**沒有** schedule：它只在需要判斷「現在哪個免費模型可用」時手動跑。
+on:
+  workflow_dispatch:
+    inputs:
+      size:
+        description: "每批送幾家廠商（撞額度上限用）"
+        required: false
+        default: "10"
+
+permissions:
+  contents: read              # 唯讀：不 commit、不部署、不動 data/ 與 docs/
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安裝依賴
+        run: pip install httpx
+
+      - name: 探測
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          PYTHONIOENCODING: utf-8
+        run: python scripts/probe_free_models.py --size ${{ inputs.size }}
