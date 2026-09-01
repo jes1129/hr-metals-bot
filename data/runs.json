@@ -1,57 +1,5 @@
 [
  {
-  "agent": "customers",
-  "ts": "2026-08-17T23:47:47+08:00",
-  "stages": {
-   "crossmatch": {
-    "version_changed": true,
-    "factory_total": 100634,
-    "all_factory_bans": 86082,
-    "factory_城市內": 20036,
-    "factory_白名單命中": 3756,
-    "factory_兼營非金屬而剔除": 222,
-    "factory_去重後": 3106,
-    "tax_pool": 36831,
-    "both": 1711,
-    "only_factory": 1395,
-    "only_tax": 35120,
-    "dropped_no_capability": 0,
-    "dropped_machine_builder": 0,
-    "candidates": 1711,
-    "tie_at_top": 1711
-   },
-   "changes": {
-    "comparable": false,
-    "new": 0,
-    "gone_closed": 0,
-    "gone_moved": 0,
-    "improved": 0,
-    "partner_alerts": 0
-   },
-   "select": {
-    "top": 50,
-    "layer": "free"
-   }
-  },
-  "layer": "free",
-  "degraded": [
-   {
-    "what": "變化比對",
-    "why": "首次執行，尚無上期快照可比對"
-   }
-  ],
-  "notified": null,
-  "ok": true,
-  "error": null,
-  "sources": {
-   "factory": {
-    "version": "https://serv.gcis.nat.gov.tw/RDownLoad/Data/statistical/%E7%94%9F%E7%94%A2%E4%B8%AD%E5%B7%A5%E5%BB%A0%E6%B8%85%E5%86%8A.zip",
-    "changed": true
-   }
-  },
-  "seconds": 339.2
- },
- {
   "agent": "suppliers",
   "ts": "2026-08-17T22:21:49+08:00",
   "stages": {
@@ -362,5 +310,109 @@
    }
   },
   "seconds": 343.7
+ },
+ {
+  "agent": "customers",
+  "ts": "2026-08-17T23:47:47+08:00",
+  "stages": {
+   "crossmatch": {
+    "version_changed": true,
+    "factory_total": 100634,
+    "all_factory_bans": 86082,
+    "factory_城市內": 20036,
+    "factory_白名單命中": 3756,
+    "factory_兼營非金屬而剔除": 222,
+    "factory_去重後": 3106,
+    "tax_pool": 36831,
+    "both": 1711,
+    "only_factory": 1395,
+    "only_tax": 35120,
+    "dropped_no_capability": 0,
+    "dropped_machine_builder": 0,
+    "candidates": 1711,
+    "tie_at_top": 1711
+   },
+   "changes": {
+    "comparable": false,
+    "new": 0,
+    "gone_closed": 0,
+    "gone_moved": 0,
+    "improved": 0,
+    "partner_alerts": 0
+   },
+   "select": {
+    "top": 50,
+    "layer": "free"
+   }
+  },
+  "layer": "free",
+  "degraded": [
+   {
+    "what": "變化比對",
+    "why": "首次執行，尚無上期快照可比對"
+   }
+  ],
+  "notified": null,
+  "ok": true,
+  "error": null,
+  "sources": {
+   "factory": {
+    "version": "https://serv.gcis.nat.gov.tw/RDownLoad/Data/statistical/%E7%94%9F%E7%94%A2%E4%B8%AD%E5%B7%A5%E5%BB%A0%E6%B8%85%E5%86%8A.zip",
+    "changed": true
+   }
+  },
+  "seconds": 339.2
+ },
+ {
+  "agent": "customers",
+  "ts": "2026-09-01T10:02:30+08:00",
+  "stages": {
+   "crossmatch": {
+    "version_changed": true,
+    "factory_total": 100779,
+    "all_factory_bans": 86164,
+    "factory_城市內": 20094,
+    "factory_白名單命中": 3774,
+    "factory_兼營非金屬而剔除": 224,
+    "factory_去重後": 3116,
+    "tax_pool": 36824,
+    "both": 1720,
+    "only_factory": 1396,
+    "only_tax": 35104,
+    "dropped_no_capability": 0,
+    "dropped_machine_builder": 0,
+    "candidates": 1720,
+    "tie_at_top": 1720
+   },
+   "changes": {
+    "comparable": true,
+    "new": 11,
+    "gone_closed": 0,
+    "gone_moved": 2,
+    "improved": 0,
+    "partner_alerts": 0
+   },
+   "select": {
+    "top": 50,
+    "layer": "free"
+   }
+  },
+  "layer": "free",
+  "degraded": [
+   {
+    "what": "部分 AI 結果未採用",
+    "why": "失敗 1/6 批；驗證剔除 0 筆"
+   }
+  ],
+  "notified": null,
+  "ok": true,
+  "error": null,
+  "sources": {
+   "factory": {
+    "version": "https://serv.gcis.nat.gov.tw/RDownLoad/Data/statistical/%E7%94%9F%E7%94%A2%E4%B8%AD%E5%B7%A5%E5%BB%A0%E6%B8%85%E5%86%8A.zip",
+    "changed": true
+   }
+  },
+  "seconds": 527.0
  }
 ]
