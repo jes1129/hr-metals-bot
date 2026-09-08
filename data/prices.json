@@ -863,6 +863,14 @@
       "rate": 31.503,
       "change": null,
       "change_pct": null
+    },
+    {
+      "ts": "2026-09-08T17:46:30.061415+00:00",
+      "price": 14540.0,
+      "price_twd": 458039,
+      "rate": 31.502,
+      "change": 169.0,
+      "change_pct": 1.18
     }
   ],
   "aluminum": [
@@ -1729,6 +1737,14 @@
       "rate": 31.503,
       "change": null,
       "change_pct": null
+    },
+    {
+      "ts": "2026-09-08T17:46:30.061415+00:00",
+      "price": 3310.0,
+      "price_twd": 104272,
+      "rate": 31.502,
+      "change": 17.5,
+      "change_pct": 0.53
     }
   ],
   "nickel": [
