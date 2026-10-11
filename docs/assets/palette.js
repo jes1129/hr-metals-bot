@@ -16,7 +16,7 @@
     ["admin.html", "行政工作台", "users"], ["admin.html#tab=org", "行政 · 組織與員工", "users"], ["admin.html#tab=shifts", "行政 · 週班表", "calendar"],
     ["admin.html#tab=attendance", "行政 · 出勤", "clock"], ["admin.html#tab=requests", "行政 · 申請簽核", "clipboard"],
     ["admin.html#tab=equip", "行政 · 設備預約", "wrench"], ["admin.html#tab=notices", "行政 · 公告", "bell"],
-    ["assistant.html", "AI 助手", "bot"], ["db.html", "資料庫", "db"], ["help.html", "使用說明", "book"], ["help.html#map", "功能地圖", "book"]
+    ["db.html", "資料庫", "db"], ["help.html", "使用說明", "book"], ["help.html#map", "功能地圖", "book"]
   ];
   // 資料表 → [類別名稱, 圖示, 標題, 補充說明, 所在頁]
   var REC = {

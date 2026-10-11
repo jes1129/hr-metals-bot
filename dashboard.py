@@ -86,7 +86,6 @@ def _nav(active: str) -> str:
         + item("erp", "erp.html", "factory", "ERP 作業")
         + item("admin", "admin.html", "users", "行政工作台")
         + '<div class="side-label">工具</div>'
-        + item("ai", "assistant.html", "bot", "AI 助手")
         + item("db", "db.html", "db", "資料庫")
         + item("help", "help.html", "book", "使用說明")
         + "</nav>"
@@ -135,8 +134,8 @@ def render_home(history: dict, sup_total, sup_near, cust_total=None) -> str:
                 f'<div class="hfbody"><div class="hft">{title}</div><div class="hfl">{note}</div></div>'
                 f'<div class="hfcta">{cta}{_ic("arrow", "after")}</div></a>')
     feat = (
-        _feat("assistant.html", "bot", "AI 助手",
-              "問一句就答：逾期、待出貨、本月概況…＋中越對話（老闆⇄越南員工）。", "問問看")
+        _feat("erp.html", "factory", "ERP 作業",
+              "庫存成本、報價、訂單出貨收款、工單、客戶案件，一頁看本月銷售、毛利與缺料。", "打開 ERP")
         + _feat("https://mail.google.com", "mail", "每日早報信箱",
                 "每天自動收 ERP 早報：待出貨、逾期、原料行情。", "開啟信箱", ext=True)
     )
@@ -317,35 +316,6 @@ def render_admin_html() -> str:
 
 
 # ===========================================================================
-# AI 助手（🤖 快速問答本地即時算 + 自由提問走免費 Gemini）
-# ===========================================================================
-def render_assistant_html() -> str:
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
-    return f"""<!doctype html>
-<html lang="zh-TW">
-<head>
-{_HEAD}
-<title>九上科技 · AI 助手</title>
-</head>
-<body>
-  <div class="wrap">
-    <div class="topbar">{_nav("ai")}{_THEME_BTN}</div>
-    <div class="eyebrow">九上科技 · 智慧儀表板</div>
-    <h1>{_ic('bot')}AI 助手</h1>
-    <div class="sub">問一句就答：逾期、待出貨、本月概況 · 快速問答免設定、免費 · ＋中越對話 · 更新於 {now}</div>
-    <div id="aiView" class="aiview">
-      <div class="dbloading">載入中…（若一直沒出現，請先用右上角「使用 Google 帳戶登入」）</div>
-    </div>
-    <div class="foot">快速問答由系統即時計算（不外傳、免費）。自由提問使用客戶自己的免費 AI 金鑰（Groq，放在 Apps Script）。</div>
-  </div>
-  <script src="assets/app.js?v={_VER}"></script>
-</body>
-</html>"""
-
-
-# ===========================================================================
-# 說明頁（📖 白話使用教學；給非科技用戶）
-# ===========================================================================
 def render_help_html() -> str:
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
     return f"""<!doctype html>
@@ -445,11 +415,11 @@ def render_help_html() -> str:
   <div class="help-main">
     <div class="q">
       <h2>這是什麼？</h2>
-      <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情；一邊管報價、訂單、進銷存與生產（ERP）、客戶與案件、行政（員工、班表、出勤、請假），還有 AI 助手（含中越對話）。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
+      <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情；一邊管報價、訂單、進銷存與生產（ERP）、客戶與案件，以及行政（員工、班表、出勤、請假）。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
       <div class="groups">
         <div class="group"><b>{_ic('bars')}總覽</b><span>今日總覽、原料行情：每天打開先看這兩頁。</span></div>
         <div class="group"><b>{_ic('factory')}營運</b><span>報價試算、訂單看板、ERP 作業、行政工作台：從報價、出貨收款到員工排班。</span></div>
-        <div class="group"><b>{_ic('wrench')}工具</b><span>AI 助手、資料庫、使用說明：查資料、管名單、看教學。</span></div>
+        <div class="group"><b>{_ic('wrench')}工具</b><span>資料庫、使用說明：管名單、看教學。</span></div>
       </div>
       <p class="muted" style="margin-top:10px">選單在左側；手機上在頁面上方，可左右滑動。</p>
       <div class="jumpbox">
@@ -457,7 +427,7 @@ def render_help_html() -> str:
       <div class="jump">
         <a href="#start">新手上路</a><a href="#f-login">登入</a><a href="#f-home">{_ic('home')}首頁</a><a href="#f-metals">{_ic('ingot')}原料</a>
         <a href="#f-quote">{_ic('calc')}報價</a><a href="#f-orders">{_ic('box')}訂單</a><a href="#f-erp">{_ic('factory')}ERP</a><a href="#f-admin">{_ic('users')}行政</a>
-        <a href="#f-ai">{_ic('bot')}助手</a><a href="#f-vn">中越對話</a><a href="#f-notebook">{_ic('notebook')}NotebookLM</a><a href="#f-email">早報信</a>
+        <a href="#f-notebook">{_ic('notebook')}NotebookLM</a><a href="#f-email">早報信</a>
         <a href="#db">{_ic('db')}資料庫/試算表</a><a href="#freq">更新頻率/費用</a><a href="#map">功能地圖</a><a href="#faq">常見問題</a>
       </div>
       </div>
@@ -471,9 +441,8 @@ def render_help_html() -> str:
         <li><b>看行情</b>：原料行情看銅、鋁價格走勢，平常參考用。</li>
         <li><b>報價</b>：客人詢價 → 報價算一算 → 存起來。</li>
         <li><b>轉訂單</b>：接到單 → 訂單「從報價轉單」或「＋新增訂單」，用看板追進度。</li>
-        <li><b>問 AI</b>：助手點按鈕或打字，隨時問「哪些逾期 / 本月概況 / 待出貨」；要跟越南員工溝通就切「中越對話」。</li>
       </ul>
-      <div class="tip">只想輕鬆用？每天開<b>首頁</b>看重點卡片、需要時點 <b>助手</b>問一句，就很夠了。</div>
+      <div class="tip">只想輕鬆用？每天開<b>首頁</b>看重點卡片、需要時開 <b>ERP 作業</b>看總覽，就很夠了。</div>
     </div>
 
     <div class="q">
@@ -501,7 +470,7 @@ def render_help_html() -> str:
           <p><b>怎麼看：</b></p>
           <ul>
             <li>最上面是<b>今日數字</b>：<b>待出貨</b>幾筆、<b>逾期未出</b>幾筆（會標紅）、<b>本月訂單</b>幾筆（登入後才有數字）。</li>
-            <li>下面兩張大卡＝最常用的 <b>AI 助手</b> 和 <b>每日早報</b>，點就進去。</li>
+            <li>下面兩張大卡＝最常用的 <b>ERP 作業</b> 和 <b>每日早報</b>，點就進去。</li>
             <li>再下面「快速前往」小圖示＝其他功能（ERP、原料、報價、資料庫、說明⋯），點一下就到。</li>
           </ul>
           <p><b>小撇步：</b>只想輕鬆用？每天看一眼首頁「逾期未出」有沒有紅字，就大概知道今天要不要盯。</p>
@@ -590,38 +559,6 @@ def render_help_html() -> str:
         </div>
       </details>
 
-      <details class="acc" id="f-ai">
-        <summary>{_ic('bot')}AI 助手 <span class="sm">— 用問的查資料</span><span class="chev">▾</span></summary>
-        <div class="acc-body">
-          <p><b>這是什麼：</b>用問的就能查公司資料、也能教你怎麼用網站。</p>
-          <p><b>怎麼用：</b>登入後，點上面的快速鈕（<b>教我用網站、哪些訂單逾期、本月概況、待出貨</b>），或直接<b>打字問</b>。</p>
-          <p><b>小撇步：</b>想讓它像 ChatGPT 什麼都能聊，要一次性啟用免費 AI（下面步驟，工程師幫忙一次就好）；不設定也能用上面的快速問答。</p>
-          <h3>（選用）啟用「自由提問」：一次性設定（用免費 Groq）</h3>
-          <ol>
-            <li>去 <b>console.groq.com</b> 用 Google 登入，建立免費 API 金鑰（免綁卡，複製起來）。</li>
-            <li>打開公司試算表 → 擴充功能 → Apps Script → 左側 <b>「專案設定」</b>。</li>
-            <li>下方 <b>「指令碼屬性」→ 新增屬性</b>：名稱填 <b>GROQ_API_KEY</b>、值貼上金鑰 → 儲存。</li>
-            <li>回程式碼把最新版 <code>google-apps-script.gs</code> 貼上、重新部署（新版本）即可。</li>
-          </ol>
-          <a class="gobtn" href="assistant.html">前往 AI 助手 →</a>
-        </div>
-      </details>
-
-      <details class="acc" id="f-vn">
-        <summary>中越對話 <span class="sm">— 跟越南員工溝通</span><span class="chev">▾</span></summary>
-        <div class="acc-body">
-          <p><b>這是什麼：</b>讓老闆和越南員工<b>雙向溝通</b>。在「助手」頁的最上方，切到「中越對話」就是。</p>
-          <p><b>怎麼用（超簡單）：</b></p>
-          <ul>
-            <li><b>常用句</b>：點「停機／換刀／小心／休息⋯」任一顆，畫面立刻<b>同時顯示中文＋越南文</b>，把手機拿給對方看就懂。<b>免登入、免設定、即時。</b></li>
-            <li><b>語音</b>：手機沒有越南文鍵盤？按「Nói tiếng Việt」直接<b>用嘴巴講越南文</b>，它自動辨識再翻成中文（講中文也可以）。</li>
-            <li><b>打字翻譯</b>：打一句話按「翻譯」，自動判斷中↔越。</li>
-          </ul>
-          <p><b>小撇步：</b>常用句永遠免費、沒網路也能用；語音／打字翻譯需登入＋啟用免費 AI，語音建議用 <b>Android 版 Chrome</b>（iPhone Safari 多半不支援，會提示改打字）。</p>
-          <a class="gobtn" href="assistant.html">前往 中越對話 →</a>
-        </div>
-      </details>
-
       <details class="acc" id="f-notebook">
         <summary>{_ic('notebook')}NotebookLM 知識庫 <span class="sm">— 進階／選用</span><span class="chev">▾</span></summary>
         <div class="acc-body">
@@ -661,13 +598,11 @@ def render_help_html() -> str:
         <tr><td>每日早報信</td><td>平日早上約 9 點（週末不寄）</td><td>維持</td></tr>
         <tr><td>NotebookLM 近況文件</td><td>平日早上約 9 點（週末不更新）</td><td>維持（免費）</td></tr>
         <tr><td>訂單 · 報價 · 名單／收藏</td><td>即時（你一存就同步）</td><td>—</td></tr>
-        <tr><td>AI 問答 · 中越翻譯</td><td>即時（你一問就算）</td><td>—</td></tr>
       </table></div>
       <h3>會不會被收費？<b>不會。</b></h3>
       <p>整套跑在<b>免費額度</b>上（GitHub＋Google＋免費 AI），關機也會自己在雲端更新，<b>不會跟你收錢</b>。唯一要知道的是免費額度的「<b>每日上限</b>」——超過只是<b>當天暫時擋一下</b>，不是收費：</p>
       <ul>
         <li><b>NotebookLM</b>：每天自動更新的只是「寫一份文件」（免費、無限）。你手動生成的<b>「語音摘要」每天次數有限——需要時再生成、別每天狂產</b>。</li>
-        <li><b>AI 問答／翻譯</b>：免費有每分鐘上限；日常問幾句遠低於，短時間狂刷才會暫時擋，等幾分鐘就好。</li>
         <li><b>每日早報</b>：一天一封，離 Gmail 每天 100 封上限差很遠。</li>
       </ul>
       <div class="tip">一句話：<b>正常使用完全免費、不會超量</b>；唯一要節制的是 NotebookLM 的「語音摘要」別每天狂生成。</div>
@@ -805,8 +740,6 @@ def render_help_html() -> str:
       <a href="#f-orders">{_ic('clipboard')}訂單看板</a>
       <a href="#f-erp">{_ic('factory')}ERP 作業</a>
       <a href="#f-admin">{_ic('users')}行政工作台</a>
-      <a href="#f-ai">{_ic('bot')}AI 助手</a>
-      <a href="#f-vn">{_ic('languages')}中越對話</a>
       <a href="#f-notebook">{_ic('notebook')}NotebookLM</a>
       <a href="#f-email">{_ic('mail')}每日早報信</a>
       <div class="tg">其他</div>
