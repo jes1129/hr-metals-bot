@@ -271,6 +271,21 @@ test("工作日曆：週日不上班、交期算到當天下班、時間可來�
   assert.equal(new Date(cal.toDate(960, true)).getHours(), 0);   // 第一天 08:00 + 16 小時 = 24:00（當天下班）
 });
 
+test("準時優先：EDD 能做到全部準時時，最佳化也一定全部準時；效率優先的平均週期不會比準時優先長", () => {
+  const cfg = D.defaultConfig(); cfg.calendar.start = "2026-10-12";
+  const cal = E.calendar(cfg.calendar), base = D.demoOrders(cal), rnd = E.rngOf(42), orders = [];
+  for (let i = 0; i < 40; i++) {
+    const b = base[i % base.length], rel = Math.floor(rnd() * 12), due = rel + 3 + Math.floor(rnd() * 8);
+    orders.push({ id: "B" + (i + 1), product: b.product, qty: Math.round(b.qty * (0.4 + rnd() * 0.8) / 10) * 10 || 10, release: cal.dayDate(rel), due: cal.dayDate(due), weight: rnd() < 0.15 ? 3 : rnd() < 0.3 ? 2 : 1 });
+  }
+  const M = E.compile(cfg, orders, { cal });
+  const due = E.optimize(M, { weights: { flow: 0.15, tardy: 1, late: 8, out: 6 }, timeLimit: 3000, seed: 3 });
+  assert.equal(due.heur.edd.kpi.tardy, 0, "這組資料 EDD 全部準時");
+  assert.equal(due.kpi.tardy, 0);
+  const eff = E.optimize(M, { weights: { flow: 1, tardy: 0.3, late: 0, out: 6 }, timeLimit: 3000, seed: 3 });
+  assert.ok(eff.kpi.meanF <= due.kpi.meanF + EPS, "效率優先的平均週期較短（或相同）");
+});
+
 test("休假日：國定假日當天不上班，交期落在假日就算前一個工作日下班", () => {
   const cal = E.calendar({ start: "2026-10-12", days: [1, 2, 3, 4, 5, 6], dayStart: 8, hours: 16, holidays: ["2026-10-14", "2026-10-15"] });
   assert.equal(cal.dayDate(0), "2026-10-12");

@@ -273,14 +273,14 @@
       }
     }
     // 結果
-    var C = new Float64Array(n), sumF = 0, maxF = 0, mk = 0, twt = 0, tardy = 0, cnt = 0, hasDue = 0, onTime = 0;
+    var C = new Float64Array(n), sumF = 0, maxF = 0, mk = 0, twt = 0, tardy = 0, cnt = 0, hasDue = 0, onTime = 0, lateW = 0, dueW = 0;
     for (i = 0; i < n; i++) {
       if (act && !act[i]) continue;
       od = M.orders[i]; var c = maxOf(ready[i]); C[i] = c; cnt++;
       var F = c - od.release; sumF += F; if (F > maxF) maxF = F; if (c > mk) mk = c;
-      if (od.due != null) { hasDue++; var T = c - od.due; if (T > 1e-6) { tardy++; twt += od.weight * T; } else onTime++; }
+      if (od.due != null) { hasDue++; dueW += od.weight; var T = c - od.due; if (T > 1e-6) { tardy++; lateW += od.weight; twt += od.weight * T; } else onTime++; }
     }
-    return { C: C, meanF: cnt ? sumF / cnt : 0, maxF: maxF, makespan: mk, twt: twt, tardy: tardy, onTimeRate: hasDue ? onTime / hasDue : 1,
+    return { C: C, meanF: cnt ? sumF / cnt : 0, maxF: maxF, makespan: mk, twt: twt, tardy: tardy, lateFrac: dueW ? lateW / dueW : 0, onTimeRate: hasDue ? onTime / hasDue : 1,
       cost: cost, outFrac: totQty ? outQty / totQty : 0, setups: setups, ops: ops, busy: busy, info: info };
   }
 
@@ -436,12 +436,12 @@
   }
 
   // ===========================================================================
-  // 評估：目標函數（越小越好）＝ 效率 × 平均流程時間 ＋ 準時 × 加權延遲 ＋ 外包比例 ＋ 變動懲罰
+  // 評估：目標函數（越小越好）＝ 效率 × 平均流程時間 ＋ 準時 × 加權延遲 ＋ 延遲單比例（依重要度加權）＋ 外包比例 ＋ 變動懲罰
   //   以「經驗法則」的成績當基準做正規化（經驗法則的平均週期＝1；它的加權延遲＝1）
   // ===========================================================================
   function makeEval(M, o) {
     o = o || {};
-    var w = Object.assign({ flow: 1, tardy: 1, out: 1, stable: 0 }, o.weights || {});
+    var w = Object.assign({ flow: 1, tardy: 1, out: 1, stable: 0, late: 0 }, o.weights || {});
     var base = o.base || { meanF: 1, twt: 0 };
     var F0 = Math.max(1, base.meanF), T0 = Math.max(base.twt, F0 * 0.25);   // 經驗法則都準時時，延遲以「平均週期的 1/4」為一單位
     var ref = o.ref || null, refC = o.refC || null, S = M.S;
@@ -462,7 +462,7 @@
       return 0.5 * p.assign + 0.5 * Math.min(1, p.shift / (0.25 * F0));
     }
     function f(res, X) {
-      return w.flow * res.meanF / F0 + w.tardy * res.twt / T0 + w.out * res.outFrac + (w.stable ? w.stable * instab(X, res) : 0);
+      return w.flow * res.meanF / F0 + w.tardy * res.twt / T0 + w.late * res.lateFrac + w.out * res.outFrac + (w.stable ? w.stable * instab(X, res) : 0);
     }
     f.instab = instab; f.parts = parts;
     return f;
@@ -506,7 +506,7 @@
     var lock = o.lock || null, simBase = lockSim(lock);
     if (o.down) simBase.down = o.down;
     var cv = Number(o.cv) || 0, stochastic = cv > 0;
-    var pop = o.pop || 30, gens = o.gens || 400, timeLimit = o.timeLimit || 15000, cr = o.cr != null ? o.cr : 0.8, mr = o.mr != null ? o.mr : 0.4;
+    var pop = o.pop || 30, gens = o.gens || 100000, timeLimit = o.timeLimit || 15000, cr = o.cr != null ? o.cr : 0.8, mr = o.mr != null ? o.mr : 0.4;
     var n0 = o.n0 || (stochastic ? 3 : 1), delta = o.delta || 10, pstar = o.pcs || 0.9, budget = o.budget || pop * 4;
     var evals = 0, reps = 0, cache = {}, history = [];
     // 凍結的基因（已開工的訂單：拆批不能改、已開工的站機型不能改）
@@ -593,13 +593,30 @@
         if (!moved) break;
       }
     }
-    var stallMax = o.stall || 80;
+    // 卡住（連續 stallMax 代沒進步）就「重啟」：留下目前最好的，其餘換成它的大幅變形＋隨機新排法，
+    // 再繼續演化；連續 restartsMax 次重啟都沒找到更好的，或時間到，才結束（時間拉長就能換到更好的結果）
+    var stallMax = o.stall || 40, restartsMax = o.restarts != null ? o.restarts : 6, restarts = 0;
+    function restartPop() {
+      var out = [best], k, c, m;
+      while (out.length < pop) {
+        var u = r();
+        if (u < 0.5) { c = cloneX(best.X); m = 3 + Math.floor(r() * 5); for (k = 0; k < m; k++) mutate(c); }
+        else if (u < 0.75) c = randomX();
+        else { c = cloneX(P[Math.floor(r() * Math.min(P.length, 10))].X); m = 2 + Math.floor(r() * 4); for (k = 0; k < m; k++) mutate(c); }
+        out.push(make(repair(c)));
+      }
+      return out;
+    }
     for (g = 0; g < gens; g++) {
       runOcba(); sortP();
-      if (!best || P[0].mean < best.mean - 1e-9) { best = P[0]; stall = 0; } else stall++;
+      if (!best || P[0].mean < best.mean - 1e-9) { best = P[0]; stall = 0; restarts = 0; } else stall++;
       history.push({ gen: g, f: best.mean, meanF: best.mf / best.n, twt: best.tw / best.n, onTime: best.ot / best.n, reps: reps, t: Date.now() - t0 });
       if (o.onProgress) o.onProgress({ gen: g, gens: gens, best: { f: best.mean, meanF: best.mf / best.n, twt: best.tw / best.n, onTime: best.ot / best.n }, evals: evals, reps: reps, elapsed: Date.now() - t0, limit: timeLimit });
-      if (Date.now() - t0 > timeLimit || stall >= stallMax) break;
+      if (Date.now() - t0 > timeLimit) break;
+      if (stall >= stallMax) {
+        if (restarts >= restartsMax) break;
+        restarts++; stall = 0; P = restartPop(); sortP(); continue;
+      }
       // ---- 下一代：保留前 50%（菁英），其餘由交配＋突變產生
       var elite = P.slice(0, Math.max(2, Math.floor(pop / 2))), next = elite.slice();
       while (next.length < pop) {
@@ -613,6 +630,8 @@
       // ---- 迭代貪婪（IG）：把最好的方案拆掉幾張單、再一張張插回最好的位置；機型局部搜尋
       var ig = igStep(P[0].X); if (ig) P.push(make(ig));
       var ls = assignStep(P[0].X); if (ls) P.push(make(ls));
+      var pr = promoteStep(P[0].X); if (pr) P.push(make(pr));
+      if (g % 3 === 0) { var os = outStep(P[0].X); if (os) P.push(make(os)); }
       sortP(); P = P.slice(0, pop);
     }
     runOcba(); sortP();
@@ -691,6 +710,39 @@
         var c2 = cloneX(cur); c2.split[worst] = sp; var v3 = quick(c2); if (v3 < curV - 1e-9) { cur = c2; curV = v3; improved = true; }
       }
       return improved ? cur : null;
+    }
+    // 延遲的單往前提：隨機挑一張會延遲的單，試著插到前面幾個位置，取最好的
+    function promoteStep(X) {
+      var res = sim(X, 0), cand = [], i;
+      for (i = 0; i < n; i++) { var od = M.orders[i]; if (od.due != null && res.C[i] > od.due + 1e-6) cand.push(i); }
+      if (!cand.length) return null;
+      var pick = cand[Math.floor(r() * cand.length)], arr = Array.from(X.seq), at = arr.indexOf(pick);
+      var bestV = feval(res, X), bestSeq = null;
+      arr.splice(at, 1);
+      var steps = Math.min(arr.length + 1, 14);
+      for (var k = 0; k < steps; k++) {
+        var pos = Math.round(k * arr.length / Math.max(1, steps - 1));
+        if (pos === at) continue;
+        var c = arr.slice(); c.splice(pos, 0, pick);
+        var cx = cloneX(X); cx.seq = Int32Array.from(c);
+        var v = quick(cx); if (v < bestV - 1e-9) { bestV = v; bestSeq = c; }
+      }
+      if (!bestSeq) return null;
+      var out = cloneX(X); out.seq = Int32Array.from(bestSeq); return out;
+    }
+    // 外包開關：試著把某張單的某一站改成外包（或改回自己做），最多試 30 個，取最好的
+    function outStep(X) {
+      var pairs = [], i, s2;
+      for (i = 0; i < n; i++) for (s2 = 0; s2 < S; s2++) if (!lockA[i * S + s2] && M.orders[i].optType[s2].indexOf(OUT) >= 0 && M.orders[i].optType[s2].length > 1) pairs.push(i * S + s2);
+      if (!pairs.length) return null;
+      shuffle(pairs, r);
+      var res = sim(X, 0), bestV = feval(res, X), best = null;
+      pairs.slice(0, 30).forEach(function (gi) {
+        var oi = Math.floor(gi / S), st = gi % S, ot = M.orders[oi].optType[st], k = ot.indexOf(OUT), c = cloneX(X);
+        c.asg[gi] = X.asg[gi] === k ? (ot[0] === OUT ? 1 : 0) : k;
+        var v = quick(c); if (v < bestV - 1e-9) { bestV = v; best = c; }
+      });
+      return best;
     }
     function hasFree(i) { for (var s = 0; s < S; s++) if (!lockA[i * S + s] && M.orders[i].optType[s].length > 1) return true; return false; }
     function robustness(X, rcv) { return risk(M, X, simBase, rcv, o.robustReps); }

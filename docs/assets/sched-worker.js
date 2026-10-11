@@ -17,7 +17,7 @@ self.onmessage = function (ev) {
     var last = 0;
     var out = E.optimize(M, {
       weights: o.weights, cv: o.cv, timeLimit: o.timeLimit, seed: o.seed, down: o.down, lock: lock, ref: o.ref || null,
-      stall: o.stall, pop: o.pop,
+      stall: o.stall, restarts: o.restarts, pop: o.pop,
       onProgress: function (p) {
         var t = Date.now();
         if (t - last < 120 && p.gen > 0) return;   // 每秒最多回報約 8 次

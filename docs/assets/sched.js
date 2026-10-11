@@ -14,16 +14,16 @@
   var KEY = "sched_state_v1", VER = (document.currentScript && /v=([\w.-]+)/.exec(document.currentScript.src) || [])[1] || "";
   var WD = "日一二三四五六";
   var PRESET = {
-    eff: { label: "效率優先", hint: "訂單越快做完越好（平均生產週期最短）", w: { flow: 1, tardy: 0.3 } },
-    bal: { label: "兩者兼顧", hint: "週期短、又盡量準時（建議）", w: { flow: 1, tardy: 1 } },
-    due: { label: "準時優先", hint: "先保交期，再求快", w: { flow: 0.3, tardy: 1 } }
+    eff: { label: "效率優先", hint: "訂單越快做完越好（平均生產週期最短），準時是其次", w: { flow: 1, tardy: 0.3, late: 0 } },
+    bal: { label: "兩者兼顧", hint: "週期短、又盡量準時（建議）", w: { flow: 1, tardy: 1, late: 1.5 } },
+    due: { label: "準時優先", hint: "先想辦法讓每張單都準時，其次才求快", w: { flow: 0.15, tardy: 1, late: 8 } }
   };
   var OUTS = {
     no: { label: "不主動外包", hint: "只有你自己指定的單才外包", w: 0 },
     need: { label: "必要時外包", hint: "外包能明顯救到交期或縮短週期才建議（建議）", w: 6 },
     free: { label: "積極外包", hint: "只要外包比較快就建議外包（外包費較高）", w: 1 }
   };
-  var SPEED = { fast: { label: "快速", sec: 3, stall: 60 }, std: { label: "標準", sec: 10, stall: 150 }, deep: { label: "深入", sec: 30, stall: 600 } };
+  var SPEED = { fast: { label: "快速", sec: 3, stall: 40, restarts: 3 }, std: { label: "標準", sec: 10, stall: 40, restarts: 8 }, deep: { label: "深入", sec: 30, stall: 50, restarts: 25 } };
   var MODE = { whole: "整批流動", parallel: "拆批平行", batch: "併批" };
   var MODE_HINT = {
     whole: "一張單在一台機台上連續做完，每做好一個子批就先送下一站（例：下料、黏晶）",
@@ -80,13 +80,21 @@
     if (!parts.length) return null;
     try { return JSON.parse(parts.map(function (r) { return r.data; }).join("")); } catch (e) { return null; }
   }
+  function putRows(b, rows) {                        // 一次寫入；舊版後端沒有 tImport 就一筆一筆存
+    return b.call("tImport", { table: "sched", rows: rows, header: ["id", "data"] }).then(function (d) {
+      if (!(d && d.error && /unknown/i.test(String(d.error)))) return d;
+      return rows.reduce(function (pr, r) {
+        return pr.then(function (ok) { return b.call("tUpsert", { table: "sched", row: r, header: ["id", "data"] }).then(function (x) { return ok && !!x && !x.error; }); });
+      }, Promise.resolve(true)).then(function (ok) { return ok ? { ok: true } : { error: "tUpsert failed" }; });
+    });
+  }
   function cloudSave() {
     var b = bridge(); if (!b || !b.authed()) return;
     var rows = blobRows("cfg", S.cfg)
       .concat(blobRows("orders", { orders: S.orders, down: S.down, log: S.log.slice(0, 40), preset: S.preset, noise: S.noise, out: S.out }))
       .concat(blobRows("plan", S.plan));
     var ids = rows.map(function (r) { return r.id; }), stale = (S.cloudIds || []).filter(function (id) { return ids.indexOf(id) < 0; });
-    chain = chain.then(function () { return b.call("tImport", { table: "sched", rows: rows, header: ["id", "data"] }); }).then(function (d) {
+    chain = chain.then(function () { return putRows(b, rows); }).then(function (d) {
       if (!d || d.error) { toast("存到公司試算表失敗（資料還在這台電腦裡），改動後會再試一次。", true); return; }
       S.cloud = true; S.cloudIds = ids; lsSet(KEY, S); paintMode();
       return stale.reduce(function (pr, id) { return pr.then(function () { return b.call("tRemove", { table: "sched", id: id }); }); }, Promise.resolve());
@@ -267,7 +275,7 @@
   function opts(extra) {
     var sp = SPEED[V.speed];
     return Object.assign({ weights: Object.assign({}, PRESET[V.preset].w, { out: OUTS[V.out].w }), noOut: V.out === "no", cv: V.noise ? NOISE : 0,
-      timeLimit: sp.sec * 1000, stall: sp.stall, seed: (Date.now() % 100000) + 1 }, extra || {});
+      timeLimit: sp.sec * 1000, stall: sp.stall, restarts: sp.restarts, seed: (Date.now() % 100000) + 1 }, extra || {});
   }
 
   // 第一次排程／從頭排程：從「現在」開始排，不管之前的進度
@@ -395,7 +403,7 @@
   function controls() {
     var seg = function (name, map, val) {
       return '<div class="btnbar sc-seg" data-seg="' + name + '">' + Object.keys(map).map(function (k) {
-        return '<button type="button" class="' + (val === k ? "on" : "") + '" data-v="' + k + '" title="' + esc(map[k].hint || (map[k].sec ? "最多算 " + map[k].sec + " 秒" : "")) + '">' + esc(map[k].label) + "</button>";
+        return '<button type="button" class="' + (val === k ? "on" : "") + '" data-v="' + k + '" title="' + esc(map[k].hint || (map[k].sec ? "最多算 " + map[k].sec + " 秒（結果穩定了會提早結束）" : "")) + '">' + esc(map[k].label) + "</button>";
       }).join("") + "</div>";
     };
     var has = !!(cur && cur.M);
