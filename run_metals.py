@@ -116,9 +116,6 @@ def main():
             f.write(dashboard.render_admin_html())
     except Exception as e:  # noqa: BLE001
         print("[run_metals] 行政工作台頁產生失敗（略過，不影響其他頁）：", e)
-    # AI 助手（純靜態外殼，快速問答本地算、自由提問走 Gemini）
-    with open(os.path.join("docs", "assistant.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_assistant_html())
     # 原料現況/突破訊號（供 email 早報讀取）
     with open(os.path.join("docs", "signals.json"), "w", encoding="utf-8") as f:
         json.dump(_build_signals(history), f, ensure_ascii=False)

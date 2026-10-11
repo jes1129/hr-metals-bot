@@ -1,4 +1,4 @@
-/* 儀表板互動 — 主題切換 + 銅鋁日線走勢圖(單位切換/期間統計) + 報價/訂單/資料庫/中越對話(對話)
+/* 儀表板互動 — 主題切換 + 銅鋁日線走勢圖(單位切換/期間統計) + 報價/訂單/資料庫(對話)
    等 ERP 模組。資料由頁面內嵌的 window.* 或登入後的試算表提供，無第三方外部請求。 */
 (function () {
   "use strict";
@@ -124,7 +124,6 @@
     // 登入狀態一改變就刷新資料庫操作中心 / 訂單頁 / 首頁數字（顯示/隱藏「未登入」橫幅、載入雲端資料）
     if (window.__refreshConsole) window.__refreshConsole();
     if (window.__refreshOrders) window.__refreshOrders();
-    if (window.__refreshAssistant) window.__refreshAssistant();
     if (window.__refreshHome) window.__refreshHome();
     if (window.__refreshErp) window.__refreshErp();
   }
@@ -1014,102 +1013,6 @@
   // ===========================================================================
   // AI 助手（assistant.html）— 快速問答本地即時算（免設定）；自由提問走 Gemini（Apps Script 代理）
   // ===========================================================================
-  // 中越對話（assistant.html）：常用句免登入即時顯示；語音／打字翻譯走 Apps Script 的免費 AI（Groq）
-  function initAssistant() {
-    var mount = document.getElementById("aiView");
-    if (!mount) return;
-    window.__refreshAssistant = function () {   // 登入後移除「未登入」提示
-      if (!idToken) return;
-      var bn = mount.querySelector(".dbbanner"); if (bn) bn.parentNode.removeChild(bn);
-    };
-
-    // 🗣️ 中越對話（獨立系統）：常用句免登入即時顯示；打字翻譯走現成 Groq
-    var PHRASES = [
-      ["上班打卡", "Chấm công đi làm"], ["下班了", "Tan làm rồi"], ["休息時間", "Giờ nghỉ"],
-      ["來我這裡", "Đến chỗ tôi"], ["去領料", "Đi lấy vật liệu"], ["搬到那邊", "Chuyển sang bên kia"],
-      ["停機", "Dừng máy"], ["換刀", "Thay dao"], ["做完了", "Làm xong rồi"],
-      ["小心危險", "Cẩn thận nguy hiểm"], ["注意安全", "Chú ý an toàn"], ["戴手套/護目鏡", "Đeo găng tay / kính bảo hộ"],
-      ["我不懂", "Tôi không hiểu"], ["等一下", "Đợi một chút"], ["慢一點", "Chậm lại một chút"],
-      ["這樣對嗎？", "Như vậy đúng không?"], ["不對，重做", "Sai rồi, làm lại"], ["好 / OK", "Được / OK"],
-      ["謝謝", "Cảm ơn"], ["辛苦了", "Vất vả rồi"]
-    ];
-    var phrHtml = PHRASES.map(function (p, i) { return '<button class="dbbtn" data-i="' + i + '">' + p[0] + '</button>'; }).join("");
-
-    mount.innerHTML =
-      (!idToken ? '<div class="dbbanner">' + ic("lock") + '尚未登入：常用句可以直接用；語音和打字翻譯需要先登入。</div>' : "")
-      + '<div id="biMode">'
-      + '<div class="bihint">點常用句 → 立刻顯示中文＋越南文；或用語音／打字，按「翻譯」自動判斷中↔越。<br>Bấm câu thường dùng, hoặc dùng giọng nói / gõ chữ rồi bấm Dịch.</div>'
-      + '<div class="biphr">' + phrHtml + '</div>'
-      + '<div class="ailog bilog" id="biLog"></div>'
-      + '<div class="bimic"><button class="dbbtn bimicbtn" data-mic="zh">' + ic("mic") + '說中文</button><button class="dbbtn bimicbtn" data-mic="vi">' + ic("mic") + 'Nói tiếng Việt</button></div>'
-      + '<div class="airow"><input id="biInput" class="dbsearch" placeholder="打中文或越南文… / Gõ tiếng Trung hoặc tiếng Việt…"><button class="dbbtn primary bitr" id="biTr">' + ic("languages") + '翻譯 · Dịch</button></div>'
-      + '<div class="dbfoot">現場口語溝通用；常用句免登入。語音需 Android／桌機 Chrome＋麥克風權限。即時翻譯為機器翻譯，重要文件仍請人工複核。</div>'
-      + '</div>';
-
-    // ── 🗣️ 中越對話（獨立邏輯／獨立對話容器 #biLog）──
-    function biMsg(role, text) {
-      var log = document.getElementById("biLog");
-      var b = document.createElement("div"); b.className = "aimsg " + role; b.textContent = text;
-      log.appendChild(b); log.scrollTop = log.scrollHeight; return b;
-    }
-    function biPair(cn, vi) {
-      var log = document.getElementById("biLog");
-      var b = document.createElement("div"); b.className = "aimsg pair";
-      var c = document.createElement("div"); c.className = "bicn"; c.textContent = cn;
-      var v = document.createElement("div"); v.className = "bivi"; v.textContent = vi;
-      b.appendChild(c); b.appendChild(v);
-      log.appendChild(b); log.scrollTop = log.scrollHeight;
-    }
-    function biTranslate(dir) {
-      var inp = document.getElementById("biInput");
-      var v = (inp && inp.value || "").trim(); if (!v) return; inp.value = "";
-      biMsg("user", v);
-      if (!idToken) { biMsg("ai", "即時翻譯需先用右上角 Google 登入；上面常用句免登入即可用。\nDịch tức thời cần đăng nhập Google trước."); return; }
-      var wait = biMsg("ai", "翻譯中… Đang dịch…");
-      var prompt = (dir === "cn2vi")
-        ? "把以下內容翻成越南文，用詞簡單口語、適合工廠越南籍移工，只回越南文，不要加任何解釋：\n" + v
-        : "把以下越南文翻成繁體中文，口語、簡單，只回中文，不要加任何解釋：\n" + v;
-      dbCall("ai", { question: prompt, context: {} }).then(function (d) {
-        if (d && d.ok && d.text) { wait.textContent = d.text; return; }
-        if (d && d.need_setup) { wait.textContent = "需先啟用免費 AI（見「說明 → 中越對話」，一次就好）。上面常用句可先用。"; return; }
-        if (d && d.error) { wait.textContent = "翻譯失敗：" + d.error; return; }
-        wait.textContent = "暫時無法翻譯（可能未登入或未設定 AI）。";
-      });
-    }
-    // 自動判方向：含中日韓漢字 → 中翻越，否則（越南文拉丁字母）→ 越翻中
-    function autoDir(t) { return /[一-鿿]/.test(t || "") ? "cn2vi" : "vi2cn"; }
-    // 🎤 免費語音輸入（瀏覽器內建 Web Speech API，免金鑰）
-    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    function biVoice(which) {
-      var el = document.getElementById("biInput");
-      if (!SR) { biMsg("ai", "這支手機/瀏覽器不支援語音輸入，請改打字或用上面常用句。語音建議用 Android 版 Chrome。\nThiết bị không hỗ trợ giọng nói — hãy gõ chữ."); return; }
-      var rec = new SR();
-      rec.lang = (which === "zh") ? "zh-TW" : "vi-VN";
-      rec.interimResults = false; rec.maxAlternatives = 1;
-      var btn = mount.querySelector('.bimicbtn[data-mic="' + which + '"]'), old = btn ? btn.innerHTML : "";
-      if (btn) { btn.innerHTML = ic("mic") + "聆聽中… Đang nghe…"; btn.disabled = true; }
-      rec.onresult = function (e) {
-        var t = (e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript) || "";
-        if (t) { el.value = t; biTranslate(which === "zh" ? "cn2vi" : "vi2cn"); }
-      };
-      rec.onerror = function (e) { biMsg("ai", "語音辨識失敗（" + ((e && e.error) || "") + "）。請確認已允許麥克風、有網路。"); };
-      rec.onend = function () { if (btn) { btn.innerHTML = old; btn.disabled = false; } };
-      try { rec.start(); } catch (err) { if (btn) { btn.innerHTML = old; btn.disabled = false; } }
-    }
-
-    biMsg("ai", "這裡讓老闆和越南員工雙向對話\n・點上面常用句 → 立刻同時顯示中文＋越南文，把手機拿給對方看。\n・要講別的話 → 用語音或打字，按「翻譯」自動判斷中↔越。手機沒越南文鍵盤？按「Nói tiếng Việt」直接講。");
-    Array.prototype.forEach.call(mount.querySelectorAll(".biphr [data-i]"), function (b) {
-      b.onclick = function () { var p = PHRASES[+b.getAttribute("data-i")]; biPair(p[0], p[1]); };
-    });
-    Array.prototype.forEach.call(mount.querySelectorAll(".bimic [data-mic]"), function (b) {
-      b.onclick = function () { biVoice(b.getAttribute("data-mic")); };
-    });
-    var biInput = document.getElementById("biInput");
-    document.getElementById("biTr").onclick = function () { var v = (biInput.value || "").trim(); if (v) biTranslate(autoDir(v)); };
-    biInput.addEventListener("keydown", function (e) { if (e.key === "Enter") { var v = (biInput.value || "").trim(); if (v) biTranslate(autoDir(v)); } });
-    window.__refreshAssistant();
-  }
-
   // 首頁「今日數字」大看板：登入後由訂單即時算出（未登入顯示 —）
   function initHome() {
     if (!document.getElementById("stShip")) return;
@@ -1150,7 +1053,6 @@
     if (window.CUSTOMERS_DATA) initCustomers(window.CUSTOMERS_DATA);
     if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
     if (document.getElementById("ordersView")) initOrders();     // 訂單 + 老闆儀表板
-    if (document.getElementById("aiView")) initAssistant();       // 中越對話
     if (document.getElementById("stShip")) initHome();            // 首頁今日數字看板
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
     // 情報下拉：點空白處收起（原生 details 負責開關）
