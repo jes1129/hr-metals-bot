@@ -13,6 +13,8 @@
     ["erp.html#tab=receive", "ERP · 進貨", "truck"], ["erp.html#tab=quotes", "ERP · 報價單", "file"], ["erp.html#tab=orders", "ERP · 銷售訂單", "cart"],
     ["erp.html#tab=mfg", "ERP · BOM／工單", "factory"], ["erp.html#tab=crm", "ERP · 客戶／商機", "users"], ["erp.html#tab=cases", "ERP · 客服案件", "chat"],
     ["erp.html#tab=service", "ERP · 服務交付", "check"], ["erp.html#tab=project", "ERP · 專案", "list"], ["erp.html#tab=moves", "ERP · 異動紀錄", "list"],
+    ["schedule.html", "生產排程", "gantt"], ["schedule.html#tab=orders", "排程 · 訂單", "clipboard"], ["schedule.html#tab=factory", "排程 · 工廠設定", "factory"],
+    ["schedule.html#tab=method", "排程 · 方法說明", "book"],
     ["admin.html", "行政工作台", "users"], ["admin.html#tab=org", "行政 · 組織與員工", "users"], ["admin.html#tab=shifts", "行政 · 週班表", "calendar"],
     ["admin.html#tab=attendance", "行政 · 出勤", "clock"], ["admin.html#tab=requests", "行政 · 申請簽核", "clipboard"],
     ["admin.html#tab=equip", "行政 · 設備預約", "wrench"], ["admin.html#tab=notices", "行政 · 公告", "bell"],

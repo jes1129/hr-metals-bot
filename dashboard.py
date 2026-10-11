@@ -84,6 +84,7 @@ def _nav(active: str) -> str:
         + item("quote", "quote.html", "calc", "報價試算")
         + item("orders", "orders.html", "clipboard", "訂單看板")
         + item("erp", "erp.html", "factory", "ERP 作業")
+        + item("sched", "schedule.html", "gantt", "生產排程")
         + item("admin", "admin.html", "users", "行政工作台")
         + '<div class="side-label">工具</div>'
         + item("db", "db.html", "db", "資料庫")
@@ -149,6 +150,7 @@ def render_home(history: dict, sup_total, sup_near, cust_total=None) -> str:
     quick_items = [
         _q("orders.html", "box", "訂單管理"),
         _q("erp.html", "factory", "ERP 作業"),
+        _q("schedule.html", "gantt", "生產排程"),
         _q("admin.html", "users", "行政工作台"),
         _q("metals.html", "ingot", "原料行情"),
         _q("quote.html", "calc", "報價試算"),
@@ -316,6 +318,40 @@ def render_admin_html() -> str:
 
 
 # ===========================================================================
+# 生產排程（多站多機型排程、插單／急單／外包／機台故障重排、甘特圖）
+#   計算在 docs/assets/sched-engine.js（瀏覽器背景執行緒 sched-worker.js；Node 測試共用），畫面在 sched.js。
+#   設定與排程結果登入後存公司試算表「sched」分頁（通用資料表，免重新部署 Apps Script）；未登入存本機瀏覽器。
+# ===========================================================================
+def render_schedule_html() -> str:
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+{_HEAD}
+<link rel="stylesheet" href="assets/erp.css?v={_VER}">
+<link rel="stylesheet" href="assets/sched.css?v={_VER}">
+<title>九上科技 · 生產排程</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">{_nav("sched")}{_THEME_BTN}</div>
+    <div class="eyebrow">九上科技 · 智慧儀表板</div>
+    <h1>{_ic('gantt')}生產排程</h1>
+    <div class="sub">多站多機台排程 · 插單／急單／外包／機台故障重排 · 甘特圖與準時預測 · 更新於 {now}</div>
+    <div id="schedView" class="erpview">
+      <div class="dbloading">載入中…</div>
+    </div>
+    <div class="foot">排程在你的瀏覽器裡計算，不會把訂單送到任何外部服務。登入後設定與排程存在公司 Google 試算表的「sched」分頁；未登入時只存在這台電腦。方法與文獻見「方法說明」分頁。</div>
+  </div>
+  <script src="assets/sched-engine.js?v={_VER}"></script>
+  <script src="assets/sched-data.js?v={_VER}"></script>
+  <script src="assets/sched.js?v={_VER}"></script>
+  <script src="assets/app.js?v={_VER}"></script>
+</body>
+</html>"""
+
+
+# ===========================================================================
 def render_help_html() -> str:
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
     return f"""<!doctype html>
@@ -418,7 +454,7 @@ def render_help_html() -> str:
       <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情；一邊管報價、訂單、進銷存與生產（ERP）、客戶與案件，以及行政（員工、班表、出勤、請假）。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
       <div class="groups">
         <div class="group"><b>{_ic('bars')}總覽</b><span>今日總覽、原料行情：每天打開先看這兩頁。</span></div>
-        <div class="group"><b>{_ic('factory')}營運</b><span>報價試算、訂單看板、ERP 作業、行政工作台：從報價、出貨收款到員工排班。</span></div>
+        <div class="group"><b>{_ic('factory')}營運</b><span>報價試算、訂單看板、ERP 作業、生產排程、行政工作台：從報價、出貨收款、排產到員工排班。</span></div>
         <div class="group"><b>{_ic('wrench')}工具</b><span>資料庫、使用說明：管名單、看教學。</span></div>
       </div>
       <p class="muted" style="margin-top:10px">選單在左側；手機上在頁面上方，可左右滑動。</p>
@@ -426,7 +462,7 @@ def render_help_html() -> str:
       <p class="muted">點下面任一顆，直接跳到該功能的詳細說明：</p>
       <div class="jump">
         <a href="#start">新手上路</a><a href="#f-login">登入</a><a href="#f-home">{_ic('home')}首頁</a><a href="#f-metals">{_ic('ingot')}原料</a>
-        <a href="#f-quote">{_ic('calc')}報價</a><a href="#f-orders">{_ic('box')}訂單</a><a href="#f-erp">{_ic('factory')}ERP</a><a href="#f-admin">{_ic('users')}行政</a>
+        <a href="#f-quote">{_ic('calc')}報價</a><a href="#f-orders">{_ic('box')}訂單</a><a href="#f-erp">{_ic('factory')}ERP</a><a href="#f-sched">{_ic('gantt')}排程</a><a href="#f-admin">{_ic('users')}行政</a>
         <a href="#f-notebook">{_ic('notebook')}NotebookLM</a><a href="#f-email">早報信</a>
         <a href="#db">{_ic('db')}資料庫/試算表</a><a href="#freq">更新頻率/費用</a><a href="#map">功能地圖</a><a href="#faq">常見問題</a>
       </div>
@@ -539,6 +575,24 @@ def render_help_html() -> str:
           <p><b>誰看得到金額：</b>ERP 會顯示售價、成本、毛利。若只想讓特定人使用，請管理者在 Apps Script「專案設定 → 指令碼屬性」新增 <code>ERP_EMAILS</code>（多個 email 用逗號分隔）。</p>
           <p><b>ERP 設定（管理者做一次）：</b>在同一個 Apps Script 專案新增一個指令碼檔，貼上 repo 的 <code>google-apps-script-erp.gs</code>；把主檔 <code>default:</code> 那一行換成新版；「部署 → 管理部署 → 編輯 → 新版本 → 部署」（網址不變）。詳見 README「ERP 設定」。</p>
           <a class="gobtn" href="erp.html">前往 ERP 作業 →</a>
+        </div>
+      </details>
+
+      <details class="acc" id="f-sched">
+        <summary>{_ic('gantt')}生產排程 <span class="sm">— 哪台機器先做哪張單；插單、急單、外包、機台故障怎麼辦</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p><b>這是什麼：</b>把訂單排進各站的機台，算出每張單什麼時候做完、哪張會延遲、瓶頸在哪，用甘特圖畫出來。從左側選單的「生產排程」進入。<b>電腦在你的瀏覽器裡算，訂單不會送到外部。</b></p>
+          <ol class="steps">
+            <li><b>確認訂單</b>：「訂單」分頁新增，或按「從 ERP 匯入」把還沒做完的工單、未出貨的銷售訂單帶進來（料號要和「工廠設定」裡的產品一樣）。</li>
+            <li><b>確認工廠</b>：「工廠設定」分頁。預設是 下料 → CNC 加工 → 表面處理 → 品檢包裝 四站和常見機型；每件幾分鐘只是示範值，請改成你們的實際工時。站別、台數、上班日和時數都能隨時改。</li>
+            <li><b>開始排程</b>：「排程看板」選目標——<b>效率優先</b>（訂單越快做完越好）、<b>兩者兼顧</b>（建議）、<b>準時優先</b>——按「開始排程」，約 3～30 秒。</li>
+            <li><b>看結果</b>：最上面是白話重點和數字卡；甘特圖每一條橫列是一台機台、顏色＝訂單，<b>點色塊</b>會標出整張單的路線；下面表格有每張單的交期狀況與「準時機率」（加工時間有誤差時準時的機會）。</li>
+            <li><b>臨時狀況</b>：<b>插單、急單、外包、機台故障／保養、取消訂單、改交期或數量</b>——按看板上對應的按鈕，填幾個欄位，系統只重排「還沒開工」的部分，並盡量不大改原計畫，再給你<b>新舊對照</b>；你按「採用新排程」才會生效，不滿意按「放棄」。</li>
+          </ol>
+          <p><b>它怎麼想（白話）：</b>電腦先把整間工廠「模擬」一遍，算出每個方案的結果；再用「演化」的方式從數千種排法裡挑——好的排法留下、互相混合、隨機改一點，一代代變好。同一張單在同一站只用一種機型；每站依性質分三種做法：<b>整批流動</b>（一台做完，做好一批就先送下一站）、<b>拆批平行</b>（拆成子批給多台同時做）、<b>併批</b>（湊成一批一起做，如電鍍、陽極）。開始前會先試「現場經驗做法」（先到先做）、交期優先 EDD、加權急迫度 ATC，作為起點與比較基準，所以最後的綜合成績不會比現場做法差。</p>
+          <p><b>方法與出處：</b>核心是陳建銘（2015，清華大學博士論文；Lin &amp; Chen, 2015, <i>Simulation Modelling Practice and Theory</i>）的「模擬＋基因演算法＋OCBA」，加上迭代貪婪（Ruiz &amp; Stützle, 2007, <i>EJOR</i>）、NEH 插入、ATC 派工、多目標（效率×準時）與插單／機台故障的事件驅動重排程。「方法說明」分頁可以看到本系統算出的結果與論文逐項<b>對答案</b>。</p>
+          <p><b>要注意：</b>系統假設現場<b>照排程在做</b>（時間一到就視為已開工、不再更動）；現場進度和排程不一樣時，請在對話框的「發生時間」調整。工廠設定改過後，請按「從頭排程」。資料登入後存公司試算表的「sched」分頁；同時有人改時，以最後存的為準。</p>
+          <a class="gobtn" href="schedule.html">前往 生產排程 →</a>
         </div>
       </details>
 
@@ -691,7 +745,8 @@ def render_help_html() -> str:
         <tr><td>銷售</td><td>已提供</td><td>報價（版本、轉單）、銷售訂單、分批出貨、收款、退貨、列印</td><td>信用額度控管</td></tr>
         <tr><td>庫存</td><td>已提供</td><td>FIFO 成本、成本批次、盤點調整、異動紀錄、缺料與安全庫存提醒</td><td>多倉庫、序號／批號追溯</td></tr>
         <tr><td>採購</td><td>部分</td><td>進貨單（實際進價入庫）</td><td>請購、採購單核准、供應商對帳</td></tr>
-        <tr><td>製造</td><td>已提供</td><td>BOM 版本、防循環、工單預留／開工／完工、用料成本轉入成品</td><td>產能排程、途程工時</td></tr>
+        <tr><td>製造</td><td>已提供</td><td>BOM 版本、防循環、工單預留／開工／完工、用料成本轉入成品</td><td>設備保養計畫、品質檢驗</td></tr>
+        <tr><td>生產排程</td><td>已提供</td><td>多站多機型排程（整批流動／拆批平行／併批）、換線、插單／急單／外包／機台故障重排、甘特圖、準時機率、和現場做法比較</td><td>現場即時進度回報、物料齊套檢查、人員技能排班</td></tr>
         <tr><td>客戶管理（CRM）</td><td>已提供</td><td>客戶 360、多位聯絡人、商機看板、跟進紀錄</td><td>行銷活動、名單自動化</td></tr>
         <tr><td>客服</td><td>已提供</td><td>客服案件（類別、優先、期限、處理紀錄、結案結果）</td><td>客戶自助入口</td></tr>
         <tr><td>服務交付</td><td>已提供</td><td>確認、交付版次、驗收或要求修改、收款</td><td>合約與續約</td></tr>
@@ -739,6 +794,7 @@ def render_help_html() -> str:
       <a href="#f-quote">{_ic('calc')}報價試算</a>
       <a href="#f-orders">{_ic('clipboard')}訂單看板</a>
       <a href="#f-erp">{_ic('factory')}ERP 作業</a>
+      <a href="#f-sched">{_ic('gantt')}生產排程</a>
       <a href="#f-admin">{_ic('users')}行政工作台</a>
       <a href="#f-notebook">{_ic('notebook')}NotebookLM</a>
       <a href="#f-email">{_ic('mail')}每日早報信</a>

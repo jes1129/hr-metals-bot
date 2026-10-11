@@ -118,6 +118,16 @@ ERP（料號庫存 FIFO、進貨、報價、銷售訂單、BOM／工單、客戶
 
 開發者：ERP 規則只有一份 `docs/assets/erp-engine.js`（瀏覽器與 Apps Script 共用）。改了它或 `gas/erp-adapter.gs` 後執行 `python scripts/build_erp_gas.py` 重新產生 `google-apps-script-erp.gs`，並跑 `node --test tests/erp-engine.test.mjs`。ERP 規則移植自 [mars-tw/freedom-erp-crm](https://github.com/mars-tw/freedom-erp-crm)（MIT License, Copyright (c) 2026 mars-tw）。
 
+### 生產排程（🗓 生產排程頁）
+
+多站別、每站多種機型的**混合流線型排程**（站別預設：下料 → CNC 加工 → 表面處理 → 品檢包裝，可在「工廠設定」隨時改）。選單「生產排程」進入：一鍵最佳化、甘特圖、白話重點、和「現場經驗做法／EDD／ATC」的比較、效率×準時取捨圖，以及**插單、急單、外包、機台故障／保養、取消／完工、改交期／數量**的重排程（已開工的不動、盡量少改原計畫、前後對照後才採用）。
+
+- **不用重新部署 Apps Script**：登入後設定、訂單與採用的排程存進公司試算表的 `sched` 分頁（沿用主檔的通用資料表 `tList／tImport`）；未登入則只存本機瀏覽器。
+- **計算都在瀏覽器**（`sched-worker.js` 背景執行緒），訂單不會送到外部服務。
+- **方法**：陳建銘（2015，清大博士論文）／Lin & Chen（2015, SIMPAT 51:100–114）的「離散事件模擬＋基因演算法＋OCBA」為核心，融合迭代貪婪（Ruiz & Stützle 2007）、NEH 插入、ATC 派工（Vepsalainen & Morton 1987）、多目標（平均週期×加權延遲）與事件驅動重排程（Peng et al. 2019；Uhlmann et al. 2022）。完整文獻在頁面「方法說明」，同一頁也會把系統算的結果和論文範例（50,000／44,000／48,000／42,000）逐項對答案。
+- **檔案**：`docs/assets/sched-engine.js`（引擎，瀏覽器與 Node 測試共用）、`sched-worker.js`、`sched.js`＋`sched.css`（畫面）、`sched-data.js`（預設工廠與範例訂單）。測試：`node --test tests/sched-engine.test.mjs`。
+- **限制**：假設現場照排程進行（沒有「回報實際進度」功能；現場和排程不同時，在對話框改「發生時間」）；不含物料齊套檢查、人員技能排班、各機台各自的上下班時間。
+
 ### 交接給客戶時
 
 程式碼零個資。客戶只需：① 收下這個 repo（或 fork 到客戶 GitHub）② 設客戶自己的 `GROQ_API_KEY`（第一層，免費）或 `ANTHROPIC_API_KEY`（第二層，付費）——**兩者都不設也能跑**，判斷端會落入第三層規則式後備，名單與儀表板照常產出 ③ 照上面用**客戶自己的 Google 帳號**做一次設定。之後整套都在客戶名下，跟你無關。

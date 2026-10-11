@@ -1,0 +1,205 @@
+/* sched.css — 只給 schedule.html 用；沿用 style.css／erp.css 的色彩變數（Industrial 主題） */
+
+/* ---------- 控制列 ---------- */
+.sc-ctl { border-top-color: var(--secondary); }
+.sc-ctl-row { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; }
+.sc-ctl-item { display: flex; align-items: center; gap: 8px; }
+.sc-ctl-item > span { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.sc-seg { flex-wrap: nowrap; }
+.sc-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); cursor: pointer; }
+.sc-check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.sc-ctl-go { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.sc-ctl-hint { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+
+/* ---------- 計算中 ---------- */
+#schedBusy { position: sticky; top: calc(var(--topbar-h) + 6px); z-index: 30; }
+@media (max-width: 860px) { #schedBusy { top: 6px; } }
+.sc-busy { background: color-mix(in srgb, var(--secondary) 12%, var(--card)); border: 1px solid color-mix(in srgb, var(--secondary) 45%, var(--line));
+  border-left: 4px solid var(--accent); padding: 12px 16px; margin-bottom: 14px; }
+.sc-busy-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 13.5px; }
+.sc-busy-top b { display: inline-flex; align-items: center; color: var(--text); }
+.sc-busy-top span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.sc-busy-top .dbbtn { margin-left: auto; padding: 5px 12px; }
+.sc-busy .ic { color: var(--accent); }
+.sc-busy-top b .ic { animation: sc-spin 1.2s linear infinite; }
+@keyframes sc-spin { to { transform: rotate(360deg); } }
+.sc-prog { height: 6px; background: var(--line2); margin: 10px 0 6px; overflow: hidden; }
+.sc-prog i { display: block; height: 100%; background: var(--accent); transition: width .2s linear; }
+.sc-busy-sub { font-size: 12.5px; color: var(--muted); }
+
+/* ---------- 臨時狀況 ---------- */
+.sc-whatif-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.sc-whatif-row > b { display: inline-flex; align-items: center; margin-right: 6px; }
+.sc-whatif-row > b .ic { color: var(--accent); }
+.sc-warn { margin-bottom: 14px; }
+
+/* ---------- KPI ---------- */
+.sc-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.sc-kpi { padding: 12px 13px; min-width: 0; }
+.sc-kpi .v { font-size: 19px; line-height: 1.25; word-break: keep-all; overflow-wrap: anywhere; }
+.sc-kpi.bad { border-left-color: var(--up); }
+.sc-kpi .erp-kpisub { overflow-wrap: anywhere; }
+.sc-delta { font-size: 11.5px; margin-top: 5px; color: var(--muted); }
+.sc-delta.up { color: var(--down); font-weight: 600; }
+.sc-delta.down { color: var(--up); font-weight: 600; }
+@media (max-width: 1280px) { .sc-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .sc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------- 重點（白話） ---------- */
+.sc-ins { border-top-color: var(--accent); }
+.sc-inslist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.sc-inslist li { display: flex; gap: 10px; align-items: flex-start; line-height: 1.7; font-size: 14px; }
+.sc-inslist li > .ic { color: var(--accent); margin: 4px 0 0; flex: none; }
+.sc-inslist li > div { min-width: 0; }
+.sc-inslist .dbmini { margin: 2px 4px 2px 0; }
+
+/* ---------- 甘特圖 ---------- */
+.sc-gantt { position: relative; display: flex; border: 1px solid var(--line); background: var(--card); overflow: hidden; }
+.g-labels { flex: none; border-right: 1px solid var(--line); background: var(--card); z-index: 2; }
+.gl { display: flex; align-items: center; padding: 0 8px; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); box-sizing: border-box; border-bottom: 1px solid var(--line2); }
+.gl.head { background: var(--line2); font-weight: 700; justify-content: space-between; gap: 6px; font-size: 12.5px; }
+.gl.head small { color: var(--muted); font-weight: 400; font-size: 11px; }
+.gl.out { color: var(--muted); font-style: italic; }
+.gl.axis { border-bottom: 1px solid var(--line); background: var(--card); }
+.g-scroll { flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; }
+.g-svg { display: block; font-family: var(--utility-font); }
+.g-day { fill: var(--line2); opacity: .5; }
+.g-dayln { stroke: var(--line); stroke-width: 1; }
+.g-hrln { stroke: var(--line2); stroke-width: 1; }
+.g-axis { fill: var(--text); font-size: 11.5px; font-weight: 700; }
+.g-hr { fill: var(--muted2); font-size: 9.5px; }
+.g-head { fill: var(--line2); }
+.g-rowln { stroke: var(--line2); stroke-width: 1; }
+.g-op rect { stroke: rgba(0,0,0,.28); stroke-width: .6; }
+.g-op { cursor: pointer; transition: opacity .12s; }
+.g-op:hover rect:first-child { filter: brightness(1.15); }
+.g-op.frozen rect:first-child { stroke: var(--text); stroke-width: 1.2; stroke-dasharray: 3 2; }
+.g-op.out rect:first-child { opacity: .78; stroke-dasharray: 5 2; }
+.g-op.dim { opacity: .16; }
+.g-op.hl rect:first-child { stroke: var(--text); stroke-width: 2; }
+.g-lbl { fill: #fff; font-size: 10.5px; pointer-events: none; font-weight: 600; }
+.g-setupbg { fill: transparent; }
+.g-setupln { stroke: rgba(255,255,255,.75); stroke-width: 2; }
+.g-downln { stroke: rgba(255,255,255,.65); stroke-width: 2; }
+.g-down { fill: color-mix(in srgb, var(--up) 55%, transparent); stroke: var(--up); stroke-width: 1; }
+.g-due { stroke: var(--up); stroke-width: 1.6; stroke-dasharray: 4 3; }
+.g-duelbl { fill: var(--up); font-size: 10.5px; font-weight: 700; }
+.g-now { stroke: var(--accent); stroke-width: 2; }
+.g-nowlbl { fill: var(--accent); font-size: 10.5px; font-weight: 700; }
+.g-tip { position: absolute; z-index: 5; pointer-events: none; background: var(--nav-bg); color: var(--nav-text); border: 1px solid var(--nav-line);
+  padding: 8px 11px; font-size: 12.5px; line-height: 1.6; max-width: 280px; box-shadow: var(--shadow-lg); }
+.g-tip[hidden] { display: none; }
+.sc-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12px; color: var(--muted); align-items: center; }
+.sc-legend i { display: inline-block; width: 18px; height: 10px; vertical-align: -1px; margin-right: 5px; border: 1px solid var(--line); }
+.lg-setup { background: repeating-linear-gradient(135deg, var(--muted2) 0 2px, transparent 2px 5px); }
+.lg-frozen { border: 1px dashed var(--text) !important; background: var(--line2); }
+.lg-down { background: color-mix(in srgb, var(--up) 55%, transparent); border-color: var(--up) !important; }
+.lg-now { border: 0 !important; border-left: 2px solid var(--accent) !important; width: 0 !important; height: 12px !important; margin-right: 7px !important; }
+.sc-hl { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 9px 13px; margin-bottom: 10px; font-size: 13.5px; }
+.sc-hl .erp-row { margin-top: 6px; }
+.sc-dot { display: inline-block; width: 10px; height: 10px; margin-right: 7px; vertical-align: -1px; border: 1px solid rgba(0,0,0,.25); }
+
+/* ---------- 訂單進度表 ---------- */
+.sc-otable td { vertical-align: top; }
+.sc-otable .nw, .sc-otable td.nw { white-space: nowrap; }
+.sc-otable tbody tr[data-o] { cursor: pointer; }
+.sc-otable .dbmini { margin: 1px; }
+.sc-hlrow td { background: var(--accent-soft) !important; }
+.sc-route { font-size: 12px; color: var(--muted); min-width: 230px; max-width: 380px; line-height: 1.55; }
+.sc-prob { position: relative; width: 74px; height: 18px; background: var(--line2); }
+.sc-prob i { position: absolute; left: 0; top: 0; bottom: 0; opacity: .55; }
+.sc-prob span { position: relative; display: block; text-align: center; font-size: 12px; line-height: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ---------- 各站忙碌程度 ---------- */
+.sc-ustage { padding: 8px 0 10px; border-bottom: 1px solid var(--line2); }
+.sc-ustage:last-of-type { border-bottom: 0; }
+.sc-urow { display: flex; align-items: center; gap: 10px; }
+.sc-urow > b { flex: 0 0 120px; font-size: 13.5px; }
+.sc-ubar { flex: 1; height: 12px; background: var(--line2); position: relative; }
+.sc-ubar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--muted2); }
+.sc-ustage.hot .sc-ubar i { background: var(--accent); }
+.sc-ubar.sm { height: 7px; flex: 1 1 auto; }
+.sc-uval { flex: 0 0 44px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.sc-units { margin: 6px 0 0 130px; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 3px 16px; }
+.sc-unit { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.sc-unit span { flex: 0 0 82px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-unit em { font-style: normal; flex: 0 0 34px; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .sc-urow > b { flex-basis: 84px; } .sc-units { margin-left: 0; } }
+
+/* ---------- 方法比較 ---------- */
+.sc-mtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sc-mtable th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.sc-mtable td { padding: 8px; border-bottom: 1px solid var(--line2); vertical-align: top; }
+.sc-mtable .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sc-mtable tr.me td { background: var(--accent-soft); }
+.sc-mbar { position: relative; height: 22px; background: var(--line2); min-width: 120px; }
+.sc-mbar i { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--muted2) 55%, transparent); }
+.sc-mtable tr.me .sc-mbar i { background: var(--accent); opacity: .55; }
+.sc-mbar span { position: relative; line-height: 22px; padding-left: 7px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- 圖表 ---------- */
+.sc-chart { width: 100%; min-height: 170px; }
+.sc-svg { display: block; font-family: var(--utility-font); max-width: 100%; }
+.c-line { fill: none; stroke: var(--accent); stroke-width: 2; }
+.c-base { stroke: var(--muted2); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.c-lbl { fill: var(--muted); font-size: 10.5px; }
+.c-tick { fill: var(--muted); font-size: 10.5px; }
+.c-axis { stroke: var(--line); stroke-width: 1; }
+.c-front { fill: none; stroke: var(--muted2); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.c-pt { fill: var(--secondary); stroke: var(--card); stroke-width: 1.5; }
+.c-pt.pick { cursor: pointer; }
+.c-pt.pick:hover { fill: var(--accent); }
+.c-pt.best { fill: var(--accent); stroke: var(--text); stroke-width: 2; }
+.c-ref rect { fill: var(--nav-surface); }
+.c-ref text { fill: var(--muted); font-size: 10.5px; }
+
+/* ---------- 重排結果對照 ---------- */
+.sc-cmp { border-top-color: var(--accent); background: color-mix(in srgb, var(--secondary) 8%, var(--card)); }
+.sc-cmpgrid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(260px, 1fr); gap: 20px; margin-top: 12px; }
+.sc-chlist { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; line-height: 1.9; }
+@media (max-width: 900px) { .sc-cmpgrid { grid-template-columns: 1fr; } }
+
+/* ---------- 其他 ---------- */
+.sc-log { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 1.9; }
+.sc-log li span { display: inline-block; width: 96px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sc-empty p { line-height: 1.8; }
+.sc-toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 20px); z-index: 1200; background: var(--nav-bg); color: var(--nav-text);
+  border-left: 4px solid var(--secondary); padding: 11px 18px; font-size: 13.5px; max-width: min(92vw, 560px); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; box-shadow: var(--shadow-lg); }
+.sc-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.sc-toast.bad { border-left-color: var(--up); background: #5a1f17; }
+
+/* ---------- 設定頁 ---------- */
+.sc-calrow { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: flex-end; }
+.sc-hol { flex: 1 1 280px; min-width: 240px; }
+.sc-hol input { width: 100%; }
+.sc-days { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.sc-day { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--chip-border); padding: 6px 11px; cursor: pointer; font-size: 13.5px; background: var(--card); }
+.sc-day input { accent-color: var(--accent); }
+.sc-cfg input[type="text"], .sc-cfg input:not([type]), .sc-cfg input[type="number"], .sc-cfg select { width: 100%; min-width: 64px; padding: 6px 8px; border: 1px solid var(--chip-border); background: var(--bg); color: var(--text); font: inherit; font-size: 13px; }
+.sc-cfg input[type="number"] { max-width: 96px; }
+.sc-cfg input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+.sc-cfg td { vertical-align: middle; }
+.sc-modehelp { margin: 10px 0 0; padding-left: 20px; line-height: 1.8; }
+.sc-routeedit { display: flex; flex-direction: column; gap: 10px; }
+.sc-rs { border: 1px solid var(--line2); padding: 8px 10px; }
+.sc-rtypes { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; }
+.sc-rtypes label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.sc-rtypes input { width: 112px; padding: 7px 9px; border: 1px solid var(--chip-border); background: var(--bg); color: var(--text); font-size: 14px; }
+.sc-imp { display: flex; flex-direction: column; gap: 4px; max-height: 340px; overflow-y: auto; }
+.sc-impr { display: block; padding: 7px 9px; border: 1px solid var(--line2); font-size: 13px; cursor: pointer; }
+.sc-impr input { margin-right: 8px; accent-color: var(--accent); }
+.sc-impr.no { opacity: .6; cursor: default; }
+.sc-err { min-height: 0; font-size: 13px; }
+.sc-refs { padding-left: 20px; line-height: 1.8; font-size: 13px; color: var(--text); }
+.sc-refs li { margin-bottom: 4px; }
+.sc-method .erp-steps li { margin-bottom: 4px; }
+
+@media (max-width: 760px) {
+  .sc-ctl-go { margin-left: 0; width: 100%; }
+  .sc-ctl-item { flex-wrap: wrap; }
+  .gl { font-size: 11.5px; padding: 0 5px; }
+  .gl.head small { display: none; }
+}
+@media print {
+  .sc-whatif, .sc-ctl, .dbtabs, .topbar, .side { display: none !important; }
+}
