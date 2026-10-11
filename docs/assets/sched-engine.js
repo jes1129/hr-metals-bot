@@ -508,7 +508,7 @@
     var cv = Number(o.cv) || 0, stochastic = cv > 0;
     var pop = o.pop || 30, gens = o.gens || 100000, timeLimit = o.timeLimit || 15000, cr = o.cr != null ? o.cr : 0.8, mr = o.mr != null ? o.mr : 0.4;
     var n0 = o.n0 || (stochastic ? 3 : 1), delta = o.delta || 10, pstar = o.pcs || 0.9, budget = o.budget || pop * 4;
-    var evals = 0, reps = 0, cache = {}, history = [];
+    var evals = 0, reps = 0, cache = {}, history = [], qc = {}, qcN = 0;
     // 凍結的基因（已開工的訂單：拆批不能改、已開工的站機型不能改）
     var lockS = new Uint8Array(n), lockA = new Uint8Array(n * S), free = [];
     if (lock && lock.genes) lock.genes.forEach(function (g, i) {
@@ -593,14 +593,19 @@
         if (!moved) break;
       }
     }
-    // 卡住（連續 stallMax 代沒進步）就「重啟」：留下目前最好的，其餘換成它的大幅變形＋隨機新排法，
-    // 再繼續演化；連續 restartsMax 次重啟都沒找到更好的，或時間到，才結束（時間拉長就能換到更好的結果）
-    var stallMax = o.stall || 40, restartsMax = o.restarts != null ? o.restarts : 6, restarts = 0;
-    function restartPop() {
-      var out = [best], k, c, m;
+    // 卡住（連續 stallMax 代沒進步）時：先試「外包對調」的深度搜尋；沒翻身就「重啟」——
+    //   單數次：獨立重來（啟發式種子的變形＋隨機新排法，不帶目前最好的，避免一直困在同一個山谷）
+    //   雙數次：留著目前最好的，其餘換成它的大幅變形（在好解附近再找）
+    // 連續 restartsMax 次重啟都沒有找到更好的，或時間到，才結束（時間拉長就能換到更好的結果）
+    var stallMax = o.stall || 40, restartsMax = o.restarts != null ? o.restarts : 6, restarts = 0, startBest = null, nRestart = 0;
+    function restartPop(independent) {
+      var out = independent ? [] : [best], k, c, m;
       while (out.length < pop) {
         var u = r();
-        if (u < 0.5) { c = cloneX(best.X); m = 3 + Math.floor(r() * 5); for (k = 0; k < m; k++) mutate(c); }
+        if (independent) {
+          if (u < 0.55) c = randomX();
+          else { c = cloneX(seeds[Math.floor(r() * seeds.length)]); m = 1 + Math.floor(r() * 5); for (k = 0; k < m; k++) mutate(c); }
+        } else if (u < 0.5) { c = cloneX(best.X); m = 3 + Math.floor(r() * 5); for (k = 0; k < m; k++) mutate(c); }
         else if (u < 0.75) c = randomX();
         else { c = cloneX(P[Math.floor(r() * Math.min(P.length, 10))].X); m = 2 + Math.floor(r() * 4); for (k = 0; k < m; k++) mutate(c); }
         out.push(make(repair(c)));
@@ -609,13 +614,16 @@
     }
     for (g = 0; g < gens; g++) {
       runOcba(); sortP();
-      if (!best || P[0].mean < best.mean - 1e-9) { best = P[0]; stall = 0; restarts = 0; } else stall++;
+      if (!startBest || P[0].mean < startBest.mean - 1e-9) { startBest = P[0]; stall = 0; } else stall++;
+      if (!best || P[0].mean < best.mean - 1e-9) { best = P[0]; restarts = 0; }
       history.push({ gen: g, f: best.mean, meanF: best.mf / best.n, twt: best.tw / best.n, onTime: best.ot / best.n, reps: reps, t: Date.now() - t0 });
       if (o.onProgress) o.onProgress({ gen: g, gens: gens, best: { f: best.mean, meanF: best.mf / best.n, twt: best.tw / best.n, onTime: best.ot / best.n }, evals: evals, reps: reps, elapsed: Date.now() - t0, limit: timeLimit });
       if (Date.now() - t0 > timeLimit) break;
       if (stall >= stallMax) {
+        var dp = deepOut(startBest.X);
+        if (dp) { var di = make(repair(dp)); if (di.mean < startBest.mean - 1e-9) { P.push(di); sortP(); P = P.slice(0, pop); stall = 0; continue; } }
         if (restarts >= restartsMax) break;
-        restarts++; stall = 0; P = restartPop(); sortP(); continue;
+        restarts++; nRestart++; stall = 0; startBest = null; P = restartPop(nRestart % 2 === 1); sortP(); continue;
       }
       // ---- 下一代：保留前 50%（菁英），其餘由交配＋突變產生
       var elite = P.slice(0, Math.max(2, Math.floor(pop / 2))), next = elite.slice();
@@ -670,7 +678,11 @@
         c.asg[gi] = Math.floor(r() * M.orders[oi].optType[s].length);
       }
     }
-    function quick(X) { var res = sim(X, 0); return feval(res, X); }
+    function quick(X) {                          // 局部搜尋常重複試同一個方案：算過就直接用（第 0 次模擬的結果固定，可以放心快取）
+      var k = keyX(X), v = qc[k];
+      if (v === undefined) { v = feval(sim(X, 0), X); if (++qcN > 150000) { qc = {}; qcN = 0; } qc[k] = v; }
+      return v;
+    }
     function igStep(X) {
       if (n < 3) return null;
       var d = Math.min(4, Math.max(2, Math.round(n * 0.1))), arr = Array.from(X.seq), removed = [];
@@ -730,17 +742,59 @@
       if (!bestSeq) return null;
       var out = cloneX(X); out.seq = Int32Array.from(bestSeq); return out;
     }
-    // 外包開關：試著把某張單的某一站改成外包（或改回自己做），最多試 30 個，取最好的
-    function outStep(X) {
-      var pairs = [], i, s2;
-      for (i = 0; i < n; i++) for (s2 = 0; s2 < S; s2++) if (!lockA[i * S + s2] && M.orders[i].optType[s2].indexOf(OUT) >= 0 && M.orders[i].optType[s2].length > 1) pairs.push(i * S + s2);
-      if (!pairs.length) return null;
-      shuffle(pairs, r);
-      var res = sim(X, 0), bestV = feval(res, X), best = null;
-      pairs.slice(0, 30).forEach(function (gi) {
-        var oi = Math.floor(gi / S), st = gi % S, ot = M.orders[oi].optType[st], k = ot.indexOf(OUT), c = cloneX(X);
-        c.asg[gi] = X.asg[gi] === k ? (ot[0] === OUT ? 1 : 0) : k;
-        var v = quick(c); if (v < bestV - 1e-9) { bestV = v; best = c; }
+    // 外包候選：①某張單的某一站改成外包（或改回自己做）；②把「已外包的」改回自己做、同時外包另一張（對調）。
+    //   每個候選＝[[基因位置, 新值]…]
+    function outMoves(X, maxToggle, maxSwap) {
+      var pairs = [], on = [], i, s2;
+      for (i = 0; i < n; i++) for (s2 = 0; s2 < S; s2++) {
+        var ot = M.orders[i].optType[s2];
+        if (lockA[i * S + s2] || ot.indexOf(OUT) < 0 || ot.length < 2) continue;
+        pairs.push(i * S + s2);
+        if (X.asg[i * S + s2] === ot.indexOf(OUT)) on.push(i * S + s2);
+      }
+      var moves = [];
+      if (!pairs.length) return moves;
+      function outIdx(gi) { return M.orders[Math.floor(gi / S)].optType[gi % S].indexOf(OUT); }
+      function backIdx(gi) { return M.orders[Math.floor(gi / S)].optType[gi % S][0] === OUT ? 1 : 0; }
+      shuffle(pairs.slice(), r).slice(0, maxToggle).forEach(function (gi) { moves.push([[gi, X.asg[gi] === outIdx(gi) ? backIdx(gi) : outIdx(gi)]]); });
+      var off = pairs.filter(function (gi) { return on.indexOf(gi) < 0; });
+      shuffle(on.slice(), r).slice(0, 3).forEach(function (a) {
+        shuffle(off.slice(), r).slice(0, Math.ceil(maxSwap / 3)).forEach(function (b2) { moves.push([[a, backIdx(a)], [b2, outIdx(b2)]]); });
+      });
+      return moves;
+    }
+    function applyMove(X, mv) { var c = cloneX(X); mv.forEach(function (m) { c.asg[m[0]] = m[1]; }); return c; }
+    function outStep(X) {                        // 每隔幾代試一輪，取最好的
+      var moves = outMoves(X, 24, 30); if (!moves.length) return null;
+      var bestV = quick(X), best = null;
+      moves.forEach(function (mv) { var c = applyMove(X, mv), v = quick(c); if (v < bestV - 1e-9) { bestV = v; best = c; } });
+      return best;
+    }
+    // 把指定的幾張單從順序拿出來，各自插回最好的位置
+    function reinsert(X, list) {
+      var cur = cloneX(X), arr = Array.from(cur.seq);
+      list.forEach(function (o2) {
+        arr.splice(arr.indexOf(o2), 1);
+        var bestV = Infinity, bestArr = null, len = arr.length + 1, step = Math.max(1, Math.floor(len / 20));
+        for (var pos = 0; pos < len; pos += step) {
+          var cand = arr.slice(); cand.splice(pos, 0, o2); cur.seq = Int32Array.from(cand);
+          var v = quick(cur); if (v < bestV) { bestV = v; bestArr = cand; }
+        }
+        arr = bestArr; cur.seq = Int32Array.from(arr);
+      });
+      return cur;
+    }
+    // 卡住時的深度搜尋：外包候選先粗排，前幾名再把牽涉到的單重新插到最好位置，看有沒有翻身的
+    function deepOut(X) {
+      var moves = outMoves(X, 24, 30); if (!moves.length) return null;
+      var scored = moves.map(function (mv) { return { mv: mv, c: null, v: 0 }; });
+      scored.forEach(function (x) { x.c = applyMove(X, x.mv); x.v = quick(x.c); });
+      scored.sort(function (a, b) { return a.v - b.v; });
+      var bestV = quick(X), best = null;
+      scored.slice(0, 4).forEach(function (x) {
+        var ids = x.mv.map(function (m) { return Math.floor(m[0] / S); });
+        var c = reinsert(x.c, ids), v = quick(c);
+        if (v < bestV - 1e-9) { bestV = v; best = c; }
       });
       return best;
     }

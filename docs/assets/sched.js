@@ -23,7 +23,7 @@
     need: { label: "必要時外包", hint: "外包能明顯救到交期或縮短週期才建議（建議）", w: 6 },
     free: { label: "積極外包", hint: "只要外包比較快就建議外包（外包費較高）", w: 1 }
   };
-  var SPEED = { fast: { label: "快速", sec: 3, stall: 40, restarts: 3 }, std: { label: "標準", sec: 10, stall: 40, restarts: 8 }, deep: { label: "深入", sec: 30, stall: 50, restarts: 25 } };
+  var SPEED = { fast: { label: "快速", sec: 3, stall: 40, restarts: 5 }, std: { label: "標準", sec: 10, stall: 40, restarts: 15 }, deep: { label: "深入", sec: 30, stall: 50, restarts: 40 } };
   var MODE = { whole: "整批流動", parallel: "拆批平行", batch: "併批" };
   var MODE_HINT = {
     whole: "一張單在一台機台上連續做完，每做好一個子批就先送下一站（例：下料、黏晶）",
