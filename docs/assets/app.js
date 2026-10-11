@@ -1,4 +1,4 @@
-/* 儀表板互動 — 主題切換 + 銅鋁日線走勢圖(單位切換/期間統計) + 報價/訂單/資料庫/助手(含中越對話)
+/* 儀表板互動 — 主題切換 + 銅鋁日線走勢圖(單位切換/期間統計) + 報價/訂單/資料庫/中越對話(對話)
    等 ERP 模組。資料由頁面內嵌的 window.* 或登入後的試算表提供，無第三方外部請求。 */
 (function () {
   "use strict";
@@ -1014,133 +1014,14 @@
   // ===========================================================================
   // AI 助手（assistant.html）— 快速問答本地即時算（免設定）；自由提問走 Gemini（Apps Script 代理）
   // ===========================================================================
+  // 中越對話（assistant.html）：常用句免登入即時顯示；語音／打字翻譯走 Apps Script 的免費 AI（Groq）
   function initAssistant() {
     var mount = document.getElementById("aiView");
     if (!mount) return;
-    function num(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
-    function nt(n) { return "NT$ " + Math.round(n).toLocaleString(); }
-    function today() { var d = new Date(); return d.getFullYear() + "-" + zz(d.getMonth() + 1) + "-" + zz(d.getDate()); }
-    function zz(n) { return (n < 10 ? "0" : "") + n; }
-    function D(t) { return lsGet("console_" + t, []) || []; }
-
-    function pullAll() {
+    window.__refreshAssistant = function () {   // 登入後移除「未登入」提示
       if (!idToken) return;
-      var bn = mount.querySelector(".dbbanner"); if (bn) bn.parentNode.removeChild(bn);  // 登入後移除「未登入」提示
-      ["orders"].forEach(function (t) { dbCall("tList", { table: t }).then(function (d) { if (d && d.rows) lsSet("console_" + t, d.rows); }); });
-    }
-    window.__refreshAssistant = pullAll;
-
-    function overdueList() {
-      var t = today();
-      return D("orders").filter(function (o) { return o.due && String(o.due) < t && ["報價", "接單", "生產"].indexOf(o.status) >= 0; });
-    }
-    function kpi() {
-      var tm = today().slice(0, 7), rev = 0, cnt = 0, ship = 0;
-      D("orders").forEach(function (o) {
-        if (o.status === "取消") return;
-        if (String(o.order_date || "").slice(0, 7) === tm) { rev += (num(o.amount) || num(o.qty) * num(o.price)); cnt++; }
-        if (o.status === "接單" || o.status === "生產") ship++;
-      });
-      return { rev: rev, cnt: cnt, ship: ship };
-    }
-    function ans(type) {
-      if (type === "overdue") {
-        var o = overdueList();
-        if (!o.length) return "目前沒有逾期未出貨的訂單。";
-        return "逾期訂單（交期已過、尚未出貨）：\n" + o.map(function (x) { return "・" + (x.customer || "?") + "／" + (x.product || "") + "：交期 " + x.due + "（狀態：" + x.status + "）"; }).join("\n");
-      }
-      if (type === "kpi") {
-        var k = kpi();
-        return "本月概況：\n・訂單數：" + k.cnt + " 筆\n・待出貨：" + k.ship + " 筆\n・逾期：" + overdueList().length + " 筆";
-      }
-      if (type === "ship") {
-        var sh = D("orders").filter(function (x) { return x.status === "接單" || x.status === "生產"; });
-        if (!sh.length) return "目前沒有待出貨的訂單。";
-        return "待出貨清單（接單/生產中）：\n" + sh.map(function (x) { return "・" + (x.customer || "?") + "／" + (x.product || "") + " ×" + num(x.qty) + "（交期 " + (x.due || "未定") + "）"; }).join("\n");
-      }
-      if (type === "howto") return OVERVIEW;
-      return "";
-    }
-
-    // 教學小腦袋（本地，免 Gemini 也能答網站怎麼用）
-    var OVERVIEW = "這個網站是一套免費小型 ERP，最簡單的用法：\n"
-      + "1) 右上角用 Google 登入。\n"
-      + "2) 平常開「今日總覽」看重點；原料行情、ERP 作業等都在左側選單。\n"
-      + "3) 客人詢價 →「報價」算一算 → 存起來。\n"
-      + "4) 接到單 →「訂單」按＋新增或「從報價轉單」，用看板追進度。\n"
-      + "5) 任何細節直接打字問我，例如：報價怎麼用、怎麼建訂單、匯出。\n"
-      + "6) 要跟越南員工溝通？我這頁上面可切「中越對話」。\n"
-      + "想更詳細請看「說明」的「新手上路」。";
-    var HELP_KB = [
-      { k: ["登入", "login", "登陸", "登錄"], a: "登入：點右上角「使用 Google 帳戶登入」→ 選公司帳號。登入後資料才會存進公司試算表、換裝置也看得到；約一小時後要再登一次是正常的。" },
-      { k: ["報價", "估價", "算價"], a: "報價：上面「報價」→ 選材質(自動帶入最新原料價)→ 填重量(或填長寬高按「計算」)→ 看建議報價 → 按「存這筆」記錄。" },
-      { k: ["轉單", "轉訂單", "報價轉"], a: "報價轉訂單：到「訂單」按「從報價轉單」，會把最新一筆報價帶成新訂單，可再修改。" },
-      { k: ["訂單", "建單", "接單", "下單", "開單"], a: "訂單：「訂單」按「＋新增訂單」填客戶/品名/數量/單價/交期(金額留空會自動＝數量×單價)。看板每張卡下拉可改狀態(報價→接單→生產→出貨→結案)，點卡片可編輯或刪除。" },
-      { k: ["看板", "狀態", "進度"], a: "狀態看板在「訂單」：欄位是 報價→接單→生產→出貨→結案。改某張訂單卡的下拉，就會移到對應欄位；逾期會標紅。" },
-      { k: ["中越", "越南", "翻譯", "vietnam", "移工", "員工溝通", "語音"], a: "中越對話：到「助手」頁上方切「中越對話」。點常用句立刻顯示中文＋越南文；或打字/用語音講，按「翻譯」自動中↔越（打字翻譯需登入）。" },
-      { k: ["資料庫", "試算表", "增刪改", "編輯資料", "新增資料", "名單", "收藏"], a: "資料庫操作中心「資料庫」：不用開 Google 試算表，站內就能新增/編輯/刪除/搜尋/篩選/匯出 CSV。分頁有：我的名單/待辦、收藏與標記、報價歷史、訂單。" },
-      { k: ["收藏", "標記", "備註", "星星"], a: "收藏與標記可在「資料庫 → 收藏與標記」管理：選狀態、打備註，會存進試算表。" },
-      { k: ["匯出", "csv", "excel", "下載", "報表"], a: "匯出：資料庫或訂單頁的「匯出 CSV」，下載成 Excel 可開的檔案。" },
-      { k: ["深色", "淺色", "主題", "暗", "亮"], a: "右上角的月亮／太陽按鈕切深色/淺色，設定會記住。" },
-      { k: ["更新", "看不到", "重新整理", "舊的", "沒變", "刷新"], a: "看不到新資料：按 Ctrl+F5 強制重新整理(Mac 是 Cmd+Shift+R)。原料價一天更新兩次。" },
-      { k: ["供應商", "進貨"], a: "供應商與進貨：到「ERP 作業 → 進貨」新增進貨單（填供應商、品項、實際單價），庫存成本自動用先進先出計算。" },
-      { k: ["客戶", "商機", "crm"], a: "客戶與商機：到「ERP 作業 → 客戶／商機」建立客戶、追蹤商機與跟進紀錄，再開報價單。" },
-      { k: ["原料", "行情", "價格", "銅價", "鋁價"], a: "「原料行情」(左側選單)：看銅/鋁國際價(換算台幣)走勢，可切單位與期間、附相關新聞。漲＝進料成本高要注意。" },
-      { k: ["行政", "員工", "班表", "排班", "出勤", "請假", "簽核", "核准", "設備", "預約", "公告"], a: "行政工作台（左側選單）：組織與員工、週班表（可把上一週複製到這週）、出勤（自動比對遲到早退缺勤）、申請簽核（請假／加班／出差，不能核准自己的）、設備預約、公告。" },
-      { k: ["搜尋", "找不到資料", "ctrl", "快速找"], a: "任何頁按 Ctrl+K（或右上「搜尋」）：可找頁面、料號、客戶、聯絡人、單號、案件、員工、設備。單據詳情可按「釘選」，首頁會列出。" },
-      { k: ["案件", "客訴", "服務", "打樣", "專案", "任務", "里程碑"], a: "ERP 作業的分頁：客服案件（詢價／客訴／維修，結案要寫處理結果）、服務交付（打樣外包：交付→驗收→收款）、專案（任務看板與里程碑）。" },
-      { k: ["免費", "要錢", "收費", "費用"], a: "整套免費——跑在 GitHub + Google 的免費額度上，關機也會自己在雲端更新。" },
-      { k: ["手機", "平板"], a: "手機可用：表格會自動變成一張張卡片，好點好讀。" },
-      { k: ["情報", "下拉", "分頁", "選單", "找不到", "在哪"], a: "左側選單：今日總覽、原料行情、報價試算、訂單看板、ERP 作業、AI 助手、資料庫、使用說明（手機上在頁面上方，可左右滑）。" }
-    ];
-    function matchData(q) {
-      q = String(q || "").toLowerCase();
-      if (/逾期|過期|延誤|遲交|來不及/.test(q)) return "overdue";
-      if (/營收|業績|收入|營業額|賺多少|這個?月.*(如何|怎樣|多少|概況)/.test(q)) return "kpi";
-      if (/待出貨|要出貨|出貨清單|還沒出/.test(q)) return "ship";
-      return "";
-    }
-    function matchHelp(q) {
-      var s = String(q || "").toLowerCase();
-      for (var i = 0; i < HELP_KB.length; i++) {
-        if (HELP_KB[i].k.some(function (w) { return s.indexOf(w.toLowerCase()) >= 0; })) return HELP_KB[i].a;
-      }
-      if (/怎麼用|怎用|教我|教學|不會用|不懂|使用方式|操作|入門|上手|new|help|介紹|功能/.test(s)) return OVERVIEW;
-      return "";
-    }
-
-    function buildContext() {
-      var k = kpi();
-      return { 月份: today().slice(0, 7), 本月訂單數: k.cnt, 待出貨: k.ship,
-        逾期訂單: overdueList().map(function (o) { return { 客戶: o.customer, 品名: o.product, 交期: o.due, 狀態: o.status }; }),
-        網站功能說明: "這是九上科技的免費小型 ERP。分頁：今日總覽、原料行情、ERP 作業(料號庫存/進貨/報價單/銷售訂單/BOM工單/客戶商機)、報價(選材質+重量算報價並存檔)、訂單(建單/報價轉單/狀態看板 報價→接單→生產→出貨→結案)、資料庫(站內增刪改查：我的名單/待辦、收藏與標記、報價歷史、訂單，匯出CSV)、助手(你，含中越對話)。右上角 Google 登入才會存資料。看不到新資料按 Ctrl+F5。全部免費。回答使用問題時請用這份說明、給具體步驟。" };
-    }
-
-    function msg(role, text) {
-      var log = document.getElementById("aiLog");
-      var b = document.createElement("div"); b.className = "aimsg " + role; b.textContent = text;
-      log.appendChild(b); log.scrollTop = log.scrollHeight; return b;
-    }
-    function askText(q) {
-      msg("user", q);
-      var dt = matchData(q);
-      if (dt) { msg("ai", ans(dt)); return; }          // 資料問題 → 本地精準計算（最快最準）
-      var wait = msg("ai", "思考中…");
-      dbCall("ai", { question: q, context: buildContext() }).then(function (d) {
-        if (d && d.ok && d.text) { wait.textContent = d.text; return; }   // Gemini 已啟用 → 什麼都能答
-        var local = matchHelp(q);                        // 沒 Gemini → 本地教學小腦袋
-        if (local) {
-          wait.textContent = local + "\n\n 想讓我像 ChatGPT 一樣什麼都能聊？在「說明 → AI 助手」照步驟啟用免費 AI（一次就好）。";
-          return;
-        }
-        if (d && d.need_setup) {
-          wait.textContent = "這題要啟用免費 AI 我才能自由回答～設定很簡單(一次就好)，「說明 → AI 助手」有圖解。\n或先問我：報價怎麼用 / 怎麼建訂單 / 哪些逾期 / 這個網站怎麼用。";
-          return;
-        }
-        if (d && d.error) { wait.textContent = "AI 失敗：" + d.error + "\n先試試：報價怎麼用 / 待出貨 / 逾期。"; return; }
-        wait.textContent = "這題我暫時答不了(可能未登入或未設定 AI)。試試問：報價怎麼用 / 怎麼建訂單 / 哪些逾期 / 這個網站怎麼用。";
-      });
-    }
+      var bn = mount.querySelector(".dbbanner"); if (bn) bn.parentNode.removeChild(bn);
+    };
 
     // 🗣️ 中越對話（獨立系統）：常用句免登入即時顯示；打字翻譯走現成 Groq
     var PHRASES = [
@@ -1155,25 +1036,8 @@
     var phrHtml = PHRASES.map(function (p, i) { return '<button class="dbbtn" data-i="' + i + '">' + p[0] + '</button>'; }).join("");
 
     mount.innerHTML =
-      (!idToken ? '<div class="dbbanner">' + ic("lock") + '尚未登入：登入後 ERP 助手才能讀公司資料、中越對話才能即時翻譯（常用句免登入）。</div>' : "")
-      + '<div class="aimode">'
-      + '<button class="aimodebtn on" data-mode="erp">' + ic("bot") + 'ERP 助手</button>'
-      + '<button class="aimodebtn" data-mode="bi">' + ic("languages") + '中越對話</button>'
-      + '</div>'
-      // ── 🤖 ERP 助手（查公司資料／教學）──
-      + '<div id="erpMode">'
-      + '<div class="aichips">'
-      + '<button class="dbbtn" data-q="howto">' + ic("book") + '教我用這個網站</button>'
-      + '<button class="dbbtn" data-q="overdue">' + ic("clock") + '哪些訂單逾期？</button>'
-      + '<button class="dbbtn" data-q="kpi">' + ic("bars") + '本月概況</button>'
-      + '<button class="dbbtn" data-q="ship">' + ic("truck") + '待出貨清單</button>'
-      + '</div>'
-      + '<div class="ailog" id="aiLog"></div>'
-      + '<div class="airow"><input id="aiInput" class="dbsearch" placeholder="什麼都能問：報價怎麼用？怎麼建訂單？哪些訂單逾期？"><button class="dbbtn primary" id="aiSend">送出</button></div>'
-      + '<div class="dbfoot">打字問我「網站怎麼用、報價/訂單怎麼操作、逾期/待出貨/本月概況」都行。啟用免費 AI 後(見說明)可像 ChatGPT 一樣自由聊。</div>'
-      + '</div>'
-      // ── 🗣️ 中越對話（老闆 ⇄ 越南員工，獨立於上面）──
-      + '<div id="biMode" style="display:none">'
+      (!idToken ? '<div class="dbbanner">' + ic("lock") + '尚未登入：常用句可以直接用；語音和打字翻譯需要先登入。</div>' : "")
+      + '<div id="biMode">'
       + '<div class="bihint">點常用句 → 立刻顯示中文＋越南文；或用語音／打字，按「翻譯」自動判斷中↔越。<br>Bấm câu thường dùng, hoặc dùng giọng nói / gõ chữ rồi bấm Dịch.</div>'
       + '<div class="biphr">' + phrHtml + '</div>'
       + '<div class="ailog bilog" id="biLog"></div>'
@@ -1181,26 +1045,6 @@
       + '<div class="airow"><input id="biInput" class="dbsearch" placeholder="打中文或越南文… / Gõ tiếng Trung hoặc tiếng Việt…"><button class="dbbtn primary bitr" id="biTr">' + ic("languages") + '翻譯 · Dịch</button></div>'
       + '<div class="dbfoot">現場口語溝通用；常用句免登入。語音需 Android／桌機 Chrome＋麥克風權限。即時翻譯為機器翻譯，重要文件仍請人工複核。</div>'
       + '</div>';
-
-    // 模式切換（兩系統各自獨立顯示）
-    Array.prototype.forEach.call(mount.querySelectorAll(".aimode [data-mode]"), function (b) {
-      b.onclick = function () {
-        var m = b.getAttribute("data-mode");
-        Array.prototype.forEach.call(mount.querySelectorAll(".aimode [data-mode]"), function (x) { x.classList.toggle("on", x === b); });
-        document.getElementById("erpMode").style.display = (m === "erp") ? "" : "none";
-        document.getElementById("biMode").style.display = (m === "bi") ? "" : "none";
-      };
-    });
-
-    // ── 🤖 ERP 助手 ──
-    msg("ai", "嗨！我是九上 ERP 助手\n・想學怎麼用？點「教我用這個網站」，或直接問「報價怎麼用」「怎麼建訂單」。\n・想查資料？點按鈕或問「哪些訂單逾期 / 本月概況 / 待出貨」。\n・要跟越南員工溝通？上面切到「中越對話」。");
-    Array.prototype.forEach.call(mount.querySelectorAll(".aichips [data-q]"), function (b) {
-      b.onclick = function () { var t = b.getAttribute("data-q"); msg("user", b.textContent.replace(/^\S+\s/, "")); msg("ai", ans(t)); };
-    });
-    var input = document.getElementById("aiInput"), send = document.getElementById("aiSend");
-    function go() { var v = (input.value || "").trim(); if (!v) return; input.value = ""; if (!idToken) { msg("user", v); var lh = matchHelp(v); msg("ai", lh || "先用右上角 Google 登入，我才能查你的資料；不過網站用法我現在就能教，例如問「報價怎麼用」。"); return; } askText(v); }
-    send.onclick = go;
-    input.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
 
     // ── 🗣️ 中越對話（獨立邏輯／獨立對話容器 #biLog）──
     function biMsg(role, text) {
@@ -1227,7 +1071,7 @@
         : "把以下越南文翻成繁體中文，口語、簡單，只回中文，不要加任何解釋：\n" + v;
       dbCall("ai", { question: prompt, context: {} }).then(function (d) {
         if (d && d.ok && d.text) { wait.textContent = d.text; return; }
-        if (d && d.need_setup) { wait.textContent = "需先啟用免費 AI（見「說明 → AI 助手」，一次就好）。上面常用句可先用。"; return; }
+        if (d && d.need_setup) { wait.textContent = "需先啟用免費 AI（見「說明 → 中越對話」，一次就好）。上面常用句可先用。"; return; }
         if (d && d.error) { wait.textContent = "翻譯失敗：" + d.error; return; }
         wait.textContent = "暫時無法翻譯（可能未登入或未設定 AI）。";
       });
@@ -1263,7 +1107,7 @@
     var biInput = document.getElementById("biInput");
     document.getElementById("biTr").onclick = function () { var v = (biInput.value || "").trim(); if (v) biTranslate(autoDir(v)); };
     biInput.addEventListener("keydown", function (e) { if (e.key === "Enter") { var v = (biInput.value || "").trim(); if (v) biTranslate(autoDir(v)); } });
-    pullAll();
+    window.__refreshAssistant();
   }
 
   // 首頁「今日數字」大看板：登入後由訂單即時算出（未登入顯示 —）
@@ -1306,7 +1150,7 @@
     if (window.CUSTOMERS_DATA) initCustomers(window.CUSTOMERS_DATA);
     if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
     if (document.getElementById("ordersView")) initOrders();     // 訂單 + 老闆儀表板
-    if (document.getElementById("aiView")) initAssistant();       // AI 助手
+    if (document.getElementById("aiView")) initAssistant();       // 中越對話
     if (document.getElementById("stShip")) initHome();            // 首頁今日數字看板
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
     // 情報下拉：點空白處收起（原生 details 負責開關）
