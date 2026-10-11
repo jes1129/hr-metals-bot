@@ -5,6 +5,9 @@
   var LB_PER_TONNE = 2204.62, MA_N = 20;
   var REDRAWS = [];
 
+  // ---------- 單色線條圖示（docs/assets/icons.svg） ----------
+  function ic(name, cls) { return '<svg class="ic' + (cls ? " " + cls : "") + '" aria-hidden="true"><use href="assets/icons.svg#' + name + '"/></svg>'; }
+
   // ---------- 主題 ----------
   function initTheme() {
     var root = document.documentElement;
@@ -13,7 +16,7 @@
     root.setAttribute("data-theme", saved || (sysDark ? "dark" : "light"));
     var btn = document.getElementById("themeBtn");
     if (!btn) return;
-    var paint = function () { btn.textContent = root.getAttribute("data-theme") === "dark" ? "☀️" : "🌙"; };
+    var paint = function () { btn.innerHTML = ic(root.getAttribute("data-theme") === "dark" ? "sun" : "moon"); };
     paint();
     btn.addEventListener("click", function () {
       var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
@@ -59,6 +62,8 @@
       body: JSON.stringify({ action: action, token: idToken, payload: payload || {} })
     }).then(function (r) { return r.json(); }).catch(function () { return null; });
   }
+  // 給 erp.js 用的橋接：沿用同一個登入與後端呼叫（erp.js 不另做登入）
+  window.__erpBridge = { call: dbCall, authed: function () { return !!(API && idToken); }, configured: function () { return !!(API && CLIENT_ID); } };
   function cloudPull() {   // 登入後從試算表拉最新，覆蓋本機並刷新畫面
     dbCall("load", {}).then(function (d) {
       if (!d || d.error) return;
@@ -109,7 +114,7 @@
   function paintAuth() {
     var box = document.getElementById("gAuth"); if (!box) return;
     if (gUser) {
-      box.innerHTML = '<span class="guser" title="' + escAttr(gUser.email) + '">👤 ' + escAttr(gUser.name || gUser.email) + '</span><button id="gOut" class="gbtn">登出</button>';
+      box.innerHTML = '<span class="guser" title="' + escAttr(gUser.email) + '">' + ic("user") + escAttr(gUser.name || gUser.email) + '</span><button id="gOut" class="gbtn">登出</button>';
       var o = document.getElementById("gOut"); if (o) o.onclick = signOut;
     } else {
       box.innerHTML = '<div id="gBtn"></div>';
@@ -121,19 +126,20 @@
     if (window.__refreshOrders) window.__refreshOrders();
     if (window.__refreshAssistant) window.__refreshAssistant();
     if (window.__refreshHome) window.__refreshHome();
+    if (window.__refreshErp) window.__refreshErp();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
 
   var STATUS = ["", "已聯絡", "合作中", "不合適"];
   function escAttr(s) { return String(s || "").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
-  function favSpan(id) { return '<span class="mkfav' + (markGet(id).fav ? " on" : "") + '" data-id="' + escAttr(id) + '" title="收藏">' + (markGet(id).fav ? "⭐" : "☆") + "</span> "; }
+  function favSpan(id) { return '<span class="mkfav' + (markGet(id).fav ? " on" : "") + '" data-id="' + escAttr(id) + '" title="收藏">' + ic("star") + "</span> "; }
   // Google 日曆 / Gmail 預填深連結（免 OAuth、免敏感權限）
   function calLink(title) { return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(title); }
   function markCell(id, name) {
     var m = markGet(id); name = name || "";
     var opts = STATUS.map(function (o) { return '<option value="' + o + '"' + (m.status === o ? " selected" : "") + ">" + (o || "—狀態—") + "</option>"; }).join("");
-    var acts = '<a class="mkact" target="_blank" rel="noopener" href="' + calLink("追蹤／拜訪 " + name) + '" title="加到 Google 日曆提醒">📅</a>';
+    var acts = '<a class="mkact" target="_blank" rel="noopener" href="' + calLink("追蹤／拜訪 " + name) + '" title="加到 Google 日曆提醒">' + ic("calendar") + '</a>';
     return '<td class="mkcell"><select class="mkstat" data-id="' + escAttr(id) + '">' + opts + "</select>" +
       '<input class="mknote" data-id="' + escAttr(id) + '" value="' + escAttr(m.note) + '" placeholder="備註…">' +
       '<div class="mkacts">' + acts + "</div></td>";
@@ -151,7 +157,7 @@
     tbody.addEventListener("click", function (e) {
       var el = e.target; if (!el.classList || !el.classList.contains("mkfav")) return;
       var id = el.getAttribute("data-id"); var m = markGet(id); m.fav = !m.fav; markSet(id, m);
-      el.textContent = m.fav ? "⭐" : "☆"; el.classList.toggle("on", m.fav);
+      el.classList.toggle("on", m.fav);
     });
   }
 
@@ -364,7 +370,7 @@
       if (countEl) countEl.textContent = rows.length + " / " + SUP.length + " 家";
       tbody.innerHTML = rows.map(function (s) {
         var id = s.url || s.name;
-        var near = s.is_near ? '<span class="star">⭐</span> ' : "";
+        var near = s.is_near ? '<span class="star" title="神岡周邊">' + ic("star") + '</span> ' : "";
         var name = s.url ? '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.name.slice(0, 34)) + "</a>" : esc(s.name.slice(0, 34));
         return "<tr><td>" + favSpan(id) + near + name + "</td><td>" + esc(s.category) + "</td><td>" +
           esc(s.area || s.address || "—") + "</td><td>" + esc(s.size || "—") + "</td><td>" + esc(s.source) + "</td>" + markCell(id, s.name) + "</tr>";
@@ -512,7 +518,7 @@
       var m = cur();
       if (m.nt != null && !pEl.value) pEl.value = m.nt;
       else if (m.nt != null) pEl.value = m.nt;
-      noteEl.textContent = m.live ? "（已帶入最新行情，可修改）" : "⚠️ " + (m.note || "參考值，請填實際採購價");
+      noteEl.textContent = m.live ? "（已帶入最新行情，可修改）" : (m.note || "參考值，請填實際採購價");
       noteEl.style.color = m.live ? "var(--muted)" : "var(--up)";
       calc();
     }
@@ -541,7 +547,7 @@
         return '<div class="qh"><div><b>' + escAttr(q.material) + "</b>　" + q.weight + "kg × NT$" + q.price +
           (q.proc ? "　+工 " + q.proc : "") + "　利 " + q.margin + "% → <b style='color:var(--accent)'>" + ntd(q.quote) + "</b>" +
           '<div class="mnote">' + ds + "</div></div><button class=\"qdel\" data-ts=\"" + q.ts + "\">刪除</button></div>";
-      }).join("") : '<div class="mnote" style="padding:10px 4px">尚無報價紀錄（算好後按「💾 存這筆」）</div>';
+      }).join("") : '<div class="mnote" style="padding:10px 4px">尚無報價紀錄（算好後按「存這筆」）</div>';
     }
     window.__refreshQuotes = renderHist;
     if (saveBtn) saveBtn.addEventListener("click", function () {
@@ -559,9 +565,9 @@
       if (needLogin()) { alert("請先用右上角「Google 登入」，才能存到公司 Drive。"); return; }
       if (!API || !idToken) { alert("尚未設定 Google（見說明），目前報價只存在本機。"); return; }
       if (!Quotes.length) { alert("尚無報價紀錄，先算好並「存這筆」。"); return; }
-      driveBtn.textContent = "⏳ 存檔中…"; driveBtn.disabled = true;
+      driveBtn.textContent = "存檔中…"; driveBtn.disabled = true;
       dbCall("driveSave", { quotes: Quotes }).then(function (d) {
-        driveBtn.textContent = "📄 報價歷史另存到 Drive"; driveBtn.disabled = false;
+        driveBtn.textContent = "報價歷史另存到 Drive"; driveBtn.disabled = false;
         if (d && d.url) { window.open(d.url, "_blank"); }
         else alert("存檔失敗，請稍後再試。");
       });
@@ -575,7 +581,7 @@
   // ===========================================================================
   var SCHEMAS = {
     mylist: {
-      title: "我的名單 / 待辦", icon: "📝", table: "mylist", canAdd: true, canEdit: true, canDelete: true,
+      title: "我的名單 / 待辦", icon: "list", table: "mylist", canAdd: true, canEdit: true, canDelete: true,
       cols: [
         { k: "name", label: "名稱", wide: true },
         { k: "category", label: "分類", filter: true },
@@ -591,7 +597,7 @@
       ]
     },
     marks: {
-      title: "收藏與標記", icon: "⭐", table: "marks", canAdd: false, canEdit: true, canDelete: true,
+      title: "收藏與標記", icon: "star", table: "marks", canAdd: false, canEdit: true, canDelete: true,
       cols: [
         { k: "id", label: "對象", wide: true, ro: true },
         { k: "status", label: "狀態", type: "select", opts: ["", "已聯絡", "合作中", "不合適"], filter: true, stat: true },
@@ -600,7 +606,7 @@
       ]
     },
     quotes: {
-      title: "報價歷史", icon: "🧮", table: "quotes", canAdd: false, canEdit: false, canDelete: true,
+      title: "報價歷史", icon: "calc", table: "quotes", canAdd: false, canEdit: false, canDelete: true,
       delKey: "ts", delAction: "quoteDel",
       cols: [
         { k: "ts", label: "時間", type: "time", ro: true },
@@ -611,7 +617,7 @@
       ]
     },
     orders: {
-      title: "訂單", icon: "📦", table: "orders", canAdd: true, canEdit: true, canDelete: true,
+      title: "訂單", icon: "box", table: "orders", canAdd: true, canEdit: true, canDelete: true,
       cols: [
         { k: "customer", label: "客戶", filter: true },
         { k: "product", label: "品名", wide: true },
@@ -640,7 +646,7 @@
     function fmtCell(col, v) {
       if (v === undefined || v === null || v === "") return "";
       if (col.type === "time") { var d = new Date(Number(v) || v); return isNaN(d) ? String(v) : d.toLocaleString("zh-TW", { hour12: false }).replace(/:\d\d$/, ""); }
-      if (col.type === "bool") return (v === true || v === "TRUE" || v === "true") ? "⭐" : "";
+      if (col.type === "bool") return (v === true || v === "TRUE" || v === "true") ? "是" : "";
       if (col.type === "num") { var n = Number(v); return isNaN(n) ? String(v) : n.toLocaleString(); }
       return String(v);
     }
@@ -700,7 +706,7 @@
     function render() {
       var s = schema(), rows = filtered();
       var tabs = Object.keys(SCHEMAS).map(function (k) {
-        return '<button class="dbtab' + (k === state.cur ? " on" : "") + '" data-tab="' + k + '">' + SCHEMAS[k].icon + " " + SCHEMAS[k].title + '</button>';
+        return '<button class="dbtab' + (k === state.cur ? " on" : "") + '" data-tab="' + k + '">' + ic(SCHEMAS[k].icon) + SCHEMAS[k].title + '</button>';
       }).join("");
 
       var filterCtrls = s.cols.filter(function (c) { return c.filter; }).map(function (c) {
@@ -712,11 +718,11 @@
       }).join("");
 
       var toolbar = '<div class="dbtoolbar">'
-        + '<input id="dbSearch" class="dbsearch" placeholder="🔍 搜尋…" value="' + escAttr(state.q) + '">'
+        + '<input id="dbSearch" class="dbsearch" placeholder="搜尋…" value="' + escAttr(state.q) + '">'
         + filterCtrls
-        + (s.canAdd ? '<button class="dbbtn primary" id="dbAdd">＋ 新增</button>' : "")
-        + '<button class="dbbtn" id="dbExport">⬇ 匯出 CSV</button>'
-        + '<button class="dbbtn" id="dbReload">↻ 重新整理</button>'
+        + (s.canAdd ? '<button class="dbbtn primary" id="dbAdd">' + ic("plus") + '新增</button>' : "")
+        + '<button class="dbbtn" id="dbExport">' + ic("download") + '匯出 CSV</button>'
+        + '<button class="dbbtn" id="dbReload">' + ic("refresh") + '重新整理</button>'
         + '</div>';
 
       // 表頭
@@ -727,14 +733,14 @@
 
       var body = rows.map(function (r) {
         var tds = s.cols.map(function (c) {
-          var val = c.type === "bool" ? (isFav(r[c.k]) ? "⭐" : "") : fmtCell(c, r[c.k]);
-          return '<td data-label="' + escAttr(c.label) + '"' + (c.wide ? ' class="wide"' : "") + '>' + escAttr(val) + "</td>";
+          var cell = c.type === "bool" ? (isFav(r[c.k]) ? '<span class="star">' + ic("star") + "</span>" : "") : escAttr(fmtCell(c, r[c.k]));
+          return '<td data-label="' + escAttr(c.label) + '"' + (c.wide ? ' class="wide"' : "") + '>' + cell + "</td>";
         }).join("");
         var act = "";
         if (s.canEdit || s.canDelete) {
           act = '<td class="dbact">'
-            + (s.canEdit ? '<button class="dbmini" data-edit="' + escAttr(r.id !== undefined ? r.id : r[s.delKey]) + '">✏️</button>' : "")
-            + (s.canDelete ? '<button class="dbmini" data-del="' + escAttr(r.id !== undefined && r.id !== "" ? r.id : r[s.delKey]) + '">🗑️</button>' : "")
+            + (s.canEdit ? '<button class="dbmini" data-edit="' + escAttr(r.id !== undefined ? r.id : r[s.delKey]) + '" title="編輯">' + ic("edit") + '</button>' : "")
+            + (s.canDelete ? '<button class="dbmini" data-del="' + escAttr(r.id !== undefined && r.id !== "" ? r.id : r[s.delKey]) + '" title="刪除">' + ic("trash") + '</button>' : "")
             + "</td>";
         }
         return "<tr>" + tds + act + "</tr>";
@@ -750,7 +756,7 @@
 
       mount.innerHTML =
         '<div class="dbtabs">' + tabs + '</div>'
-        + (!idToken ? '<div class="dbbanner">🔒 尚未登入：目前顯示的是本機快取。登入後可新增/編輯並同步到公司試算表。</div>' : "")
+        + (!idToken ? '<div class="dbbanner">' + ic("lock") + '尚未登入：目前顯示的是本機快取。登入後可新增/編輯並同步到公司試算表。</div>' : "")
         + statBlock(rows)
         + toolbar
         + '<div class="dbtablewrap"><table class="dbtable"><thead><tr>' + ths + "</tr></thead><tbody>" + body + "</tbody></table></div>"
@@ -816,7 +822,7 @@
       }).join("");
       var ov = document.createElement("div");
       ov.className = "dbmodal";
-      ov.innerHTML = '<div class="dbdialog"><h3>' + (editing ? "編輯" : "新增") + " · " + s.icon + escAttr(s.title) + "</h3>"
+      ov.innerHTML = '<div class="dbdialog"><h3>' + (editing ? "編輯" : "新增") + " · " + ic(s.icon) + escAttr(s.title) + "</h3>"
         + '<div class="dbform">' + fields + "</div>"
         + '<div class="dbdlgbtns"><button class="dbbtn" data-x>取消</button><button class="dbbtn primary" data-ok>儲存</button></div></div>';
       document.body.appendChild(ov);
@@ -910,14 +916,14 @@
     function render() {
       var k = kpis();
       var kpiHTML = '<div class="okpis">'
-        + kcard("🧾 本月訂單", k.cnt + " 筆", "")
-        + kcard("🚚 待出貨", k.ship + " 筆", "")
-        + kcard("⏰ 逾期未出", k.late + " 筆", k.late ? "warn" : "")
+        + kcard(ic("file") + "本月訂單", k.cnt + " 筆", "")
+        + kcard(ic("truck") + "待出貨", k.ship + " 筆", "")
+        + kcard(ic("clock") + "逾期未出", k.late + " 筆", k.late ? "warn" : "")
         + '</div>';
       var tools = '<div class="otools">'
-        + '<button class="dbbtn primary" id="oAdd">＋ 新增訂單</button>'
-        + '<button class="dbbtn" id="oConv">🧮 從報價轉單</button>'
-        + '<a class="dbbtn" href="db.html">🗂️ 在資料庫管理全部訂單</a>'
+        + '<button class="dbbtn primary" id="oAdd">' + ic("plus") + '新增訂單</button>'
+        + '<button class="dbbtn" id="oConv">' + ic("calc") + '從報價轉單</button>'
+        + '<a class="dbbtn" href="db.html">' + ic("db") + '在資料庫管理全部訂單</a>'
         + '</div>';
       // 看板（每欄依狀態上色 oks0..oks4）
       var board = '<div class="okanban">' + ORDER_FLOW.map(function (st, si) {
@@ -926,7 +932,7 @@
           return '<div class="ocardk' + (overdue(o) ? " od" : "") + '" data-edit="' + escAttr(o.id) + '">'
             + '<div class="ock-cust">' + escAttr(o.customer || "（未填客戶）") + '</div>'
             + '<div class="ock-prod">' + escAttr(o.product || "") + '</div>'
-            + (o.due ? '<div class="ock-meta"><span class="' + (overdue(o) ? "od" : "") + '">📅 ' + escAttr(o.due) + '</span></div>' : '')
+            + (o.due ? '<div class="ock-meta"><span class="' + (overdue(o) ? "od" : "") + '">' + ic("calendar") + escAttr(o.due) + '</span></div>' : '')
             + '<select class="ock-move" data-id="' + escAttr(o.id) + '">'
             + ORDER_FLOW.concat(["取消"]).map(function (s) { return '<option' + (s === st ? " selected" : "") + '>' + s + '</option>'; }).join("")
             + '</select></div>';
@@ -934,7 +940,7 @@
         return '<div class="okcol oks' + si + '"><div class="okhead">' + st + ' <span>' + cards.length + '</span></div>' + body + '</div>';
       }).join("") + '</div>';
 
-      mount.innerHTML = (!idToken ? '<div class="dbbanner">🔒 尚未登入：目前顯示本機快取。登入後可新增/更新訂單並同步到公司試算表。</div>' : "")
+      mount.innerHTML = (!idToken ? '<div class="dbbanner">' + ic("lock") + '尚未登入：目前顯示本機快取。登入後可新增/更新訂單並同步到公司試算表。</div>' : "")
         + kpiHTML + tools + board;
       wire();
     }
@@ -985,10 +991,10 @@
       var ov = document.createElement("div");
       ov.className = "dbmodal";
       ov.innerHTML = '<div class="dbdialog"><h3>' + (editing ? "編輯訂單" : "新增訂單") + "</h3>"
-        + (hint ? '<div class="dbnote" style="margin-bottom:10px">💡 ' + escAttr(hint) + '</div>' : "")
+        + (hint ? '<div class="dbnote" style="margin-bottom:10px">' + ic("info") + escAttr(hint) + '</div>' : "")
         + '<div class="dbform">' + fields + "</div>"
         + '<div class="dbdlgbtns">'
-        + (editing ? '<button class="dbbtn" data-del style="margin-right:auto;color:var(--up)">🗑️ 刪除</button>' : "")
+        + (editing ? '<button class="dbbtn" data-del style="margin-right:auto;color:var(--up)">' + ic("trash") + '刪除</button>' : "")
         + '<button class="dbbtn" data-x>取消</button><button class="dbbtn primary" data-ok>儲存</button></div></div>';
       document.body.appendChild(ov);
       function close() { document.body.removeChild(ov); }
@@ -1040,7 +1046,7 @@
     function ans(type) {
       if (type === "overdue") {
         var o = overdueList();
-        if (!o.length) return "目前沒有逾期未出貨的訂單 ✅。";
+        if (!o.length) return "目前沒有逾期未出貨的訂單。";
         return "逾期訂單（交期已過、尚未出貨）：\n" + o.map(function (x) { return "・" + (x.customer || "?") + "／" + (x.product || "") + "：交期 " + x.due + "（狀態：" + x.status + "）"; }).join("\n");
       }
       if (type === "kpi") {
@@ -1059,31 +1065,33 @@
     // 教學小腦袋（本地，免 Gemini 也能答網站怎麼用）
     var OVERVIEW = "這個網站是一套免費小型 ERP，最簡單的用法：\n"
       + "1) 右上角用 Google 登入。\n"
-      + "2) 平常開「🏠 首頁」看重點；情報類（原料/供應商/客戶）在「📈 情報」下拉裡。\n"
-      + "3) 客人詢價 →「🧮 報價」算一算 → 存起來。\n"
-      + "4) 接到單 →「📦 訂單」按＋新增或「從報價轉單」，用看板追進度。\n"
+      + "2) 平常開「今日總覽」看重點；原料行情、ERP 作業等都在左側選單。\n"
+      + "3) 客人詢價 →「報價」算一算 → 存起來。\n"
+      + "4) 接到單 →「訂單」按＋新增或「從報價轉單」，用看板追進度。\n"
       + "5) 任何細節直接打字問我，例如：報價怎麼用、怎麼建訂單、匯出。\n"
-      + "6) 要跟越南員工溝通？我這頁上面可切「🗣️ 中越對話」。\n"
-      + "想更詳細請看「📖 說明」的「🚀 新手上路」。";
+      + "6) 要跟越南員工溝通？我這頁上面可切「中越對話」。\n"
+      + "想更詳細請看「說明」的「新手上路」。";
     var HELP_KB = [
       { k: ["登入", "login", "登陸", "登錄"], a: "登入：點右上角「使用 Google 帳戶登入」→ 選公司帳號。登入後資料才會存進公司試算表、換裝置也看得到；約一小時後要再登一次是正常的。" },
-      { k: ["報價", "估價", "算價"], a: "報價：上面「🧮 報價」→ 選材質(自動帶入最新原料價)→ 填重量(或填長寬高按「計算」)→ 看建議報價 → 按「存這筆」記錄。" },
-      { k: ["轉單", "轉訂單", "報價轉"], a: "報價轉訂單：到「📦 訂單」按「🧮 從報價轉單」，會把最新一筆報價帶成新訂單，可再修改。" },
-      { k: ["訂單", "建單", "接單", "下單", "開單"], a: "訂單：「📦 訂單」按「＋新增訂單」填客戶/品名/數量/單價/交期(金額留空會自動＝數量×單價)。看板每張卡下拉可改狀態(報價→接單→生產→出貨→結案)，點卡片可編輯或刪除。" },
-      { k: ["看板", "狀態", "進度"], a: "狀態看板在「📦 訂單」：欄位是 報價→接單→生產→出貨→結案。改某張訂單卡的下拉，就會移到對應欄位；逾期會標紅。" },
-      { k: ["中越", "越南", "翻譯", "vietnam", "移工", "員工溝通", "語音"], a: "中越對話：到「🤖 助手」頁上方切「🗣️ 中越對話」。點常用句立刻顯示中文＋越南文；或打字/用🎤語音講，按「翻譯」自動中↔越（打字翻譯需登入）。" },
-      { k: ["資料庫", "試算表", "增刪改", "編輯資料", "新增資料", "名單", "收藏"], a: "資料庫操作中心「🗂️ 資料庫」：不用開 Google 試算表，站內就能新增/編輯/刪除/搜尋/篩選/匯出 CSV。分頁有：我的名單/待辦、收藏與標記、報價歷史、訂單。" },
-      { k: ["收藏", "標記", "備註", "星星"], a: "在供應商/客戶/職缺名單，點星星⭐收藏、選狀態、打備註；勾「只看收藏」只顯示收藏的。會存進試算表。" },
-      { k: ["匯出", "csv", "excel", "下載", "報表"], a: "匯出：資料庫或訂單頁的「⬇ 匯出 CSV」，下載成 Excel 可開的檔案。" },
-      { k: ["深色", "淺色", "主題", "暗", "亮"], a: "右上角 🌙/☀️ 切深色/淺色，設定會記住。" },
-      { k: ["更新", "看不到", "重新整理", "舊的", "沒變", "刷新"], a: "看不到新資料：按 Ctrl+F5 強制重新整理(Mac 是 Cmd+Shift+R)。原料價一天更新兩次，其他名單每天更新。" },
-      { k: ["供應商"], a: "「🏭 供應商」(在 📈情報 下拉裡)：找金屬加工供應商，可依類別篩、勾只看神岡周邊、切地圖看位置。" },
-      { k: ["客戶", "開發"], a: "「🎯 客戶」(在 📈情報 下拉裡)：找可能買精密金屬零件的潛在客戶，可依產業篩、搜尋公司名。" },
-      { k: ["招募", "職缺", "徵才", "薪水", "薪資"], a: "「🔧 招募」(在 📈情報 下拉裡)：追蹤台中金屬加工/品管職缺行情，可搜尋、排序、看薪資分布。" },
-      { k: ["原料", "行情", "價格", "銅價", "鋁價"], a: "「🔩 原料」(在 📈情報 下拉裡)：看銅/鋁國際價(換算台幣)走勢，可切單位與期間、附相關新聞。漲＝進料成本高要注意。" },
+      { k: ["報價", "估價", "算價"], a: "報價：上面「報價」→ 選材質(自動帶入最新原料價)→ 填重量(或填長寬高按「計算」)→ 看建議報價 → 按「存這筆」記錄。" },
+      { k: ["轉單", "轉訂單", "報價轉"], a: "報價轉訂單：到「訂單」按「從報價轉單」，會把最新一筆報價帶成新訂單，可再修改。" },
+      { k: ["訂單", "建單", "接單", "下單", "開單"], a: "訂單：「訂單」按「＋新增訂單」填客戶/品名/數量/單價/交期(金額留空會自動＝數量×單價)。看板每張卡下拉可改狀態(報價→接單→生產→出貨→結案)，點卡片可編輯或刪除。" },
+      { k: ["看板", "狀態", "進度"], a: "狀態看板在「訂單」：欄位是 報價→接單→生產→出貨→結案。改某張訂單卡的下拉，就會移到對應欄位；逾期會標紅。" },
+      { k: ["中越", "越南", "翻譯", "vietnam", "移工", "員工溝通", "語音"], a: "中越對話：到「助手」頁上方切「中越對話」。點常用句立刻顯示中文＋越南文；或打字/用語音講，按「翻譯」自動中↔越（打字翻譯需登入）。" },
+      { k: ["資料庫", "試算表", "增刪改", "編輯資料", "新增資料", "名單", "收藏"], a: "資料庫操作中心「資料庫」：不用開 Google 試算表，站內就能新增/編輯/刪除/搜尋/篩選/匯出 CSV。分頁有：我的名單/待辦、收藏與標記、報價歷史、訂單。" },
+      { k: ["收藏", "標記", "備註", "星星"], a: "收藏與標記可在「資料庫 → 收藏與標記」管理：選狀態、打備註，會存進試算表。" },
+      { k: ["匯出", "csv", "excel", "下載", "報表"], a: "匯出：資料庫或訂單頁的「匯出 CSV」，下載成 Excel 可開的檔案。" },
+      { k: ["深色", "淺色", "主題", "暗", "亮"], a: "右上角的月亮／太陽按鈕切深色/淺色，設定會記住。" },
+      { k: ["更新", "看不到", "重新整理", "舊的", "沒變", "刷新"], a: "看不到新資料：按 Ctrl+F5 強制重新整理(Mac 是 Cmd+Shift+R)。原料價一天更新兩次。" },
+      { k: ["供應商", "進貨"], a: "供應商與進貨：到「ERP 作業 → 進貨」新增進貨單（填供應商、品項、實際單價），庫存成本自動用先進先出計算。" },
+      { k: ["客戶", "商機", "crm"], a: "客戶與商機：到「ERP 作業 → 客戶／商機」建立客戶、追蹤商機與跟進紀錄，再開報價單。" },
+      { k: ["原料", "行情", "價格", "銅價", "鋁價"], a: "「原料行情」(左側選單)：看銅/鋁國際價(換算台幣)走勢，可切單位與期間、附相關新聞。漲＝進料成本高要注意。" },
+      { k: ["行政", "員工", "班表", "排班", "出勤", "請假", "簽核", "核准", "設備", "預約", "公告"], a: "行政工作台（左側選單）：組織與員工、週班表（可把上一週複製到這週）、出勤（自動比對遲到早退缺勤）、申請簽核（請假／加班／出差，不能核准自己的）、設備預約、公告。" },
+      { k: ["搜尋", "找不到資料", "ctrl", "快速找"], a: "任何頁按 Ctrl+K（或右上「搜尋」）：可找頁面、料號、客戶、聯絡人、單號、案件、員工、設備。單據詳情可按「釘選」，首頁會列出。" },
+      { k: ["案件", "客訴", "服務", "打樣", "專案", "任務", "里程碑"], a: "ERP 作業的分頁：客服案件（詢價／客訴／維修，結案要寫處理結果）、服務交付（打樣外包：交付→驗收→收款）、專案（任務看板與里程碑）。" },
       { k: ["免費", "要錢", "收費", "費用"], a: "整套免費——跑在 GitHub + Google 的免費額度上，關機也會自己在雲端更新。" },
       { k: ["手機", "平板"], a: "手機可用：表格會自動變成一張張卡片，好點好讀。" },
-      { k: ["情報", "下拉", "分頁", "選單", "找不到", "在哪"], a: "上面導覽列：🏠首頁、📈情報(點開有 原料/招募/供應商/客戶)、🧮報價、📦訂單、🤖助手、🗂️資料庫、📖說明。" }
+      { k: ["情報", "下拉", "分頁", "選單", "找不到", "在哪"], a: "左側選單：今日總覽、原料行情、報價試算、訂單看板、ERP 作業、AI 助手、資料庫、使用說明（手機上在頁面上方，可左右滑）。" }
     ];
     function matchData(q) {
       q = String(q || "").toLowerCase();
@@ -1105,7 +1113,7 @@
       var k = kpi();
       return { 月份: today().slice(0, 7), 本月訂單數: k.cnt, 待出貨: k.ship,
         逾期訂單: overdueList().map(function (o) { return { 客戶: o.customer, 品名: o.product, 交期: o.due, 狀態: o.status }; }),
-        網站功能說明: "這是九上科技的免費小型 ERP。分頁：首頁(每日總覽)、情報(原料行情/供應商/客戶)、報價(選材質+重量算報價並存檔)、訂單(建單/報價轉單/狀態看板 報價→接單→生產→出貨→結案)、資料庫(站內增刪改查：我的名單/待辦、收藏與標記、報價歷史、訂單，匯出CSV)、助手(你，含🗣️中越對話)。右上角 Google 登入才會存資料。看不到新資料按 Ctrl+F5。全部免費。回答使用問題時請用這份說明、給具體步驟。" };
+        網站功能說明: "這是九上科技的免費小型 ERP。分頁：今日總覽、原料行情、ERP 作業(料號庫存/進貨/報價單/銷售訂單/BOM工單/客戶商機)、報價(選材質+重量算報價並存檔)、訂單(建單/報價轉單/狀態看板 報價→接單→生產→出貨→結案)、資料庫(站內增刪改查：我的名單/待辦、收藏與標記、報價歷史、訂單，匯出CSV)、助手(你，含中越對話)。右上角 Google 登入才會存資料。看不到新資料按 Ctrl+F5。全部免費。回答使用問題時請用這份說明、給具體步驟。" };
     }
 
     function msg(role, text) {
@@ -1117,19 +1125,19 @@
       msg("user", q);
       var dt = matchData(q);
       if (dt) { msg("ai", ans(dt)); return; }          // 資料問題 → 本地精準計算（最快最準）
-      var wait = msg("ai", "🤖 思考中…");
+      var wait = msg("ai", "思考中…");
       dbCall("ai", { question: q, context: buildContext() }).then(function (d) {
         if (d && d.ok && d.text) { wait.textContent = d.text; return; }   // Gemini 已啟用 → 什麼都能答
         var local = matchHelp(q);                        // 沒 Gemini → 本地教學小腦袋
         if (local) {
-          wait.textContent = local + "\n\n💡 想讓我像 ChatGPT 一樣什麼都能聊？在「📖 說明→🤖 AI 助手」照步驟啟用免費 AI（一次就好）。";
+          wait.textContent = local + "\n\n 想讓我像 ChatGPT 一樣什麼都能聊？在「說明 → AI 助手」照步驟啟用免費 AI（一次就好）。";
           return;
         }
         if (d && d.need_setup) {
-          wait.textContent = "這題要啟用免費 AI 我才能自由回答～設定很簡單(一次就好)，「📖 說明→🤖 AI 助手」有圖解。\n或先問我：報價怎麼用 / 怎麼建訂單 / 哪些逾期 / 這個網站怎麼用。";
+          wait.textContent = "這題要啟用免費 AI 我才能自由回答～設定很簡單(一次就好)，「說明 → AI 助手」有圖解。\n或先問我：報價怎麼用 / 怎麼建訂單 / 哪些逾期 / 這個網站怎麼用。";
           return;
         }
-        if (d && d.error) { wait.textContent = "⚠️ AI 失敗：" + d.error + "\n先試試：報價怎麼用 / 待出貨 / 逾期。"; return; }
+        if (d && d.error) { wait.textContent = "AI 失敗：" + d.error + "\n先試試：報價怎麼用 / 待出貨 / 逾期。"; return; }
         wait.textContent = "這題我暫時答不了(可能未登入或未設定 AI)。試試問：報價怎麼用 / 怎麼建訂單 / 哪些逾期 / 這個網站怎麼用。";
       });
     }
@@ -1147,18 +1155,18 @@
     var phrHtml = PHRASES.map(function (p, i) { return '<button class="dbbtn" data-i="' + i + '">' + p[0] + '</button>'; }).join("");
 
     mount.innerHTML =
-      (!idToken ? '<div class="dbbanner">🔒 尚未登入：登入後 ERP 助手才能讀公司資料、中越對話才能即時翻譯（常用句免登入）。</div>' : "")
+      (!idToken ? '<div class="dbbanner">' + ic("lock") + '尚未登入：登入後 ERP 助手才能讀公司資料、中越對話才能即時翻譯（常用句免登入）。</div>' : "")
       + '<div class="aimode">'
-      + '<button class="aimodebtn on" data-mode="erp">🤖 ERP 助手</button>'
-      + '<button class="aimodebtn" data-mode="bi">🗣️ 中越對話</button>'
+      + '<button class="aimodebtn on" data-mode="erp">' + ic("bot") + 'ERP 助手</button>'
+      + '<button class="aimodebtn" data-mode="bi">' + ic("languages") + '中越對話</button>'
       + '</div>'
       // ── 🤖 ERP 助手（查公司資料／教學）──
       + '<div id="erpMode">'
       + '<div class="aichips">'
-      + '<button class="dbbtn" data-q="howto">📖 教我用這個網站</button>'
-      + '<button class="dbbtn" data-q="overdue">⏰ 哪些訂單逾期？</button>'
-      + '<button class="dbbtn" data-q="kpi">📊 本月概況</button>'
-      + '<button class="dbbtn" data-q="ship">🚚 待出貨清單</button>'
+      + '<button class="dbbtn" data-q="howto">' + ic("book") + '教我用這個網站</button>'
+      + '<button class="dbbtn" data-q="overdue">' + ic("clock") + '哪些訂單逾期？</button>'
+      + '<button class="dbbtn" data-q="kpi">' + ic("bars") + '本月概況</button>'
+      + '<button class="dbbtn" data-q="ship">' + ic("truck") + '待出貨清單</button>'
       + '</div>'
       + '<div class="ailog" id="aiLog"></div>'
       + '<div class="airow"><input id="aiInput" class="dbsearch" placeholder="什麼都能問：報價怎麼用？怎麼建訂單？哪些訂單逾期？"><button class="dbbtn primary" id="aiSend">送出</button></div>'
@@ -1166,12 +1174,12 @@
       + '</div>'
       // ── 🗣️ 中越對話（老闆 ⇄ 越南員工，獨立於上面）──
       + '<div id="biMode" style="display:none">'
-      + '<div class="bihint">點常用句 → 立刻顯示中文＋越南文；或用 🎤語音／打字，按「翻譯」自動判斷中↔越。<br>Bấm câu thường dùng, hoặc dùng 🎤giọng nói / gõ chữ rồi bấm Dịch.</div>'
+      + '<div class="bihint">點常用句 → 立刻顯示中文＋越南文；或用語音／打字，按「翻譯」自動判斷中↔越。<br>Bấm câu thường dùng, hoặc dùng giọng nói / gõ chữ rồi bấm Dịch.</div>'
       + '<div class="biphr">' + phrHtml + '</div>'
       + '<div class="ailog bilog" id="biLog"></div>'
-      + '<div class="bimic"><button class="dbbtn bimicbtn" data-mic="zh">🎤 說中文</button><button class="dbbtn bimicbtn" data-mic="vi">🎤 Nói tiếng Việt</button></div>'
-      + '<div class="airow"><input id="biInput" class="dbsearch" placeholder="打中文或越南文… / Gõ tiếng Trung hoặc tiếng Việt…"><button class="dbbtn primary bitr" id="biTr">🔄 翻譯 · Dịch</button></div>'
-      + '<div class="dbfoot">現場口語溝通用；常用句免登入。🎤語音需 Android／桌機 Chrome＋麥克風權限。即時翻譯為機器翻譯，重要文件仍請人工複核。</div>'
+      + '<div class="bimic"><button class="dbbtn bimicbtn" data-mic="zh">' + ic("mic") + '說中文</button><button class="dbbtn bimicbtn" data-mic="vi">' + ic("mic") + 'Nói tiếng Việt</button></div>'
+      + '<div class="airow"><input id="biInput" class="dbsearch" placeholder="打中文或越南文… / Gõ tiếng Trung hoặc tiếng Việt…"><button class="dbbtn primary bitr" id="biTr">' + ic("languages") + '翻譯 · Dịch</button></div>'
+      + '<div class="dbfoot">現場口語溝通用；常用句免登入。語音需 Android／桌機 Chrome＋麥克風權限。即時翻譯為機器翻譯，重要文件仍請人工複核。</div>'
       + '</div>';
 
     // 模式切換（兩系統各自獨立顯示）
@@ -1185,7 +1193,7 @@
     });
 
     // ── 🤖 ERP 助手 ──
-    msg("ai", "嗨！我是九上 ERP 助手 🤖\n・想學怎麼用？點「📖 教我用這個網站」，或直接問「報價怎麼用」「怎麼建訂單」。\n・想查資料？點按鈕或問「哪些訂單逾期 / 本月概況 / 待出貨」。\n・要跟越南員工溝通？上面切到「🗣️ 中越對話」。");
+    msg("ai", "嗨！我是九上 ERP 助手\n・想學怎麼用？點「教我用這個網站」，或直接問「報價怎麼用」「怎麼建訂單」。\n・想查資料？點按鈕或問「哪些訂單逾期 / 本月概況 / 待出貨」。\n・要跟越南員工溝通？上面切到「中越對話」。");
     Array.prototype.forEach.call(mount.querySelectorAll(".aichips [data-q]"), function (b) {
       b.onclick = function () { var t = b.getAttribute("data-q"); msg("user", b.textContent.replace(/^\S+\s/, "")); msg("ai", ans(t)); };
     });
@@ -1219,8 +1227,8 @@
         : "把以下越南文翻成繁體中文，口語、簡單，只回中文，不要加任何解釋：\n" + v;
       dbCall("ai", { question: prompt, context: {} }).then(function (d) {
         if (d && d.ok && d.text) { wait.textContent = d.text; return; }
-        if (d && d.need_setup) { wait.textContent = "需先啟用免費 AI（見「📖 說明→🤖 AI 助手」，一次就好）。上面常用句可先用。"; return; }
-        if (d && d.error) { wait.textContent = "⚠️ 翻譯失敗：" + d.error; return; }
+        if (d && d.need_setup) { wait.textContent = "需先啟用免費 AI（見「說明 → AI 助手」，一次就好）。上面常用句可先用。"; return; }
+        if (d && d.error) { wait.textContent = "翻譯失敗：" + d.error; return; }
         wait.textContent = "暫時無法翻譯（可能未登入或未設定 AI）。";
       });
     }
@@ -1235,7 +1243,7 @@
       rec.lang = (which === "zh") ? "zh-TW" : "vi-VN";
       rec.interimResults = false; rec.maxAlternatives = 1;
       var btn = mount.querySelector('.bimicbtn[data-mic="' + which + '"]'), old = btn ? btn.innerHTML : "";
-      if (btn) { btn.innerHTML = "🔴 聆聽中… Đang nghe…"; btn.disabled = true; }
+      if (btn) { btn.innerHTML = ic("mic") + "聆聽中… Đang nghe…"; btn.disabled = true; }
       rec.onresult = function (e) {
         var t = (e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript) || "";
         if (t) { el.value = t; biTranslate(which === "zh" ? "cn2vi" : "vi2cn"); }
@@ -1245,7 +1253,7 @@
       try { rec.start(); } catch (err) { if (btn) { btn.innerHTML = old; btn.disabled = false; } }
     }
 
-    biMsg("ai", "這裡讓老闆和越南員工雙向對話 🗣️\n・點上面常用句 → 立刻同時顯示中文＋越南文，把手機拿給對方看。\n・要講別的話 → 用 🎤語音 或打字，按「翻譯」自動判斷中↔越。手機沒越南文鍵盤？按「🎤 Nói tiếng Việt」直接講。");
+    biMsg("ai", "這裡讓老闆和越南員工雙向對話\n・點上面常用句 → 立刻同時顯示中文＋越南文，把手機拿給對方看。\n・要講別的話 → 用語音或打字，按「翻譯」自動判斷中↔越。手機沒越南文鍵盤？按「Nói tiếng Việt」直接講。");
     Array.prototype.forEach.call(mount.querySelectorAll(".biphr [data-i]"), function (b) {
       b.onclick = function () { var p = PHRASES[+b.getAttribute("data-i")]; biPair(p[0], p[1]); };
     });

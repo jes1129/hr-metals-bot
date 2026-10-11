@@ -23,13 +23,12 @@ import html
 import re
 
 import config
-from dashboard import _HEAD, _THEME_BTN, _VER, _hbars, _nav
+from dashboard import _HEAD, _THEME_BTN, _VER, _hbars, _ic, _nav
 
-_CAP_EMOJI = {"代客加工": "🔧", "表面處理": "✨", "鍛造": "🔨", "板金": "📐"}
 _LAYER = {
-    "rule": ("⚪ 內建備援（未呼叫外部模型）", "var(--muted)"),
-    "free": ("🟢 免費層", "var(--down)"),
-    "paid": ("🔵 付費層", "var(--accent)"),
+    "rule": ("內建備援（未呼叫外部模型）", "var(--muted)"),
+    "free": ("免費層", "var(--down)"),
+    "paid": ("付費層", "var(--accent)"),
 }
 
 
@@ -40,7 +39,7 @@ def _area(s: str, n=12) -> str:
 def _change_block(ch: dict) -> str:
     """本月變化——取代原本的五欄評語。"""
     if not ch.get("comparable"):
-        return ('<div class="ai"><h2>📋 本月變化</h2>'
+        return ('<div class="ai"><h2>' + _ic("clipboard") + '本月變化</h2>'
                 '<div class="row"><div class="lbl">狀態</div>'
                 f'<div class="txt">{html.escape(ch.get("reason", ""))}'
                 f'　（名單 {ch.get("total", 0):,} 家）</div></div></div>')
@@ -50,24 +49,23 @@ def _change_block(ch: dict) -> str:
             return "—"
         out = []
         for it in items[:n]:
-            caps = "".join(_CAP_EMOJI.get(c, "") for c in it.get("caps", []))
             out.append(f'{html.escape(it["name"][:18])}'
                        f'<span class="rnote">（{html.escape(_area(it.get("area", ""), 10))}'
-                       f'{caps}）</span>')
+                       f'）</span>')
         more = f'　…另 {len(items) - n} 家' if len(items) > n else ""
         return "、".join(out) + more
 
     blocks = [
-        ("⚠️ 確認歇業", ch["gone_closed"], "已不在「生產中工廠清冊」內，建議儘快確認並找替代"),
-        ("🔄 搬遷或改行業", ch["gone_moved"], "仍在全國清冊中，只是不再符合本期條件（非歇業）"),
-        ("✨ 本月新增", ch["new"], "新登記的工廠通常正在找生意"),
-        ("📈 資料變完整", ch["improved"], ""),
+        ("alert", "確認歇業", ch["gone_closed"], "已不在「生產中工廠清冊」內，建議儘快確認並找替代"),
+        ("refresh", "搬遷或改行業", ch["gone_moved"], "仍在全國清冊中，只是不再符合本期條件（非歇業）"),
+        ("sparkle", "本月新增", ch["new"], "新登記的工廠通常正在找生意"),
+        ("chart", "資料變完整", ch["improved"], ""),
     ]
     body = ""
-    for label, items, note in blocks:
-        if not items and label.startswith(("⚠️", "🔄")):
+    for icon, label, items, note in blocks:
+        if not items and label in ("確認歇業", "搬遷或改行業"):
             continue          # 沒有壞消息時不佔版面
-        body += (f'<div class="row"><div class="lbl">{label} {len(items)}</div>'
+        body += (f'<div class="row"><div class="lbl">{_ic(icon)}{label} {len(items)}</div>'
                  f'<div class="txt">{lst(items)}'
                  + (f'<div class="rnote">{note}</div>' if note and items else "")
                  + "</div></div>")
@@ -76,10 +74,10 @@ def _change_block(ch: dict) -> str:
     if ch.get("partner_alerts"):
         names = "、".join(html.escape(a["name"][:18]) for a in ch["partner_alerts"])
         alert = ('<div class="row" style="border-left:3px solid var(--up);padding-left:10px">'
-                 '<div class="lbl">🔔 現有協力廠</div>'
+                 '<div class="lbl">' + _ic("bell") + '現有協力廠</div>'
                  f'<div class="txt"><b>{names}</b> 發生變化，已即時推播</div></div>')
 
-    return (f'<div class="ai"><h2>📋 本月變化（名單 {ch["total"]:,} 家，'
+    return (f'<div class="ai"><h2>{_ic("clipboard")}本月變化（名單 {ch["total"]:,} 家，'
             f'上期 {ch["prev_total"]:,} 家）</h2>{alert}{body}</div>')
 
 
@@ -158,16 +156,16 @@ def render(profile: dict, cands: list, changes: dict, st: dict,
 
     rows = ""
     for i, c in enumerate(top, 1):
-        caps = " ".join(f'<span class="rtag">{_CAP_EMOJI.get(x, "")}{html.escape(x)}</span>'
+        caps = " ".join(f'<span class="rtag">{html.escape(x)}</span>'
                         for x in c.get("caps", []))
-        star = "⭐ " if c.get("near", 0) >= near_th else ""
+        star = ('<span class="star" title="神岡周邊">' + _ic("star") + "</span> ") if c.get("near", 0) >= near_th else ""
         cap = str(c.get("capital", "") or "")
         cap_txt = f"{int(cap):,}" if cap.isdigit() else (html.escape(cap) or "—")
         reason = c.get("ai_reason", "")
         why = (f'<div class="rnote">{html.escape(reason[:150])}</div>' if reason else "")
         conflict = c.get("ai_conflict", "")
         if conflict:
-            why += (f'<div class="rnote" style="color:var(--up)">⚠️ '
+            why += (f'<div class="rnote" style="color:var(--up)">{_ic("alert")}'
                     f'{html.escape(conflict[:110])}</div>')
         rows += (f"<tr><td>{i}</td><td>{star}{html.escape(c['name'][:30])}{why}</td>"
                  f"<td>{caps}</td><td>{html.escape(_area(c.get('area', '')))}</td>"
@@ -200,23 +198,23 @@ def render(profile: dict, cands: list, changes: dict, st: dict,
       資料版本：{ver_txt}</div>
 
     <div class="ai" style="border-left:3px solid var(--accent)">
-      <h2>🎯 要找什麼樣的供應商</h2>
+      <h2>{_ic('target')}要找什麼樣的供應商</h2>
       <div class="refgrid">
         <div><span class="rk">地區</span>{html.escape(profile.get('address', ''))}</div>
         <div><span class="rk">本業</span>{html.escape(profile.get('business', ''))}</div>
       </div>
       <div class="reftags">需求能力：{needs}
-        <span class="rnote">※ 神岡周邊標 ⭐近　※ 金屬材料（棒材）無法由本資料源取得
+        <span class="rnote">※ 神岡周邊標星號　※ 金屬材料（棒材）無法由本資料源取得
         ——材料商是貿易商、無工廠登記，需另一組門檻</span></div>
     </div>
 
     <div class="cards four">
       <div class="card"><div class="k">通過六關的候選</div><div class="v">{len(cands):,}</div>
         <div class="k" style="margin-top:6px">母體 {st.get('factory_城市內', 0):,} 家</div></div>
-      <div class="card"><div class="k">⭐ 神岡周邊</div><div class="v">{near_cnt:,}</div></div>
+      <div class="card"><div class="k">{_ic('star')}神岡周邊</div><div class="v">{near_cnt:,}</div></div>
       <div class="card"><div class="k">本月新增</div>
         <div class="v">{len(changes.get('new', []))}</div></div>
-      <div class="card"><div class="k">⚠️ 確認歇業</div>
+      <div class="card"><div class="k">{_ic('alert')}確認歇業</div>
         <div class="v">{len(changes.get('gone_closed', []))}</div>
         <div class="k" style="margin-top:6px">已離開生產中清冊</div></div>
     </div>
@@ -226,11 +224,11 @@ def render(profile: dict, cands: list, changes: dict, st: dict,
     {_change_block(changes)}
 
     <div class="grid2">
-      <div class="panel"><h3>🗂️ 能力分佈（一家可符合多項）</h3>{cap_bars}</div>
+      <div class="panel"><h3>{_ic('db')}能力分佈（一家可符合多項）</h3>{cap_bars}</div>
       <div class="panel"><h3>所在行政區（前 10）</h3>{area_bars}</div>
     </div>
 
-    <div class="panel"><h3>🔎 篩選漏斗（每一關剔除了多少）</h3>{_funnel_block(st)}</div>
+    <div class="panel"><h3>{_ic('filter')}篩選漏斗（每一關剔除了多少）</h3>{_funnel_block(st)}</div>
 
     <div class="panel">
       <h3>值得優先接觸的 {len(top)} 家</h3>

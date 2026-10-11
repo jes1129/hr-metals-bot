@@ -9,6 +9,8 @@
 | **C 供應商雷達** | 104 公司搜尋 ＋ 財政部營業稅籍開放資料 | Playwright 擷取 ＋ 串流過濾 → 合併去重 → 分類評分 → AI 建議 | 每月 1 號 09:00 | `docs/suppliers.html` ＋ Discord |
 | **D 客戶開發雷達** | 同上（僅換設定檔關鍵字） | 同上 | 每月 1 號 10:00 | `docs/customers.html` ＋ Discord |
 
+> **2026-10-11 起，供應商雷達（C）與客戶開發雷達（D）已從儀表板移除**：頁面與選單拿掉、每月排程暫停（`suppliers.yml`／`customers.yml` 保留手動觸發），程式與 `data/` 名單保留；要恢復就把兩個 workflow 的 `schedule` 取消註解並在 `dashboard._nav` 加回選單。
+
 > 供應商雷達與客戶開發雷達**共用同一份感知程式碼**，差別只在 `config.py` 的關鍵字與排序權重——這是本專案的設計主張。
 
 ## 檔案結構
@@ -95,6 +97,26 @@ Repo → **Settings → Pages → Source: Deploy from a branch → 選 `main` / 
    - commit → 等 Pages 更新。
 
 完成後，網站右上角會出現「使用 Google 登入」；登入後收藏/標記/報價就會存進你們的試算表，換裝置、換人登入都看得到。試算表裡會自動長出 `marks`、`quotes` 兩個分頁，你們也能直接在試算表看/改。
+
+### ERP 設定（🏭 ERP 作業頁）
+
+ERP（料號庫存 FIFO、進貨、報價、銷售訂單、BOM／工單、客戶商機）沿用上面同一個 Apps Script 與登入，資料寫進試算表 `ERP_` 開頭的分頁，**不碰原本的分頁**。沒做這段設定時，ERP 頁是「本機試用」，其他功能完全不受影響。
+
+1. **先備份**：Google 試算表 →「檔案」→「建立副本」。
+2. **加 ERP 檔**：Apps Script 編輯器左側「檔案」旁的 **＋ → 指令碼**，命名 `erp`，把 repo 的 `google-apps-script-erp.gs` **全部貼上**、儲存。
+3. **改主檔一行**：在原本的程式碼檔（`google-apps-script.gs`）找到
+   `default:         out = { error: "unknown action" };`
+   換成 repo 新版的這一行（含上面那行註解）：
+   `default:         out = (typeof erpDispatch_ === "function" && erpDispatch_(body.action, p, email)) || { error: "unknown action" };`
+   ⚠️ **只換這一行，不要整個檔覆蓋**，否則你填好的 `CLIENT_ID`、`ALLOWED_EMAILS` 會被蓋掉。
+4. **（選填）限定誰能用 ERP**：「專案設定 → 指令碼屬性」新增 `ERP_EMAILS`，值填可使用 ERP 的人的 Google 帳號（多個用半形逗號分隔）。ERP 有成本與毛利，不想讓所有人看到就設這個；沒設 = 所有能登入的人都能用。
+5. **重新部署（網址不變）**：「部署 → 管理部署 → ✏️ 編輯 → 版本：**新版本** → 部署」。不要按「新增部署」，那會產生新網址。
+
+完成後到 ERP 頁登入，上方會顯示「☁️ 公司正式資料」。若顯示「公司後端尚未加入 ERP 檔」代表第 2 或 5 步還沒完成。
+
+同一個 ERP 檔也包含**行政工作台**（組織、員工、週班表、出勤、申請簽核、設備預約、公告）以及客服案件、服務交付、專案、備份匯入，資料都寫在 `ERP_` 開頭的分頁（例：`ERP_員工`、`ERP_班表`、`ERP_申請`）。之後更新功能時，只要重新貼上新版 `google-apps-script-erp.gs` 並「管理部署 → 新版本」即可，主檔不用再改。
+
+開發者：ERP 規則只有一份 `docs/assets/erp-engine.js`（瀏覽器與 Apps Script 共用）。改了它或 `gas/erp-adapter.gs` 後執行 `python scripts/build_erp_gas.py` 重新產生 `google-apps-script-erp.gs`，並跑 `node --test tests/erp-engine.test.mjs`。ERP 規則移植自 [mars-tw/freedom-erp-crm](https://github.com/mars-tw/freedom-erp-crm)（MIT License, Copyright (c) 2026 mars-tw）。
 
 ### 交接給客戶時
 
