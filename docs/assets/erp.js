@@ -487,7 +487,7 @@
       fields: [
         { k: "name", l: "客戶名稱", req: 1, value: c.name }, { k: "tax_id", l: "統一編號", value: c.tax_id },
         { k: "contact", l: "聯絡人", value: c.contact }, { k: "phone", l: "電話", value: c.phone }, { k: "email", l: "Email", value: c.email },
-        { k: "address", l: "地址", value: c.address }, { k: "source", l: "來源", value: c.source, ph: "例：客戶開發雷達、展覽、介紹" },
+        { k: "address", l: "地址", value: c.address }, { k: "source", l: "來源", value: c.source, ph: "例：展覽、老客戶介紹、官網詢價" },
         { k: "note", l: "備註", type: "textarea", value: c.note }
       ],
       extra: editing ? [{ l: ic("trash") + "刪除", cls: "erp-danger", fn: function (close) { if (confirm("確定刪除客戶 " + c.name + "？")) act("customer.delete", { id: c.id }).then(function (r) { if (r) close(); }); } }] : [],
@@ -780,7 +780,7 @@
     a("bom.save", { item_id: fg1, components: [{ item_id: cu, qty: 0.18 }] });
     a("bom.save", { item_id: fg2, components: [{ item_id: al, qty: 1.6 }, { item_id: sc, qty: 4 }] });
     var wo = a("wo.create", { item_id: fg2, qty: 30 }); a("wo.reserve", { id: wo }); a("wo.start", { id: wo }); a("wo.complete", { id: wo, extra_cost: 4500 });
-    var c1 = a("customer.save", { name: "大雅精密股份有限公司", tax_id: "12345678", contact: "王經理", phone: "04-2560-0000", source: "客戶開發雷達" });
+    var c1 = a("customer.save", { name: "大雅精密股份有限公司", tax_id: "12345678", contact: "王經理", phone: "04-2560-0000", source: "老客戶介紹" });
     var c2 = a("customer.save", { name: "神岡自動化設備", contact: "林小姐", source: "展覽" });
     var d1 = a("deal.save", { customer_id: c2, name: "銅接頭年度採購", amount: 360000, next_date: plusDays(3) });
     var q = a("quote.save", { customer_id: c2, deal_id: d1, valid_until: plusDays(14), lines: [{ item_id: fg1, qty: 2000, price: 175 }] }); a("quote.issue", { id: q });

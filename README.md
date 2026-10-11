@@ -9,6 +9,8 @@
 | **C 供應商雷達** | 104 公司搜尋 ＋ 財政部營業稅籍開放資料 | Playwright 擷取 ＋ 串流過濾 → 合併去重 → 分類評分 → AI 建議 | 每月 1 號 09:00 | `docs/suppliers.html` ＋ Discord |
 | **D 客戶開發雷達** | 同上（僅換設定檔關鍵字） | 同上 | 每月 1 號 10:00 | `docs/customers.html` ＋ Discord |
 
+> **2026-10-11 起，供應商雷達（C）與客戶開發雷達（D）已從儀表板移除**：頁面與選單拿掉、每月排程暫停（`suppliers.yml`／`customers.yml` 保留手動觸發），程式與 `data/` 名單保留；要恢復就把兩個 workflow 的 `schedule` 取消註解並在 `dashboard._nav` 加回選單。
+
 > 供應商雷達與客戶開發雷達**共用同一份感知程式碼**，差別只在 `config.py` 的關鍵字與排序權重——這是本專案的設計主張。
 
 ## 檔案結構
