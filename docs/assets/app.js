@@ -59,6 +59,8 @@
       body: JSON.stringify({ action: action, token: idToken, payload: payload || {} })
     }).then(function (r) { return r.json(); }).catch(function () { return null; });
   }
+  // 給 erp.js 用的橋接：沿用同一個登入與後端呼叫（erp.js 不另做登入）
+  window.__erpBridge = { call: dbCall, authed: function () { return !!(API && idToken); }, configured: function () { return !!(API && CLIENT_ID); } };
   function cloudPull() {   // 登入後從試算表拉最新，覆蓋本機並刷新畫面
     dbCall("load", {}).then(function (d) {
       if (!d || d.error) return;
@@ -121,6 +123,7 @@
     if (window.__refreshOrders) window.__refreshOrders();
     if (window.__refreshAssistant) window.__refreshAssistant();
     if (window.__refreshHome) window.__refreshHome();
+    if (window.__refreshErp) window.__refreshErp();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入

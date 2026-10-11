@@ -37,7 +37,8 @@ function doPost(e) {
       case "tRemove":  out = tRemove_(p.table, p.id); break;
       case "tImport":  out = tImport_(p.table, p.rows, p.header, email); break;
       case "ai":       out = ai_(p.question, p.context); break;
-      default:         out = { error: "unknown action" };
+      // ERP（erpLoad/erpAct）在另一個檔 google-apps-script-erp.gs；沒加那個檔時行為與原本相同
+      default:         out = (typeof erpDispatch_ === "function" && erpDispatch_(body.action, p, email)) || { error: "unknown action" };
     }
     return json_(out);
   } catch (err) {

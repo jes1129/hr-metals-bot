@@ -96,6 +96,24 @@ Repo → **Settings → Pages → Source: Deploy from a branch → 選 `main` / 
 
 完成後，網站右上角會出現「使用 Google 登入」；登入後收藏/標記/報價就會存進你們的試算表，換裝置、換人登入都看得到。試算表裡會自動長出 `marks`、`quotes` 兩個分頁，你們也能直接在試算表看/改。
 
+### ERP 設定（🏭 ERP 作業頁）
+
+ERP（料號庫存 FIFO、進貨、報價、銷售訂單、BOM／工單、客戶商機）沿用上面同一個 Apps Script 與登入，資料寫進試算表 `ERP_` 開頭的分頁，**不碰原本的分頁**。沒做這段設定時，ERP 頁是「本機試用」，其他功能完全不受影響。
+
+1. **先備份**：Google 試算表 →「檔案」→「建立副本」。
+2. **加 ERP 檔**：Apps Script 編輯器左側「檔案」旁的 **＋ → 指令碼**，命名 `erp`，把 repo 的 `google-apps-script-erp.gs` **全部貼上**、儲存。
+3. **改主檔一行**：在原本的程式碼檔（`google-apps-script.gs`）找到
+   `default:         out = { error: "unknown action" };`
+   換成 repo 新版的這一行（含上面那行註解）：
+   `default:         out = (typeof erpDispatch_ === "function" && erpDispatch_(body.action, p, email)) || { error: "unknown action" };`
+   ⚠️ **只換這一行，不要整個檔覆蓋**，否則你填好的 `CLIENT_ID`、`ALLOWED_EMAILS` 會被蓋掉。
+4. **（選填）限定誰能用 ERP**：「專案設定 → 指令碼屬性」新增 `ERP_EMAILS` = `a@x.com,b@y.com`。ERP 有成本與毛利，不想讓所有人看到就設這個；沒設 = 所有能登入的人都能用。
+5. **重新部署（網址不變）**：「部署 → 管理部署 → ✏️ 編輯 → 版本：**新版本** → 部署」。不要按「新增部署」，那會產生新網址。
+
+完成後到 ERP 頁登入，上方會顯示「☁️ 公司正式資料」。若顯示「公司後端尚未加入 ERP 檔」代表第 2 或 5 步還沒完成。
+
+開發者：ERP 規則只有一份 `docs/assets/erp-engine.js`（瀏覽器與 Apps Script 共用）。改了它或 `gas/erp-adapter.gs` 後執行 `python scripts/build_erp_gas.py` 重新產生 `google-apps-script-erp.gs`，並跑 `node --test tests/erp-engine.test.mjs`。ERP 規則移植自 [mars-tw/freedom-erp-crm](https://github.com/mars-tw/freedom-erp-crm)（MIT License, Copyright (c) 2026 mars-tw）。
+
 ### 交接給客戶時
 
 程式碼零個資。客戶只需：① 收下這個 repo（或 fork 到客戶 GitHub）② 設客戶自己的 `GROQ_API_KEY`（第一層，免費）或 `ANTHROPIC_API_KEY`（第二層，付費）——**兩者都不設也能跑**，判斷端會落入第三層規則式後備，名單與儀表板照常產出 ③ 照上面用**客戶自己的 Google 帳號**做一次設定。之後整套都在客戶名下，跟你無關。

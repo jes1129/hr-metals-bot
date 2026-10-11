@@ -1,0 +1,66 @@
+/* erp.css — 只給 erp.html 用（不影響其他頁）；沿用 style.css 的色彩變數與 db/訂單 元件 */
+.erp-mode { border-radius: 10px; padding: 10px 14px; margin: 6px 0 10px; font-size: 13.5px; border: 1px solid var(--line); }
+.erp-mode.cloud { background: color-mix(in srgb, var(--down) 10%, var(--card)); border-color: color-mix(in srgb, var(--down) 40%, var(--line)); }
+.erp-mode.local { background: color-mix(in srgb, #d68a2e 12%, var(--card)); border-color: color-mix(in srgb, #d68a2e 45%, var(--line)); }
+.erp-tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; margin-bottom: 10px; }
+.erp-busy { color: var(--accent); font-weight: 700; font-size: 13px; }
+.erp-tabs { margin-bottom: 14px; }
+
+.erp-kpis { grid-template-columns: repeat(4, 1fr); }
+.erp-kpisub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.erp-metal { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 14px; font-size: 13.5px; }
+
+.erp-sec { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; box-shadow: var(--shadow); }
+.erp-sechead { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.erp-sechead h3 { margin: 0; font-size: 1rem; color: var(--text); }
+.erp-sec .dbtablewrap { box-shadow: none; }
+.erp-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.erp-grid2 > .erp-sec { margin-bottom: 16px; min-width: 0; }
+
+.erp-table td.r, .erp-table th.r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.erp-table td { vertical-align: middle; }
+.erp-table td .dbmini { margin: 1px 2px; white-space: nowrap; }
+.erp-table tr.erp-off td { color: var(--muted2); }
+
+.erp-st { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap;
+  background: var(--chip-bg); border: 1px solid var(--chip-border); color: var(--text); }
+.erp-st.ok { background: color-mix(in srgb, var(--down) 14%, var(--card)); border-color: color-mix(in srgb, var(--down) 45%, var(--line)); color: var(--down); }
+.erp-st.warn { background: color-mix(in srgb, #d68a2e 14%, var(--card)); border-color: color-mix(in srgb, #d68a2e 45%, var(--line)); color: #b26a14; }
+.erp-st.info { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); color: var(--accent); }
+.erp-st.muted { color: var(--muted); }
+.erp-bad { color: var(--up); }
+.erp-warn { color: #b26a14; }
+.erp-good { color: var(--down); }
+.erp-muted { color: var(--muted); font-size: 12px; }
+
+.erp-steps { margin: 0 0 12px; padding-left: 22px; line-height: 1.9; }
+.erp-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.erp-list { margin: 0; padding-left: 20px; line-height: 1.9; }
+.erp-kanban .ocardk { cursor: pointer; }
+.erp-kanban .okcol { min-width: 150px; }
+.erp-table td:last-child { white-space: nowrap; }
+.erp-funnel .dbval { min-width: 140px; white-space: nowrap; text-align: right; }
+
+/* 表單彈窗 */
+.erp-dialog { max-height: 88vh; overflow-y: auto; }
+.erp-dialog.wide { width: min(860px, 94vw); max-width: 94vw; }
+.erp-intro { background: var(--line2); border-radius: 9px; padding: 9px 12px; margin: 0 0 12px; line-height: 1.7; }
+.erp-dialog textarea { padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; resize: vertical; }
+.erp-lines { gap: 8px; }
+.erp-line { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; padding: 8px; border: 1px dashed var(--line); border-radius: 10px; }
+.erp-lcol { display: flex; flex-direction: column; gap: 4px; flex: 1 1 110px; min-width: 0; }
+.erp-lcol.wide { flex: 3 1 260px; }
+.erp-lcol > span { font-size: 12px; color: var(--muted); }
+.erp-lcol input, .erp-lcol select { padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--card); color: var(--text); width: 100%; box-sizing: border-box; }
+.erp-ldel { align-self: center; }
+.erp-ladd { align-self: flex-start; }
+.erp-total { text-align: right; font-weight: 800; font-size: 1.05rem; margin: 10px 0 0; }
+.erp-sum { display: flex; flex-wrap: wrap; gap: 8px 18px; background: var(--line2); border-radius: 10px; padding: 10px 14px; margin-top: 12px; font-size: 13.5px; }
+.erp-dialog h4 { margin: 14px 0 6px; }
+.erp-danger { color: var(--up); border-color: color-mix(in srgb, var(--up) 45%, var(--line)); margin-right: auto; }
+
+@media (max-width: 760px) {
+  .erp-kpis { grid-template-columns: 1fr 1fr; }
+  .erp-grid2 { grid-template-columns: 1fr; }
+  .erp-tools { justify-content: flex-start; }
+}

@@ -105,6 +105,12 @@ def main():
     # 訂單 + 老闆儀表板（純靜態外殼，訂單登入後由前端載入）
     with open(os.path.join("docs", "orders.html"), "w", encoding="utf-8") as f:
         f.write(dashboard.render_orders_html())
+    # ERP 作業（純靜態外殼）；任何錯誤都不影響原料行情等既有頁面的產生
+    try:
+        with open(os.path.join("docs", "erp.html"), "w", encoding="utf-8") as f:
+            f.write(dashboard.render_erp_html())
+    except Exception as e:  # noqa: BLE001
+        print("[run_metals] ERP 頁產生失敗（略過，不影響其他頁）：", e)
     # AI 助手（純靜態外殼，快速問答本地算、自由提問走 Gemini）
     with open(os.path.join("docs", "assistant.html"), "w", encoding="utf-8") as f:
         f.write(dashboard.render_assistant_html())

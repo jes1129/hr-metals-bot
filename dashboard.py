@@ -61,6 +61,7 @@ def _nav(active: str) -> str:
     # 市場情報（原料/供應商/客戶）收進一個下拉，讓上排不擁擠
     intel = active in ("metals", "suppliers", "customers")
     intel_on = a if intel else ""   # 避免在 f-string 內用反斜線（Python 3.11 不允許）
+    ops_on = a if active in ("orders", "erp") else ""   # 訂單看板 + ERP 收進同一個下拉，上排不變長
     return (
         '<div class="nav">'
         f'<a{a if active == "home" else ""} href="index.html">🏠 首頁</a>'
@@ -72,7 +73,12 @@ def _nav(active: str) -> str:
         f'<a{a if active == "customers" else ""} href="customers.html">🎯 客戶開發</a>'
         '</div></details>'
         f'<a{a if active == "quote" else ""} href="quote.html">🧮 報價</a>'
-        f'<a{a if active == "orders" else ""} href="orders.html">📦 訂單</a>'
+        '<details class="navdrop">'
+        f'<summary{ops_on}>📦 訂單 ▾</summary>'
+        '<div class="navmenu">'
+        f'<a{a if active == "orders" else ""} href="orders.html">📦 訂單看板</a>'
+        f'<a{a if active == "erp" else ""} href="erp.html">🏭 ERP 作業</a>'
+        '</div></details>'
         f'<a{a if active == "ai" else ""} href="assistant.html">🤖 助手</a>'
         f'<a{a if active == "db" else ""} href="db.html">🗂️ 資料庫</a>'
         f'<a{a if active == "help" else ""} href="help.html">📖 說明</a>'
@@ -136,6 +142,7 @@ def render_home(history: dict, sup_total, sup_near, cust_total=None) -> str:
                 f'<span class="hqi">{icon}</span><span class="hqt">{label}</span></a>')
     quick_items = [
         _q("orders.html", "📦", "訂單管理"),
+        _q("erp.html", "🏭", "ERP 作業"),
         _q("metals.html", "🔩", "原料行情"),
         _q("quote.html", "🧮", "報價試算"),
     ]
@@ -233,6 +240,37 @@ def render_orders_html() -> str:
     </div>
     <div class="foot">訂單存在公司自己的 Google 試算表（與資料庫操作中心同一份、免費、多裝置同步）。</div>
   </div>
+  <script src="assets/app.js?v={_VER}"></script>
+</body>
+</html>"""
+
+
+# ===========================================================================
+# ERP 作業（🏭 料號庫存 FIFO／進貨／報價／銷售訂單／BOM 工單／客戶商機）
+#   規則在 docs/assets/erp-engine.js；資料走 Apps Script 的 ERP_ 分頁，未登入為本機試用。
+# ===========================================================================
+def render_erp_html() -> str:
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+{_HEAD}
+<link rel="stylesheet" href="assets/erp.css?v={_VER}">
+<title>九上科技 · ERP 作業</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">{_nav("erp")}{_THEME_BTN}</div>
+    <div class="eyebrow">九上科技 · 智慧儀表板</div>
+    <h1>🏭 ERP 作業</h1>
+    <div class="sub">料號庫存（先進先出成本）· 進貨 · 報價 · 銷售訂單 · BOM／工單 · 客戶商機 · 更新於 {now}</div>
+    <div id="erpView" class="erpview">
+      <div class="dbloading">載入中…</div>
+    </div>
+    <div class="foot">登入後資料存在公司 Google 試算表的「ERP_」分頁（多人共用、每筆操作留紀錄）；未登入時為本機試用，不會寫入公司資料。</div>
+  </div>
+  <script src="assets/erp-engine.js?v={_VER}"></script>
+  <script src="assets/erp.js?v={_VER}"></script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
@@ -460,6 +498,25 @@ def render_help_html() -> str:
           </ul>
           <p><b>小撇步：</b>單價／金額還是可以填、會存起來記帳，只是不顯示在看板。要看金額到「🗂️ 資料庫 → 訂單」分頁。</p>
           <a class="gobtn" href="orders.html">前往訂單儀表板 →</a>
+        </div>
+      </details>
+
+      <details class="acc" id="f-erp">
+        <summary>🏭 ERP 作業 <span class="sm">— 庫存成本、進貨、報價、訂單、工單、客戶</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p><b>這是什麼：</b>完整的進銷存＋生產：料號庫存用<b>先進先出（FIFO）</b>自動算成本；報價 → 訂單 → 出貨 → 收款一路串起來；自己生產的用 <b>BOM＋工單</b>把用料成本轉進成品；總覽直接看本月銷售、毛利、庫存價值、應收、缺料。從上方「📦 訂單 ▾ → 🏭 ERP 作業」進入。</p>
+          <p><b>建議順序：</b></p>
+          <ul>
+            <li><b>料號庫存</b>：先建原料（kg）與成品（件）。原料可勾「銅／鋁」，會顯示 LME 參考價。</li>
+            <li><b>進貨</b>：照實際進價入庫；之後出貨、領料都依先進先出扣最早那批的成本。</li>
+            <li><b>客戶／商機 → 報價單</b>：報價「發出」後鎖定，改價請開新版（舊版自動作廢）；客戶接受就一鍵轉成訂單。</li>
+            <li><b>銷售訂單</b>：可先接單後備料（庫存不夠會列在總覽「缺料」）；可分批出貨、分次收款、退貨（依原成本退回庫存）；可列印報價單／出貨單（存 PDF）。</li>
+            <li><b>BOM／工單</b>：定義每 1 件的用料 → 開工單 → 預留用料 → 開工 → 完工（可加加工費），成品成本自動算好。</li>
+          </ul>
+          <p><b>資料存哪裡：</b>登入後存在公司試算表的 <b>ERP_ 開頭分頁</b>（與原本的訂單看板、資料庫分開，互不影響）。每筆操作都記在「ERP_操作紀錄」，庫存每次增減記在「ERP_庫存異動」。<b>請不要直接在試算表改 ERP_ 分頁</b>，改了帳會對不起來（可按「🩺 資料健檢」檢查）。未登入時是「本機試用」，資料只在自己的瀏覽器。</p>
+          <p><b>誰看得到金額：</b>ERP 會顯示售價、成本、毛利。若只想讓特定人使用，請管理者在 Apps Script「專案設定 → 指令碼屬性」新增 <code>ERP_EMAILS</code>（多個 email 用逗號分隔）；其他人仍可正常使用訂單看板等功能。</p>
+          <p><b>ERP 設定（管理者做一次）：</b>在同一個 Apps Script 專案新增一個指令碼檔，貼上 repo 的 <code>google-apps-script-erp.gs</code>；並把主檔 <code>google-apps-script.gs</code> 的 <code>default:</code> 那一行換成新版；最後「部署 → 管理部署 → 編輯 → 版本選『新版本』→ 部署」（網址不變）。詳見 README「ERP 設定」。</p>
+          <a class="gobtn" href="erp.html">前往 ERP 作業 →</a>
         </div>
       </details>
 
