@@ -126,6 +126,7 @@
     if (window.__refreshOrders) window.__refreshOrders();
     if (window.__refreshHome) window.__refreshHome();
     if (window.__refreshErp) window.__refreshErp();
+    if (window.__refreshSched) window.__refreshSched();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
