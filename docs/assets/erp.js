@@ -10,10 +10,15 @@
   "use strict";
   var E = window.ErpEngine;
   var LOCAL_KEY = "erp_world_local";
-  var TABS = [
-    ["home", ic("bars") + "總覽"], ["items", ic("box") + "料號庫存"], ["receive", ic("truck") + "進貨"], ["quotes", ic("file") + "報價單"],
-    ["orders", ic("cart") + "銷售訂單"], ["mfg", ic("factory") + "BOM／工單"], ["crm", ic("users") + "客戶／商機"], ["moves", ic("list") + "異動紀錄"]
-  ];
+  var TABS = {
+    erp: [
+      ["home", ic("bars") + "總覽"], ["items", ic("box") + "料號庫存"], ["receive", ic("truck") + "進貨"], ["quotes", ic("file") + "報價單"],
+      ["orders", ic("cart") + "銷售訂單"], ["mfg", ic("factory") + "BOM／工單"], ["crm", ic("users") + "客戶／商機"], ["moves", ic("list") + "異動紀錄"]
+    ],
+    admin: []
+  };
+  var PAGE = "erp";
+  var PIN_KEY = "erp_pins";
   var S = { tab: "home", world: null, mode: "local", backend: null, backendErr: "", loading: false, busy: false, metal: {} };
   var mount;
 
@@ -44,7 +49,8 @@
   }
 
   // ---------- 載入與模式 ----------
-  function loadLocal() { S.mode = "local"; S.world = lsGet(LOCAL_KEY, null) || E.empty(); }
+  function fill(w) { var e = E.empty(); for (var k in e) if (!w[k]) w[k] = e[k]; return w; }   // 舊資料沒有新功能的表 → 補空表
+  function loadLocal() { S.mode = "local"; S.world = fill(lsGet(LOCAL_KEY, null) || E.empty()); }
   function saveLocal() { lsSet(LOCAL_KEY, S.world); }
   function load() {
     var b = bridge();
@@ -53,15 +59,15 @@
       S.loading = true; render();
       b.call("erpLoad", {}).then(function (d) {
         S.loading = false;
-        if (d && d.ok && d.world) { S.backend = true; S.backendErr = ""; S.mode = "cloud"; S.world = d.world; }
+        if (d && d.ok && d.world) { S.backend = true; S.backendErr = ""; S.mode = "cloud"; S.world = fill(d.world); }
         else {
           S.backend = false;
           S.backendErr = !d ? "連不到公司後端" : /unknown action/.test(d.error || "") ? "公司後端尚未加入 ERP 檔" : String(d.error || "");
           loadLocal();
         }
-        render();
+        render(); openFromHash();
       });
-    } else { S.backend = null; loadLocal(); render(); }
+    } else { S.backend = null; loadLocal(); render(); openFromHash(); }
   }
   window.__refreshErp = load;
 
@@ -77,7 +83,7 @@
       p = new Promise(function (res) {
         var w = JSON.parse(JSON.stringify(W()));
         try {
-          var r = E.apply(w, action, payload, { by: "本機試用", today: today(), now: new Date().toISOString() });
+          var r = E.apply(w, action, payload, { by: "本機試用", today: today(), now: new Date().toISOString(), allowSelfApprove: true });
           S.world = w; saveLocal(); res({ ok: true, result: r.result });
         } catch (e) { res({ error: e.message }); }
       });
@@ -92,7 +98,7 @@
   function sendCloud(action, payload, key, tries) {
     return bridge().call("erpAct", { action: action, payload: payload, key: key }).then(function (d) {
       if (d === null && tries < 1) return sendCloud(action, payload, key, tries + 1);
-      if (d && d.ok && d.world) S.world = d.world;
+      if (d && d.ok && d.world) S.world = fill(d.world);
       return d;
     });
   }
@@ -102,7 +108,8 @@
   function render() {
     if (!mount) return;
     var w = W();
-    var tabs = TABS.map(function (t) { return '<button class="dbtab' + (t[0] === S.tab ? " on" : "") + '" data-tab="' + t[0] + '">' + t[1] + "</button>"; }).join("");
+    window.__erpWorld = w;   // 給全站搜尋（palette.js）用
+    var tabs = TABS[PAGE].map(function (t) { return '<button class="dbtab' + (t[0] === S.tab ? " on" : "") + '" data-tab="' + t[0] + '">' + t[1] + "</button>"; }).join("");
     var mode = S.mode === "cloud"
       ? '<div class="erp-mode cloud">' + ic("db") + '公司正式資料（Google 試算表 ERP_ 分頁，多人共用）</div>'
       : '<div class="erp-mode local">' + ic("info") + '本機試用模式：資料只存在這個瀏覽器，不會進公司試算表。'
@@ -110,10 +117,11 @@
         + "</div>";
     var tools = '<div class="erp-tools">'
       + '<span id="erpBusy" class="erp-busy" style="display:none">' + ic("clock") + '處理中…</span>'
-      + btn("reload", ic("refresh") + "重新整理") + btn("backup", ic("download") + "備份 JSON") + btn("health", ic("shield") + "資料健檢")
+      + btn("reload", ic("refresh") + "重新整理") + btn("backup", ic("download") + "備份 JSON") + btn("import", ic("inbox") + "匯入備份")
+      + btn("health", ic("shield") + "資料健檢")
       + (S.mode === "local" ? btn("reset-local", ic("eraser") + "清空試用資料") : "")
       + "</div>";
-    var body = S.loading ? '<div class="dbloading">載入公司 ERP 資料中…</div>' : (VIEW[S.tab] || VIEW.home)(w);
+    var body = S.loading ? '<div class="dbloading">載入公司資料中…</div>' : (VIEW[S.tab] || VIEW[TABS[PAGE][0][0]])(w);
     mount.innerHTML = mode + tools + '<div class="dbtabs erp-tabs">' + tabs + "</div>" + body;
     paintBusy();
   }
@@ -148,14 +156,6 @@
 
   VIEW.home = function (w) {
     var r = E.report(w, today());
-    var emptyWorld = !w.items.length && !w.customers.length;
-    var guide = emptyWorld ? section(ic("play") + "第一次使用：四步驟開始",
-      '<ol class="erp-steps"><li><b>建料號</b>：原料（kg）、成品（件）都要建，進貨與出貨才算得出成本。</li>'
-      + "<li><b>進貨</b>：照實際進價登錄，系統用先進先出（FIFO）自動算庫存成本。</li>"
-      + "<li><b>建客戶 → 報價 → 接受轉訂單</b>：也可以直接開訂單。</li>"
-      + "<li><b>出貨、收款</b>；要自己生產的，先建 BOM 再開工單。</li></ol>"
-      + '<div class="erp-row">' + btn("tab", "＋ 先建第一個料號", "items", "primary")
-      + (S.mode === "local" ? btn("demo", ic("info") + "載入示範資料（只在本機）") : "") + "</div>") : "";
     var kp = '<div class="okpis erp-kpis">'
       + kpi(ic("cash") + "本月銷售", nt(r.sales_month), "", "依出貨認列")
       + kpi(ic("chart") + "本月毛利", nt(r.gp_month), r.gp_month < 0 ? "warn" : "", r.gm_month == null ? "—" : "毛利率 " + r.gm_month + "%")
@@ -183,7 +183,7 @@
     var metal = (S.metal.copper || S.metal.aluminum) ? '<div class="erp-metal">' + ic("ingot") + '原料參考價（LME 換算）：'
       + (S.metal.copper ? "銅 NT$ " + num(S.metal.copper) + "/kg　" : "") + (S.metal.aluminum ? "鋁 NT$ " + num(S.metal.aluminum) + "/kg" : "")
       + (S.metal.updated ? '　<span class="erp-muted">更新 ' + esc(S.metal.updated) + "</span>" : "") + "</div>" : "";
-    return guide + kp + metal
+    return kp + metal
       + '<div class="erp-grid2">' + section(ic("alert") + "缺料（需要補料或生產）", short) + section(ic("bars") + "低於安全庫存", low) + "</div>"
       + '<div class="erp-grid2">' + section(ic("clock") + "要注意的單據", due.length ? '<ul class="erp-list">' + due.join("") + "</ul>" : '<div class="dbempty">沒有逾期或快到期的單據</div>')
       + section(ic("target") + "銷售漏斗（商機）", '<div class="dbbars erp-funnel">' + funnel + "</div>") + "</div>";
@@ -401,7 +401,48 @@
     return ov;
   }
   // titleHtml：可含狀態標籤；呼叫端要自行 esc 使用者輸入的文字
-  function info(titleHtml, html, extra) { return form({ titleHtml: titleHtml, fields: [{ type: "html", html: html }], extra: extra, wide: true }); }
+  function info(titleHtml, html, extra) {
+    extra = (extra || []).slice();
+    var cur = S.curRec; S.curRec = null;
+    if (cur) extra.unshift({ l: ic("pin") + (isPinned(cur.t, cur.id) ? "取消釘選" : "釘選"), fn: function (close) { pinToggle(cur.t, cur.id); close(); } });
+    return form({ titleHtml: titleHtml, fields: [{ type: "html", html: html }], extra: extra, wide: true });
+  }
+
+  // ---------- 釘選（存在這個瀏覽器；總覽與搜尋會列出） ----------
+  function pinsGet() { return lsGet(PIN_KEY, []) || []; }
+  function isPinned(t, id) { return pinsGet().some(function (x) { return x.t === t && x.id === id; }); }
+  function recLabel(t, r) {
+    if (!r) return "";
+    if (t === "customers") return r.name;
+    if (t === "items") return r.sku + " " + r.name;
+    if (t === "staff") return r.code + " " + r.name;
+    return (r.no ? r.no + " " : "") + (r.title || r.name || (r.customer_id ? custName(r.customer_id) : "") || "");
+  }
+  function pinToggle(t, id) {
+    var ps = pinsGet().filter(function (x) { return !(x.t === t && x.id === id); });
+    if (ps.length === pinsGet().length) ps.unshift({ t: t, id: id, label: recLabel(t, byId(t, id)), page: PAGE });
+    lsSet(PIN_KEY, ps.slice(0, 12)); render();
+  }
+
+  // ---------- 用網址打開紀錄：erp.html#rec=orders:ID、admin.html#tab=shifts ----------
+  var OPEN = {};       // 資料表 → 打開詳情的函式（擴充模組可再加）
+  var ADMIN_TABLES = ["units", "staff", "shifts", "attendance", "requests", "equipment", "reservations", "notices"];
+  function openRec(t, id) {
+    var page = ADMIN_TABLES.indexOf(t) >= 0 ? "admin" : "erp";
+    if (page !== PAGE) { location.href = page + ".html#rec=" + t + ":" + encodeURIComponent(id); return; }
+    if (!byId(t, id) || !OPEN[t]) return;
+    S.curRec = { t: t, id: id };
+    OPEN[t](id);
+    S.curRec = null;
+  }
+  function openFromHash() {
+    var h = decodeURIComponent(location.hash.slice(1)), m;
+    if ((m = /^tab=([a-z]+)$/.exec(h)) && VIEW[m[1]]) { S.tab = m[1]; render(); }
+    else if ((m = /^rec=([a-z]+):(.+)$/.exec(h)) && S.world) {
+      history.replaceState(null, "", location.pathname);
+      openRec(m[1], m[2]);
+    }
+  }
   function needCustomers() { if (!W().customers.length) { alert("請先建立客戶（客戶／商機 → ＋ 新增客戶）。"); S.tab = "crm"; render(); return false; } return true; }
   function needItems() { if (!W().items.length) { alert("請先建立料號（料號庫存 → ＋ 新增料號）。"); S.tab = "items"; render(); return false; } return true; }
 
@@ -801,6 +842,35 @@
       var errs = E.check(W());
       alert(errs.length ? "發現 " + errs.length + " 個不一致（多半是有人直接改了試算表）：\n\n" + errs.join("\n") : "資料一致：每個料號的帳面數量都等於成本批次加總。");
     },
+    "import": function () {
+      var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".json,application/json";
+      inp.onchange = function () {
+        var f = inp.files[0]; if (!f) return;
+        var rd = new FileReader();
+        rd.onload = function () {
+          var w;
+          try { w = JSON.parse(rd.result); } catch (e) { alert("這不是有效的 JSON 備份檔。"); return; }
+          var errs = E.validate(w);
+          if (errs.length) { alert("備份檔檢查沒通過，未匯入：\n\n" + errs.slice(0, 10).join("\n")); return; }
+          var counts = Object.keys(E.TABLES).filter(function (t) { return (w[t] || []).length; }).map(function (t) { return E.TABLES[t].sheet.replace("ERP_", "") + " " + w[t].length; }).join("、");
+          var where = S.mode === "cloud" ? "公司試算表的 ERP 資料" : "這個瀏覽器的試用資料";
+          if (!confirm("用這份備份「整份取代」" + where + "？\n\n內容：" + (counts || "空的") + "\n\n取代前會先自動下載一份目前的備份。")) return;
+          H.backup();
+          if (S.mode === "cloud") {
+            S.busy = true; paintBusy();
+            bridge().call("erpImport", { world: w }).then(function (d) {
+              S.busy = false; paintBusy();
+              if (!d || d.error) { alert(d ? d.error : "連線失敗，未匯入"); return; }
+              S.world = fill(d.world); render(); alert("匯入完成。");
+            });
+          } else { S.world = fill(w); saveLocal(); render(); alert("匯入完成。"); }
+        };
+        rd.readAsText(f, "utf-8");
+      };
+      inp.click();
+    },
+    "rec": function (k) { var i = k.indexOf(":"); openRec(k.slice(0, i), k.slice(i + 1)); },
+    "pin-remove": function (k) { var i = k.indexOf(":"); pinToggle(k.slice(0, i), k.slice(i + 1)); },
     "reset-local": function () { if (confirm("清空這個瀏覽器裡的 ERP 試用資料？（不影響公司試算表）")) { S.world = E.empty(); saveLocal(); render(); } },
     "demo": demo,
     "item-new": function () { itemForm(null); },
@@ -809,7 +879,8 @@
     "item-lots": function (id) { lotsView(itemOf(id)); },
     "receive-new": function () { receiveForm(null); },
     "receive-for": function (id) { receiveForm(itemOf(id)); },
-    "receive-view": function (id) {
+    "receive-view": function (id) { openRec("receipts", id); },
+    "receive-show": function (id) {
       var r = byId("receipts", id);
       info(ic("truck") + "進貨單 " + esc(r.no), "<p>供應商：<b>" + esc(r.supplier) + "</b>　日期：" + esc(r.date) + "</p>" + table([
         { l: "料號", v: "sku" }, { l: "品名", v: "name" }, { l: "數量", r: 1, v: function (l) { return num(l.qty); } },
@@ -820,17 +891,17 @@
     "cust-edit": function (id) { custForm(byId("customers", id)); },
     "deal-new": function () { dealForm(null); },
     "deal-new-for": function (id) { dealForm(null, id); },
-    "deal-view": function (id) { dealView(byId("deals", id)); },
+    "deal-view": function (id) { openRec("deals", id); },
     "quote-new": function () { quoteForm(null); },
     "quote-new-for": function (id) { quoteForm(null, id); },
     "quote-edit": function (id) { quoteForm(byId("quotes", id)); },
-    "quote-view": function (id) { quoteView(byId("quotes", id)); },
+    "quote-view": function (id) { openRec("quotes", id); },
     "quote-issue": function (id) { doIssue(byId("quotes", id)); },
     "quote-accept": function (id) { acceptForm(byId("quotes", id)); },
     "quote-del": function (id) { if (confirm("刪除這張報價草稿？")) act("quote.delete", { id: id }); },
     "quote-print": function (id) { printQuote(byId("quotes", id)); },
     "order-new": function () { orderForm(null); },
-    "order-view": function (id) { orderView(byId("orders", id)); },
+    "order-view": function (id) { openRec("orders", id); },
     "order-ship": function (id) { shipForm(byId("orders", id)); },
     "order-pay": function (id) { payForm(byId("orders", id)); },
     "bom-new": function () { bomForm(null); },
@@ -840,7 +911,7 @@
       var short = E.report(W(), today()).shortage.filter(function (s) { return s.id === id; })[0];
       woForm(id, short ? Math.ceil(short.short) : "");
     },
-    "wo-view": function (id) { woView(byId("workorders", id)); },
+    "wo-view": function (id) { openRec("workorders", id); },
     "wo-reserve": function (id) { act("wo.reserve", { id: id }); },
     "wo-start": function (id) { act("wo.start", { id: id }); },
     "wo-complete": function (id) { completeForm(byId("workorders", id)); },
@@ -863,9 +934,32 @@
     }
   };
 
+  OPEN.orders = function (id) { orderView(byId("orders", id)); };
+  OPEN.quotes = function (id) { quoteView(byId("quotes", id)); };
+  OPEN.workorders = function (id) { woView(byId("workorders", id)); };
+  OPEN.deals = function (id) { dealView(byId("deals", id)); };
+  OPEN.receipts = function (id) { H["receive-show"](id); };
+  OPEN.items = function (id) { itemForm(itemOf(id)); };
+  OPEN.customers = function (id) { custForm(byId("customers", id)); };
+
+  // 擴充模組（erp-crm.js、erp-admin-ui.js）用的介面
+  window.__erpUI = {
+    E: E, S: S, VIEW: VIEW, H: H, OPEN: OPEN, TABS: TABS, page: function () { return PAGE; },
+    W: W, act: act, render: render, load: load, form: form, info: info, table: table, section: section, kpi: kpi, chip: chip,
+    btn: btn, mini: mini, searchBox: searchBox, esc: esc, nt: nt, num: num, ic: ic, today: today, plusDays: plusDays,
+    byId: byId, custName: custName, custOpts: custOpts, itemOpts: itemOpts, selectHtml: selectHtml, csv: csv, download: download,
+    lsGet: lsGet, lsSet: lsSet, needCustomers: needCustomers, openRec: openRec, pinsGet: pinsGet, pinToggle: pinToggle, recLabel: recLabel,
+    addTab: function (page, key, label, after) {
+      var list = TABS[page], i = after ? list.map(function (t) { return t[0]; }).indexOf(after) : -1;
+      list.splice(i >= 0 ? i + 1 : list.length, 0, [key, label]);
+    }
+  };
+
   function init() {
-    mount = document.getElementById("erpView");
+    mount = document.getElementById("erpView") || document.getElementById("adminView");
     if (!mount || !E) return;
+    if (mount.id === "adminView") { PAGE = "admin"; S.tab = TABS.admin[0] ? TABS.admin[0][0] : "home"; }
+    window.addEventListener("hashchange", openFromHash);
     mount.addEventListener("click", function (e) {
       var t = e.target.closest("[data-a],[data-tab]");
       if (!t || !mount.contains(t)) return;

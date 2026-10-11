@@ -65,12 +65,40 @@
       sheet: "ERP_工單",
       cols: ["id", "no", "bom_id", "bom", "qty", "status", "due", "extra_cost", "actual_cost", "consumed", "note", "created"],
       num: ["qty", "extra_cost", "actual_cost"], json: ["bom", "consumed"]
+    },
+    contacts: {
+      sheet: "ERP_聯絡人",
+      cols: ["id", "customer_id", "name", "title", "phone", "email", "primary", "note", "created"],
+      bool: ["primary"]
+    },
+    cases: {
+      sheet: "ERP_客服案件",
+      cols: ["id", "no", "customer_id", "contact_id", "title", "kind", "priority", "status", "owner", "due", "resolution", "log", "note", "created", "updated"],
+      json: ["log"]
+    },
+    services: {
+      sheet: "ERP_服務委託",
+      cols: ["id", "no", "customer_id", "case_id", "title", "amount", "status", "deliveries", "paid", "payments", "note", "created"],
+      num: ["amount", "paid"], json: ["deliveries", "payments"]
+    },
+    tasks: {
+      sheet: "ERP_專案任務",
+      cols: ["id", "title", "project", "customer_id", "owner", "due", "status", "note", "created", "done_at"]
+    },
+    milestones: {
+      sheet: "ERP_里程碑",
+      cols: ["id", "title", "project", "customer_id", "due", "status", "note", "created", "done_at"]
     }
   };
   var META_SHEET = "ERP_設定";
 
   var KINDS = ["原料", "半成品", "成品", "商品", "耗材"];
   var STAGES = ["新開發", "已聯繫", "已報價", "成交", "失單"];
+  var CASE_KINDS = ["詢價", "客訴", "技術支援", "維修", "其他"];
+  var CASE_STATUS = ["開啟", "處理中", "待客戶回覆", "已解決", "已關閉"];
+  var PRIORITIES = ["低", "中", "高"];
+  var TASK_STATUS = ["待辦", "進行中", "完成"];
+  var MS_STATUS = ["規劃中", "已達成", "延後"];
 
   // ---------- 小工具 ----------
   function ErpError(msg) { this.name = "ErpError"; this.message = msg; }
@@ -306,8 +334,11 @@
   };
   A["customer.delete"] = function (w, p, ctx) {
     var c = find(w, "customers", p.id, "客戶");
-    var used = ["deals", "quotes", "orders"].some(function (t) { return w[t].some(function (x) { return x.customer_id === c.id; }); });
-    need(!used, "此客戶已有商機、報價或訂單，不能刪除");
+    var used = ["deals", "quotes", "orders", "cases", "services", "tasks", "milestones"].some(function (t) { return w[t].some(function (x) { return x.customer_id === c.id; }); });
+    need(!used, "此客戶已有商機、報價、訂單、案件、服務或專案，不能刪除");
+    w.contacts.filter(function (x) { return x.customer_id === c.id; }).forEach(function (x) {
+      w.contacts.splice(w.contacts.indexOf(x), 1); (ctx.dirty.contacts = ctx.dirty.contacts || {})[x.id] = "delete";
+    });
     w.customers.splice(w.customers.indexOf(c), 1);
     (ctx.dirty.customers = ctx.dirty.customers || {})[c.id] = "delete";
     return c.id;
@@ -570,10 +601,171 @@
     return o.id;
   };
 
+  function del(w, ctx, table, rec) {
+    w[table].splice(w[table].indexOf(rec), 1);
+    (ctx.dirty[table] = ctx.dirty[table] || {})[rec.id] = "delete";
+  }
+  function oneOf(v, list, def, label) { v = str(v) || def; need(list.indexOf(v) >= 0, (label || "選項") + "不符"); return v; }
+
+  // ---- 客戶聯絡人（一個客戶可多位，其中一位為主要聯絡人） ----
+  A["contact.save"] = function (w, p, ctx) {
+    find(w, "customers", p.customer_id, "客戶");
+    var name = str(p.name, 60); need(name, "請填聯絡人姓名");
+    var c = p.id ? find(w, "contacts", p.id, "聯絡人") : { id: ctx.newId("P"), created: today(ctx) };
+    need(!p.id || c.customer_id === p.customer_id, "聯絡人不能改到別的客戶");
+    c.customer_id = p.customer_id; c.name = name;
+    ["title", "phone", "email", "note"].forEach(function (k) { c[k] = str(p[k], k === "note" ? 300 : 100); });
+    c.primary = !!p.primary || !w.contacts.some(function (x) { return x.customer_id === p.customer_id && x.id !== c.id; });
+    if (c.primary) w.contacts.forEach(function (x) {
+      if (x.customer_id === c.customer_id && x.id !== c.id && x.primary) { x.primary = false; touch(ctx, "contacts", x); }
+    });
+    if (!p.id) w.contacts.push(c);
+    touch(ctx, "contacts", c);
+    return c.id;
+  };
+  A["contact.delete"] = function (w, p, ctx) {
+    var c = find(w, "contacts", p.id, "聯絡人");
+    need(!w.cases.some(function (x) { return x.contact_id === c.id; }), "此聯絡人已有客服案件，不能刪除");
+    del(w, ctx, "contacts", c);
+    var rest = w.contacts.filter(function (x) { return x.customer_id === c.customer_id; });
+    if (c.primary && rest.length) { rest[0].primary = true; touch(ctx, "contacts", rest[0]); }
+    return c.id;
+  };
+
+  // ---- 客服案件：開啟 → 處理中 → 待客戶回覆 → 已解決／已關閉（結案要寫處理結果，每次變更留紀錄） ----
+  A["case.save"] = function (w, p, ctx) {
+    find(w, "customers", p.customer_id, "客戶");
+    if (p.contact_id) need(find(w, "contacts", p.contact_id, "聯絡人").customer_id === p.customer_id, "聯絡人不屬於這位客戶");
+    var title = str(p.title, 120); need(title, "請填案件主旨");
+    var c = p.id ? find(w, "cases", p.id, "案件") : { id: ctx.newId("K"), no: nextNo(w, ctx, "CS"), status: "開啟", resolution: "", log: [], created: today(ctx) };
+    c.customer_id = p.customer_id; c.contact_id = p.contact_id || ""; c.title = title;
+    c.kind = oneOf(p.kind, CASE_KINDS, "詢價", "案件類別");
+    c.priority = oneOf(p.priority, PRIORITIES, "中", "優先度");
+    c.owner = str(p.owner, 60); c.due = isDate(p.due) ? p.due : ""; c.note = str(p.note, 500); c.updated = today(ctx);
+    if (!p.id) { c.log.push({ date: today(ctx), by: ctx.by, status: "開啟", note: "建立案件" }); w.cases.push(c); }
+    touch(ctx, "cases", c);
+    return c.id;
+  };
+  A["case.status"] = function (w, p, ctx) {
+    var c = find(w, "cases", p.id, "案件");
+    var st = oneOf(p.status, CASE_STATUS, "", "案件狀態");
+    var note = str(p.note, 500);
+    need(st !== c.status, "狀態沒有改變");
+    if (st === "已解決" || st === "已關閉") { need(note || c.resolution, "結案請寫處理結果"); if (note) c.resolution = note; }
+    c.status = st; c.updated = today(ctx);
+    c.log.push({ date: today(ctx), by: ctx.by, status: st, note: note });
+    touch(ctx, "cases", c);
+    return c.id;
+  };
+  A["case.log"] = function (w, p, ctx) {
+    var c = find(w, "cases", p.id, "案件");
+    var note = str(p.note, 500); need(note, "請填處理紀錄");
+    c.log.push({ date: today(ctx), by: ctx.by, status: c.status, note: note }); c.updated = today(ctx);
+    touch(ctx, "cases", c);
+    return c.id;
+  };
+  A["case.delete"] = function (w, p, ctx) {
+    var c = find(w, "cases", p.id, "案件");
+    need(!w.services.some(function (x) { return x.case_id === c.id; }), "此案件已有服務委託，不能刪除");
+    need(c.log.length <= 1, "已有處理紀錄的案件請改為「已關閉」保留紀錄");
+    del(w, ctx, "cases", c);
+    return c.id;
+  };
+
+  // ---- 服務交付（代工打樣、外包加工等）：草稿 → 確認 → 交付（每次一版）→ 客戶驗收或要求修改 → 收款 ----
+  A["service.save"] = function (w, p, ctx) {
+    find(w, "customers", p.customer_id, "客戶");
+    if (p.case_id) need(find(w, "cases", p.case_id, "案件").customer_id === p.customer_id, "案件不屬於這位客戶");
+    var s = p.id ? find(w, "services", p.id, "服務委託") : null;
+    if (s) need(s.status === "草稿", "已確認的服務不能修改內容");
+    var title = str(p.title, 120); need(title, "請填服務項目");
+    var rec = s || { id: ctx.newId("V"), no: nextNo(w, ctx, "SV"), status: "草稿", deliveries: [], paid: 0, payments: [], created: today(ctx) };
+    rec.customer_id = p.customer_id; rec.case_id = p.case_id || ""; rec.title = title;
+    rec.amount = money(p.amount, "服務金額"); need(rec.amount > 0, "服務金額須大於 0");
+    rec.note = str(p.note, 500);
+    if (!s) w.services.push(rec);
+    touch(ctx, "services", rec);
+    return rec.id;
+  };
+  A["service.confirm"] = function (w, p, ctx) {
+    var s = find(w, "services", p.id, "服務委託");
+    need(s.status === "草稿", "只有草稿可以確認");
+    s.status = "已確認"; touch(ctx, "services", s);
+    return s.id;
+  };
+  A["service.deliver"] = function (w, p, ctx) {
+    var s = find(w, "services", p.id, "服務委託");
+    need(["已確認", "已交付", "要求修改"].indexOf(s.status) >= 0, "請先確認服務；已驗收的服務不能再交付");
+    need(s.paid <= 0, "已收款的服務不能改交付");
+    var ref = str(p.ref, 300); need(ref, "請填交付內容（例：樣品編號、圖檔連結）");
+    s.deliveries.push({ rev: s.deliveries.length + 1, date: today(ctx), ref: ref, note: str(p.note, 300), by: ctx.by });
+    s.status = "已交付"; touch(ctx, "services", s);
+    return s.id;
+  };
+  function latestRev(s) { return s.deliveries.length ? s.deliveries[s.deliveries.length - 1].rev : 0; }
+  A["service.accept"] = function (w, p, ctx) {
+    var s = find(w, "services", p.id, "服務委託");
+    need(s.status === "已交付" && Number(p.rev) === latestRev(s), "只能驗收最新一版交付");
+    s.status = "已驗收"; s.deliveries[s.deliveries.length - 1].result = "驗收通過";
+    touch(ctx, "services", s);
+    return s.id;
+  };
+  A["service.request_changes"] = function (w, p, ctx) {
+    var s = find(w, "services", p.id, "服務委託");
+    need(s.status === "已交付" && Number(p.rev) === latestRev(s), "只能對最新一版交付要求修改");
+    var note = str(p.note, 300); need(note, "請寫要修改的地方");
+    s.status = "要求修改"; s.deliveries[s.deliveries.length - 1].result = "要求修改：" + note;
+    touch(ctx, "services", s);
+    return s.id;
+  };
+  A["service.pay"] = function (w, p, ctx) {
+    var s = find(w, "services", p.id, "服務委託");
+    need(s.status === "已驗收" || s.status === "部分收款", "客戶驗收後才能收款");
+    var amt = money(p.amount, "收款金額"); need(amt > 0, "收款金額須大於 0");
+    need(m2(s.paid + amt) <= s.amount + 0.005, "收款超過服務金額（尚可收 " + m2(s.amount - s.paid) + "）");
+    s.paid = m2(s.paid + amt);
+    s.payments.push({ date: isDate(p.date) ? p.date : today(ctx), amount: amt, note: str(p.note, 100), by: ctx.by });
+    s.status = s.paid + 0.005 >= s.amount ? "已收款" : "部分收款";
+    touch(ctx, "services", s);
+    return s.id;
+  };
+  A["service.delete"] = function (w, p, ctx) {
+    var s = find(w, "services", p.id, "服務委託");
+    need(s.status === "草稿", "已確認的服務要保留紀錄，不能刪除");
+    del(w, ctx, "services", s);
+    return s.id;
+  };
+
+  // ---- 專案任務與里程碑 ----
+  function projectRec(w, p, ctx, table, prefix, statuses, def) {
+    var title = str(p.title, 120); need(title, "請填標題");
+    if (p.customer_id) find(w, "customers", p.customer_id, "客戶");
+    var r = p.id ? find(w, table, p.id) : { id: ctx.newId(prefix), status: def, created: today(ctx), done_at: "" };
+    r.title = title; r.project = str(p.project, 60); r.customer_id = p.customer_id || "";
+    r.due = isDate(p.due) ? p.due : ""; r.note = str(p.note, 500);
+    if (table === "tasks") r.owner = str(p.owner, 60);
+    if (p.status) setStatus(r, p.status, statuses, ctx);
+    if (!p.id) w[table].push(r);
+    touch(ctx, table, r);
+    return r.id;
+  }
+  function setStatus(r, st, statuses, ctx) {
+    r.status = oneOf(st, statuses, "", "狀態");
+    r.done_at = (r.status === "完成" || r.status === "已達成") ? (r.done_at || today(ctx)) : "";
+  }
+  A["task.save"] = function (w, p, ctx) { return projectRec(w, p, ctx, "tasks", "T", TASK_STATUS, "待辦"); };
+  A["task.status"] = function (w, p, ctx) { var t = find(w, "tasks", p.id, "任務"); setStatus(t, p.status, TASK_STATUS, ctx); touch(ctx, "tasks", t); return t.id; };
+  A["task.delete"] = function (w, p, ctx) { var t = find(w, "tasks", p.id, "任務"); del(w, ctx, "tasks", t); return t.id; };
+  A["milestone.save"] = function (w, p, ctx) { return projectRec(w, p, ctx, "milestones", "N", MS_STATUS, "規劃中"); };
+  A["milestone.status"] = function (w, p, ctx) { var m = find(w, "milestones", p.id, "里程碑"); setStatus(m, p.status, MS_STATUS, ctx); touch(ctx, "milestones", m); return m.id; };
+  A["milestone.delete"] = function (w, p, ctx) { var m = find(w, "milestones", p.id, "里程碑"); del(w, ctx, "milestones", m); return m.id; };
+
   function apply(w, action, p, ctxIn) {
     var fn = A[action];
     need(fn, "不支援的操作：" + action);
+    for (var t in TABLES) if (!w[t]) w[t] = [];      // 舊資料沒有新功能的表 → 補空表
     var ctx = makeCtx(ctxIn);
+    ctx.allowSelfApprove = !!(ctxIn && ctxIn.allowSelfApprove);
     var result = fn(w, p || {}, ctx);
     return { result: result, dirty: ctx.dirty };
   }
@@ -623,6 +815,21 @@
     STAGES.forEach(function (s) { r.pipeline[s] = { n: 0, amount: 0 }; });
     w.deals.forEach(function (d) { var x = r.pipeline[d.stage]; if (x) { x.n++; x.amount = m2(x.amount + d.amount); } });
     w.workorders.forEach(function (o) { if (["計畫", "已備料", "生產中"].indexOf(o.status) >= 0) r.wo_active++; });
+    r.cases_open = []; r.services_waiting = []; r.services_unpaid = 0; r.tasks_due = []; r.milestones_soon = [];
+    (w.cases || []).forEach(function (c) {
+      if (c.status !== "已解決" && c.status !== "已關閉") r.cases_open.push({ id: c.id, no: c.no, title: c.title, priority: c.priority, due: c.due, late: !!(c.due && c.due < t) });
+    });
+    (w.services || []).forEach(function (s) {
+      if (s.status === "已交付") r.services_waiting.push({ id: s.id, no: s.no, title: s.title });
+      if (s.status === "已驗收" || s.status === "部分收款") r.services_unpaid = m2(r.services_unpaid + s.amount - s.paid);
+    });
+    (w.tasks || []).forEach(function (x) {
+      if (x.status !== "完成" && x.due && x.due <= addDays(t, 7)) r.tasks_due.push({ id: x.id, title: x.title, due: x.due, late: x.due < t });
+    });
+    (w.milestones || []).forEach(function (x) {
+      if (x.status !== "已達成" && x.due && x.due <= addDays(t, 14)) r.milestones_soon.push({ id: x.id, title: x.title, due: x.due, late: x.due < t });
+    });
+    REPORTERS.forEach(function (fn) { fn(w, t, r); });
     return r;
   }
   function addDays(d, n) { var x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
@@ -638,9 +845,53 @@
     return errs;
   }
 
+  // 匯入備份前的完整檢查：每張表是陣列、id 不重複、參照存在、庫存一致
+  var REFS = {
+    lots: { item_id: "items" }, moves: { item_id: "items" }, deals: { customer_id: "customers" },
+    quotes: { customer_id: "customers" }, orders: { customer_id: "customers" }, boms: { item_id: "items" },
+    workorders: { bom_id: "boms" }, contacts: { customer_id: "customers" }, cases: { customer_id: "customers" },
+    services: { customer_id: "customers" }
+  };
+  function validate(w) {
+    var errs = [];
+    if (!w || typeof w !== "object") return ["不是有效的備份檔"];
+    for (var t in TABLES) {
+      if (w[t] === undefined) continue;
+      if (!Array.isArray(w[t])) { errs.push(t + " 不是清單"); continue; }
+      var seen = {};
+      w[t].forEach(function (r, i) {
+        if (!r || typeof r !== "object" || !r.id) { errs.push(TABLES[t].sheet + " 第 " + (i + 1) + " 筆缺少 id"); return; }
+        if (seen[r.id]) errs.push(TABLES[t].sheet + " 的 id 重複：" + r.id);
+        seen[r.id] = 1;
+      });
+    }
+    if (errs.length) return errs;
+    for (var tb in REFS) (w[tb] || []).forEach(function (r) {
+      for (var k in REFS[tb]) if (r[k] && !(w[REFS[tb][k]] || []).some(function (x) { return x.id === r[k]; }))
+        errs.push(TABLES[tb].sheet + " " + (r.no || r.id) + " 參照不存在的 " + k + "：" + r[k]);
+    });
+    VALIDATORS.forEach(function (fn) { fn(w, errs); });
+    if (w.items && w.lots) errs = errs.concat(check(w));
+    return errs.slice(0, 50);
+  }
+
+  // 擴充模組（例：erp-admin.js 行政工作台）用：加資料表、操作、報表、檢查
+  var REPORTERS = [], VALIDATORS = [];
+  function extend(def) {
+    for (var t in def.tables || {}) TABLES[t] = def.tables[t];
+    for (var a in def.actions || {}) A[a] = def.actions[a];
+    for (var r in def.refs || {}) REFS[r] = def.refs[r];
+    if (def.report) REPORTERS.push(def.report);
+    if (def.validate) VALIDATORS.push(def.validate);
+    api.actions = Object.keys(A);
+  }
+  var helpers = { need: need, str: str, find: find, findOpt: findOpt, touch: touch, del: del, oneOf: oneOf, nextNo: nextNo,
+    isDate: isDate, today: today, money: money, m2: m2, q3: q3, addDays: addDays, ErpError: ErpError };
+
   var api = {
     TABLES: TABLES, META_SHEET: META_SHEET, KINDS: KINDS, STAGES: STAGES,
-    empty: empty, apply: apply, report: report, check: check,
+    CASE_KINDS: CASE_KINDS, CASE_STATUS: CASE_STATUS, PRIORITIES: PRIORITIES, TASK_STATUS: TASK_STATUS, MS_STATUS: MS_STATUS,
+    empty: empty, apply: apply, report: report, check: check, validate: validate, extend: extend, h: helpers,
     orderState: orderState, payState: payState, orderNet: orderNet, stockValue: stockValue, itemLots: itemLots, activeBom: activeBom,
     ErpError: ErpError, actions: Object.keys(A)
   };

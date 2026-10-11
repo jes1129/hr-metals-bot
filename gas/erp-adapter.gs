@@ -13,7 +13,7 @@ var ERP_LOG_SHEET = "ERP_操作紀錄";
 var ERP_LOG_COLS = ["ts", "by", "action", "key", "result", "payload"];
 
 function erpDispatch_(action, p, email) {
-  if (action !== "erpLoad" && action !== "erpAct") return null;   // 不是 ERP 的 action → 交回原本的 unknown action
+  if (action !== "erpLoad" && action !== "erpAct" && action !== "erpImport") return null;   // 不是 ERP 的 action → 交回原本的 unknown action
   // ERP 含售價、成本、毛利：可在「專案設定 → 指令碼屬性」加 ERP_EMAILS（逗號分隔）限定誰能用；
   // 沒設 = 所有通過主檔白名單的人都能用。其他功能（訂單看板、資料庫…）不受影響。
   var only = String(PropertiesService.getScriptProperties().getProperty("ERP_EMAILS") || "").trim();
@@ -21,7 +21,37 @@ function erpDispatch_(action, p, email) {
     return { error: "此帳號沒有 ERP 權限（請管理者把你加入 ERP_EMAILS）：" + email };
   }
   if (action === "erpLoad") return { ok: true, world: erpLoad_() };
+  if (action === "erpImport") return erpImport_(p || {}, email);
   return erpAct_(p || {}, email);
+}
+
+// 匯入備份（整份取代 ERP_ 分頁）：先完整檢查，不通過就什麼都不寫；寫入前在操作紀錄留一筆
+function erpImport_(p, email) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try {
+    var src = p.world || {}, w = ErpEngine.empty();
+    Object.keys(ErpEngine.TABLES).forEach(function (t) { if (Array.isArray(src[t])) w[t] = src[t]; });
+    if (src.meta && typeof src.meta === "object") w.meta = { seq: src.meta.seq || {}, lotseq: Number(src.meta.lotseq) || 0 };
+    var errs = ErpEngine.validate(w);
+    if (errs.length) return { error: "備份檔檢查沒通過，未匯入：\n" + errs.slice(0, 8).join("\n") };
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var log = erpSheet_(ss, ERP_LOG_SHEET, ERP_LOG_COLS);
+    erpAppend_(log, [[new Date().toISOString(), email, "erpImport", "", "", "匯入備份：" + Object.keys(ErpEngine.TABLES).map(function (t) { return t + "=" + w[t].length; }).join(" ")]]);
+    Object.keys(ErpEngine.TABLES).forEach(function (t) {
+      var def = ErpEngine.TABLES[t], sh = ss.getSheetByName(def.sheet);
+      if (!sh && !w[t].length) return;
+      sh = sh || erpSheet_(ss, def.sheet, def.cols);
+      var hdr = erpHeader_(sh, def.cols);
+      if (sh.getLastRow() >= 2) sh.getRange(2, 1, sh.getLastRow() - 1, Math.max(sh.getLastColumn(), hdr.length)).clearContent();
+      if (w[t].length) erpAppend_(sh, w[t].map(function (r) { return hdr.map(function (h) { return erpEncode_(r[h]); }); }), hdr.length);
+    });
+    var m = erpSheet_(ss, ErpEngine.META_SHEET, ["key", "value"]);
+    m.getRange(2, 1, 1, 2).setNumberFormat("@").setValues([["meta", JSON.stringify(w.meta)]]);
+    return { ok: true, world: erpLoad_() };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function erpAct_(p, email) {

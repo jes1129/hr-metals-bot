@@ -114,6 +114,8 @@ ERP（料號庫存 FIFO、進貨、報價、銷售訂單、BOM／工單、客戶
 
 完成後到 ERP 頁登入，上方會顯示「☁️ 公司正式資料」。若顯示「公司後端尚未加入 ERP 檔」代表第 2 或 5 步還沒完成。
 
+同一個 ERP 檔也包含**行政工作台**（組織、員工、週班表、出勤、申請簽核、設備預約、公告）以及客服案件、服務交付、專案、備份匯入，資料都寫在 `ERP_` 開頭的分頁（例：`ERP_員工`、`ERP_班表`、`ERP_申請`）。之後更新功能時，只要重新貼上新版 `google-apps-script-erp.gs` 並「管理部署 → 新版本」即可，主檔不用再改。
+
 開發者：ERP 規則只有一份 `docs/assets/erp-engine.js`（瀏覽器與 Apps Script 共用）。改了它或 `gas/erp-adapter.gs` 後執行 `python scripts/build_erp_gas.py` 重新產生 `google-apps-script-erp.gs`，並跑 `node --test tests/erp-engine.test.mjs`。ERP 規則移植自 [mars-tw/freedom-erp-crm](https://github.com/mars-tw/freedom-erp-crm)（MIT License, Copyright (c) 2026 mars-tw）。
 
 ### 交接給客戶時

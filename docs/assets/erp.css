@@ -64,3 +64,49 @@
   .erp-grid2 { grid-template-columns: 1fr; }
   .erp-tools { justify-content: flex-start; }
 }
+
+/* 角色列、上手任務、釘選 */
+.erp-roles { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }
+.erp-roles > span:first-child { font-weight: 700; color: var(--muted); }
+.erp-prog { height: 8px; background: var(--line2); border: 1px solid var(--line); margin: 2px 0 12px; }
+.erp-prog > div { height: 100%; background: var(--secondary); }
+.erp-onb { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; }
+.erp-onb li { display: flex; align-items: center; gap: 4px; font-size: 13.5px; }
+.erp-onb li.done { color: var(--muted); text-decoration: line-through; }
+.erp-onb li.done .ic { color: var(--down); }
+.erp-dot { width: 14px; height: 14px; margin-right: 6px; border: 2px solid var(--line); flex: none; }
+.erp-link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.erp-link:hover { text-decoration: underline; }
+.erp-pins { display: flex; flex-wrap: wrap; gap: 8px; }
+.erp-pin { display: inline-flex; }
+.erp-pin .dbmini { margin: 0; }
+.erp-pin .dbmini + .dbmini { border-left: 0; }
+/* 時間軸、流程提示、看板移動 */
+.erp-timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); }
+.erp-timeline li { position: relative; padding: 4px 0 8px 10px; font-size: 13.5px; }
+.erp-timeline li::before { content: ""; position: absolute; left: -20px; top: 10px; width: 9px; height: 9px; background: var(--secondary); }
+.erp-flow { background: var(--line2); padding: 8px 12px; margin: 0 0 12px; font-size: 13px; }
+.erp-mv { display: flex; flex-wrap: wrap; gap: 4px; }
+.erp-mv .dbmini { font-size: 12px; padding: 3px 7px; margin: 0; }
+.erp-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); }
+/* 週班表 */
+.erp-week { font-family: var(--num-font); padding: 0 6px; }
+.erp-week-grid th, .erp-week-grid td { vertical-align: top; }
+.erp-week-grid th.erp-today { color: var(--accent); box-shadow: inset 0 -3px var(--secondary); }
+.erp-cell { min-width: 96px; }
+.erp-shift { display: block; width: 100%; margin: 0 0 4px; padding: 4px 6px; font: inherit; font-size: 12.5px; font-family: var(--num-font); text-align: left; cursor: pointer;
+  background: var(--accent-soft); color: var(--text); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-left: 3px solid var(--accent); border-radius: var(--radius); }
+.erp-shift.done { background: var(--line2); border-left-color: var(--down); }
+.erp-add { display: block; width: 100%; padding: 2px; border: 1px dashed var(--line); background: transparent; color: var(--muted2); cursor: pointer; border-radius: var(--radius); }
+.erp-add:hover { color: var(--accent); border-color: var(--accent); }
+.erp-add .ic { margin: 0; }
+/* 公告 */
+.erp-notices { list-style: none; margin: 0; padding: 0; }
+.erp-notices li { padding: 8px 0; border-bottom: 1px solid var(--line2); cursor: pointer; font-size: 13.5px; }
+.erp-notices li div { color: var(--muted); margin-top: 2px; }
+.erp-notice-list { display: grid; gap: 12px; }
+.erp-notice { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line); padding: 12px 16px; }
+.erp-notice.pin { border-left-color: var(--secondary); }
+.erp-notice.off { opacity: .6; }
+.erp-notice-body { line-height: 1.8; margin: 4px 0 8px; }
+@media (max-width: 760px) { .erp-onb { grid-template-columns: 1fr; } }

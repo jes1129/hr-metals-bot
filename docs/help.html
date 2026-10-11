@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="assets/style.css?v=202610111144">
-<script src="config.js?v=202610111144"></script>
+<link rel="stylesheet" href="assets/style.css?v=202610111205">
+<script src="config.js?v=202610111205"></script>
+<script src="assets/palette.js?v=202610111205" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <title>九上科技 · 使用說明</title>
 <style>
@@ -90,7 +91,7 @@
 </head>
 <body>
   <div class="wrap help">
-    <div class="topbar"><a class="brand" href="index.html"><span class="brand-mark">九</span><span class="brand-name">九上科技<small>智慧儀表板</small></span></a><nav class="side" aria-label="主要功能"><div class="side-label">總覽</div><a href="index.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#home"/></svg><span>今日總覽</span></a><a href="metals.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#ingot"/></svg><span>原料行情</span></a><div class="side-label">營運</div><a href="quote.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#calc"/></svg><span>報價試算</span></a><a href="orders.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#clipboard"/></svg><span>訂單看板</span></a><a href="erp.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#factory"/></svg><span>ERP 作業</span></a><div class="side-label">工具</div><a href="assistant.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#bot"/></svg><span>AI 助手</span></a><a href="db.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#db"/></svg><span>資料庫</span></a><a class="on" aria-current="page" href="help.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#book"/></svg><span>使用說明</span></a></nav><div class="toplinks"><a href="help.html#start"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#play"/></svg>快速上手</a><a href="quote.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#plus"/></svg>新增報價</a></div><span id="gAuth" class="gauth"></span><button id="themeBtn" class="theme-btn" aria-label="切換深淺色"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#moon"/></svg></button></div>
+    <div class="topbar"><a class="brand" href="index.html"><span class="brand-mark">九</span><span class="brand-name">九上科技<small>智慧儀表板</small></span></a><nav class="side" aria-label="主要功能"><div class="side-label">總覽</div><a href="index.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#home"/></svg><span>今日總覽</span></a><a href="metals.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#ingot"/></svg><span>原料行情</span></a><div class="side-label">營運</div><a href="quote.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#calc"/></svg><span>報價試算</span></a><a href="orders.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#clipboard"/></svg><span>訂單看板</span></a><a href="erp.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#factory"/></svg><span>ERP 作業</span></a><a href="admin.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#users"/></svg><span>行政工作台</span></a><div class="side-label">工具</div><a href="assistant.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#bot"/></svg><span>AI 助手</span></a><a href="db.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#db"/></svg><span>資料庫</span></a><a class="on" aria-current="page" href="help.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#book"/></svg><span>使用說明</span></a></nav><div class="toplinks"><button type="button" id="paletteBtn" class="tsearch" aria-label="搜尋（Ctrl+K）"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#search"/></svg>搜尋<kbd>Ctrl K</kbd></button><a href="help.html#start"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#play"/></svg>快速上手</a><a href="quote.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#plus"/></svg>新增報價</a></div><span id="gAuth" class="gauth"></span><button id="themeBtn" class="theme-btn" aria-label="切換深淺色"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#moon"/></svg></button></div>
     <div class="eyebrow">九上科技 · 智慧儀表板</div>
     <h1><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#book"/></svg>使用說明</h1>
     <div class="sub">一頁看懂整個網站怎麼用 · 可展開／可試玩 · 更新於 2026-10-11</div>
@@ -99,10 +100,10 @@
   <div class="help-main">
     <div class="q">
       <h2>這是什麼？</h2>
-      <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情；一邊管報價、訂單、進銷存與生產（ERP），還有 AI 助手（含中越對話）。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
+      <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情；一邊管報價、訂單、進銷存與生產（ERP）、客戶與案件、行政（員工、班表、出勤、請假），還有 AI 助手（含中越對話）。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
       <div class="groups">
         <div class="group"><b><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#bars"/></svg>總覽</b><span>今日總覽、原料行情：每天打開先看這兩頁。</span></div>
-        <div class="group"><b><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#factory"/></svg>營運</b><span>報價試算、訂單看板、ERP 作業：從報價到出貨收款。</span></div>
+        <div class="group"><b><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#factory"/></svg>營運</b><span>報價試算、訂單看板、ERP 作業、行政工作台：從報價、出貨收款到員工排班。</span></div>
         <div class="group"><b><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#wrench"/></svg>工具</b><span>AI 助手、資料庫、使用說明：查資料、管名單、看教學。</span></div>
       </div>
       <p class="muted" style="margin-top:10px">選單在左側；手機上在頁面上方，可左右滑動。</p>
@@ -110,9 +111,9 @@
       <p class="muted">點下面任一顆，直接跳到該功能的詳細說明：</p>
       <div class="jump">
         <a href="#start">新手上路</a><a href="#f-login">登入</a><a href="#f-home"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#home"/></svg>首頁</a><a href="#f-metals"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#ingot"/></svg>原料</a>
-        <a href="#f-quote"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#calc"/></svg>報價</a><a href="#f-orders"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#box"/></svg>訂單</a><a href="#f-erp"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#factory"/></svg>ERP</a>
+        <a href="#f-quote"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#calc"/></svg>報價</a><a href="#f-orders"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#box"/></svg>訂單</a><a href="#f-erp"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#factory"/></svg>ERP</a><a href="#f-admin"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#users"/></svg>行政</a>
         <a href="#f-ai"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#bot"/></svg>助手</a><a href="#f-vn">中越對話</a><a href="#f-notebook"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#notebook"/></svg>NotebookLM</a><a href="#f-email">早報信</a>
-        <a href="#db"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#db"/></svg>資料庫/試算表</a><a href="#freq">更新頻率/費用</a><a href="#faq">常見問題</a>
+        <a href="#db"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#db"/></svg>資料庫/試算表</a><a href="#freq">更新頻率/費用</a><a href="#map">功能地圖</a><a href="#faq">常見問題</a>
       </div>
       </div>
     </div>
@@ -205,21 +206,42 @@
       </details>
 
       <details class="acc" id="f-erp">
-        <summary><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#factory"/></svg>ERP 作業 <span class="sm">— 庫存成本、進貨、報價、訂單、工單、客戶</span><span class="chev">▾</span></summary>
+        <summary><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#factory"/></svg>ERP 作業 <span class="sm">— 進銷存、生產、客戶、案件、服務、專案</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p><b>這是什麼：</b>完整的進銷存＋生產：料號庫存用<b>先進先出（FIFO）</b>自動算成本；報價 → 訂單 → 出貨 → 收款一路串起來；自己生產的用 <b>BOM＋工單</b>把用料成本轉進成品；總覽直接看本月銷售、毛利、庫存價值、應收、缺料。從左側選單的「ERP 作業」進入。</p>
-          <p><b>建議順序：</b></p>
+          <p><b>這是什麼：</b>完整的進銷存＋生產＋客戶管理。從左側選單的「ERP 作業」進入，上方分頁依序是：</p>
           <ul>
-            <li><b>料號庫存</b>：先建原料（kg）與成品（件）。原料可勾「銅／鋁」，會顯示 LME 參考價。</li>
-            <li><b>進貨</b>：照實際進價入庫；之後出貨、領料都依先進先出扣最早那批的成本。</li>
-            <li><b>客戶／商機 → 報價單</b>：報價「發出」後鎖定，改價請開新版（舊版自動作廢）；客戶接受就一鍵轉成訂單。</li>
-            <li><b>銷售訂單</b>：可先接單後備料（庫存不夠會列在總覽「缺料」）；可分批出貨、分次收款、退貨（依原成本退回庫存）；可列印報價單／出貨單（存 PDF）。</li>
-            <li><b>BOM／工單</b>：定義每 1 件的用料 → 開工單 → 預留用料 → 開工 → 完工（可加加工費），成品成本自動算好。</li>
+            <li><b>總覽</b>：上方切換「我是 老闆／業務／倉管／行政／全部」，每個角色看到自己需要的重點（只改顯示，不是權限）。第一次用會有<b>上手任務清單</b>，做完一項自動打勾。</li>
+            <li><b>料號庫存</b>：原料（kg）與成品（件）；先進先出（FIFO）自動算成本，可盤點調整、看成本批次。</li>
+            <li><b>進貨</b>：照實際進價入庫。<b>報價單</b>：發出後鎖定，改價開新版；客戶接受一鍵轉訂單。</li>
+            <li><b>銷售訂單</b>：可先接單後備料，分批出貨、分次收款、退貨（依原成本退回庫存），可列印報價單／出貨單。</li>
+            <li><b>BOM／工單</b>：每 1 件用料 → 工單預留、開工、完工，成品成本自動算好。</li>
+            <li><b>客戶／商機</b>：商機看板與跟進紀錄；按客戶列的放大鏡看<b>客戶 360</b>：多位聯絡人、案件、訂單、服務都在一起。</li>
+            <li><b>客服案件</b>：詢價、客訴、技術支援、維修；狀態從開啟到結案，結案要寫處理結果，每次變更都有紀錄。</li>
+            <li><b>服務交付</b>：代工打樣、外包加工：確認 → 交付（每次一版）→ 客戶驗收或要求修改 → 收款。</li>
+            <li><b>專案</b>：任務看板（待辦／進行中／完成）與里程碑，也會列出資料庫的「我的名單／待辦」。</li>
           </ul>
-          <p><b>資料存哪裡：</b>登入後存在公司試算表的 <b>ERP_ 開頭分頁</b>（與原本的訂單看板、資料庫分開，互不影響）。每筆操作都記在「ERP_操作紀錄」，庫存每次增減記在「ERP_庫存異動」。<b>請不要直接在試算表改 ERP_ 分頁</b>，改了帳會對不起來（可按「資料健檢」檢查）。未登入時是「本機試用」，資料只在自己的瀏覽器。</p>
-          <p><b>誰看得到金額：</b>ERP 會顯示售價、成本、毛利。若只想讓特定人使用，請管理者在 Apps Script「專案設定 → 指令碼屬性」新增 <code>ERP_EMAILS</code>（多個 email 用逗號分隔）；其他人仍可正常使用訂單看板等功能。</p>
-          <p><b>ERP 設定（管理者做一次）：</b>在同一個 Apps Script 專案新增一個指令碼檔，貼上 repo 的 <code>google-apps-script-erp.gs</code>；並把主檔 <code>google-apps-script.gs</code> 的 <code>default:</code> 那一行換成新版；最後「部署 → 管理部署 → 編輯 → 版本選『新版本』→ 部署」（網址不變）。詳見 README「ERP 設定」。</p>
+          <p><b>好用的小功能：</b>任何頁按 <kbd>Ctrl</kbd>＋<kbd>K</kbd>（或右上「搜尋」）找料號、客戶、單號、員工；單據詳情可按「釘選」，首頁與總覽會列出。工具列的「備份 JSON」下載整份資料，「匯入備份」可整份還原（匯入前會先自動下載目前的備份）。</p>
+          <p><b>資料存哪裡：</b>登入後存在公司試算表的 <b>ERP_ 開頭分頁</b>（與原本的訂單看板、資料庫分開）。每筆操作記在「ERP_操作紀錄」。<b>請不要直接在試算表改 ERP_ 分頁</b>，改了帳會對不起來（可按「資料健檢」檢查）。未登入時是「本機試用」，資料只在自己的瀏覽器。</p>
+          <p><b>誰看得到金額：</b>ERP 會顯示售價、成本、毛利。若只想讓特定人使用，請管理者在 Apps Script「專案設定 → 指令碼屬性」新增 <code>ERP_EMAILS</code>（多個 email 用逗號分隔）。</p>
+          <p><b>ERP 設定（管理者做一次）：</b>在同一個 Apps Script 專案新增一個指令碼檔，貼上 repo 的 <code>google-apps-script-erp.gs</code>；把主檔 <code>default:</code> 那一行換成新版；「部署 → 管理部署 → 編輯 → 新版本 → 部署」（網址不變）。詳見 README「ERP 設定」。</p>
           <a class="gobtn" href="erp.html">前往 ERP 作業 →</a>
+        </div>
+      </details>
+
+      <details class="acc" id="f-admin">
+        <summary><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#users"/></svg>行政工作台 <span class="sm">— 員工、班表、出勤、請假簽核、設備、公告</span><span class="chev">▾</span></summary>
+        <div class="acc-body">
+          <p><b>這是什麼：</b>工廠日常行政，從左側選單的「行政工作台」進入，和 ERP 用同一個後端。</p>
+          <ul class="steps">
+            <li><b>組織與員工</b>：先建單位（工廠、部門），再加員工。員工編號建立後固定；離職請「停用」，歷史紀錄都保留。</li>
+            <li><b>週班表</b>：一週一張表，點格子的「＋」排班；結束早於開始＝跨夜班。同一人時段重疊會被擋。按「把上一週複製到這週」一次排好（衝突的會略過）。</li>
+            <li><b>出勤</b>：手動登錄上下班時間，系統自動和班表比對，列出<b>遲到、早退（超過 5 分鐘）、缺勤</b>；登錯就修改或作廢（作廢要寫原因）。可匯出整月 CSV。</li>
+            <li><b>申請簽核</b>：請假、加班、出差、採購⋯ 草稿 → 送出 → 主管核准或退回（退回要寫原因）→ 退回可改了再送；送出後可撤回。<b>不能核准自己送出的申請</b>，每一步都留紀錄。</li>
+            <li><b>設備預約</b>：量測儀、堆高機、會議室、公務車；同一設備時段不能重疊，用完按「歸還」。</li>
+            <li><b>公告</b>：可置頂，過期就封存。</li>
+          </ul>
+          <p><b>小撇步：</b>ERP 總覽切到「行政」角色，可以一眼看到今天的班次、出勤差異與待簽核。</p>
+          <a class="gobtn" href="admin.html">前往行政工作台 →</a>
         </div>
       </details>
 
@@ -381,6 +403,30 @@
       <a class="gobtn" href="db.html">前往資料庫操作中心 →</a>
     </div>
 
+    <div class="q" id="map">
+      <h2><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#book"/></svg>功能地圖：和一般大型 ERP 比</h2>
+      <p class="muted">對照 Odoo、NetSuite 這類大型 ERP 常見的功能區塊，九上儀表板目前做到哪裡（老實說，沒有的就寫沒有）。</p>
+      <div class="ftabwrap"><table class="ftab">
+        <tr><th>功能區塊</th><th>狀態</th><th>九上儀表板有什麼</th><th>還沒有的</th></tr>
+        <tr><td>銷售</td><td>已提供</td><td>報價（版本、轉單）、銷售訂單、分批出貨、收款、退貨、列印</td><td>信用額度控管</td></tr>
+        <tr><td>庫存</td><td>已提供</td><td>FIFO 成本、成本批次、盤點調整、異動紀錄、缺料與安全庫存提醒</td><td>多倉庫、序號／批號追溯</td></tr>
+        <tr><td>採購</td><td>部分</td><td>進貨單（實際進價入庫）</td><td>請購、採購單核准、供應商對帳</td></tr>
+        <tr><td>製造</td><td>已提供</td><td>BOM 版本、防循環、工單預留／開工／完工、用料成本轉入成品</td><td>產能排程、途程工時</td></tr>
+        <tr><td>客戶管理（CRM）</td><td>已提供</td><td>客戶 360、多位聯絡人、商機看板、跟進紀錄</td><td>行銷活動、名單自動化</td></tr>
+        <tr><td>客服</td><td>已提供</td><td>客服案件（類別、優先、期限、處理紀錄、結案結果）</td><td>客戶自助入口</td></tr>
+        <tr><td>服務交付</td><td>已提供</td><td>確認、交付版次、驗收或要求修改、收款</td><td>合約與續約</td></tr>
+        <tr><td>專案</td><td>已提供</td><td>任務看板、里程碑、到期提醒</td><td>工時紀錄、甘特圖</td></tr>
+        <tr><td>行政</td><td>已提供</td><td>組織、員工、週班表、出勤比對、申請簽核、設備預約、公告</td><td>打卡機串接</td></tr>
+        <tr><td>人資薪資</td><td>未提供</td><td>—</td><td>薪資計算、勞健保、扣繳</td></tr>
+        <tr><td>會計</td><td>部分</td><td>訂單與服務的收款、應收帳款、毛利</td><td>會計科目、傳票、總帳、應付沖帳</td></tr>
+        <tr><td>發票與稅務</td><td>未提供</td><td>—</td><td>電子發票、營業稅申報（建議交給加值中心或會計師）</td></tr>
+        <tr><td>報表</td><td>已提供</td><td>角色總覽、各表 CSV 匯出、原料行情</td><td>自訂報表設計器</td></tr>
+        <tr><td>權限</td><td>部分</td><td>Google 登入白名單、ERP_EMAILS 限定 ERP 使用者、簽核不能自己核准</td><td>細部角色權限（例：業務看不到成本）</td></tr>
+        <tr><td>好用工具</td><td>已提供</td><td>全站搜尋（Ctrl+K）、釘選、備份匯出／匯入、資料健檢</td><td>—</td></tr>
+      </table></div>
+      <div class="tip">九上特有、大型 ERP 沒有的：<b>LME 銅鋁行情自動更新</b>，並直接帶進報價試算與原料標準成本。</div>
+    </div>
+
     <div class="q" id="faq">
       <h2>常見問題</h2>
       <details class="acc" open>
@@ -413,6 +459,7 @@
       <a href="#f-quote"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#calc"/></svg>報價試算</a>
       <a href="#f-orders"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#clipboard"/></svg>訂單看板</a>
       <a href="#f-erp"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#factory"/></svg>ERP 作業</a>
+      <a href="#f-admin"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#users"/></svg>行政工作台</a>
       <a href="#f-ai"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#bot"/></svg>AI 助手</a>
       <a href="#f-vn"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#languages"/></svg>中越對話</a>
       <a href="#f-notebook"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#notebook"/></svg>NotebookLM</a>
@@ -421,6 +468,7 @@
       <a href="#freq"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#clock"/></svg>更新頻率／費用</a>
       <a href="#try"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#calc"/></svg>試玩報價</a>
       <a href="#db"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#db"/></svg>資料庫與試算表</a>
+      <a href="#map"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#book"/></svg>功能地圖</a>
       <a href="#faq"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#info"/></svg>常見問題</a>
     </aside>
   </div>
@@ -468,6 +516,6 @@
     });
   })();
   </script>
-  <script src="assets/app.js?v=202610111144"></script>
+  <script src="assets/app.js?v=202610111205"></script>
 </body>
 </html>

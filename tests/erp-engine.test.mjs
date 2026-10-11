@@ -228,5 +228,6 @@ test("google-apps-script-erp.gs 與引擎同步（改了引擎要重跑 scripts/
   const read = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
   const gas = read("../google-apps-script-erp.gs");
   assert.ok(gas.includes(read("../docs/assets/erp-engine.js").trimEnd()), "引擎與 GAS 檔不同步");
+  assert.ok(gas.includes(read("../docs/assets/erp-admin.js").trimEnd()), "行政模組與 GAS 檔不同步");
   assert.ok(gas.includes(read("../gas/erp-adapter.gs")), "adapter 與 GAS 檔不同步");
 });
