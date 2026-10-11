@@ -1,31 +1,39 @@
-/* 儀表板共用樣式 — 鋼藍工業主題（淺/深色以 CSS 變數切換） */
+/* 儀表板共用樣式 — 深海商務（Harbor）主題：深海藍浮動導覽、青藍主色、琥珀點綴；淺/深色以 CSS 變數切換
+   配色參考 mars-tw/freedom-erp-crm 的 Harbor 設計模板（MIT） */
 :root {
-  --bg: #eaeef3; --text: #1a2430; --muted: #5f6d7d; --muted2: #8b98a6;
-  --card: #ffffff; --line: #d3dbe4; --line2: #e7edf3;
-  --accent: #2f6fb0; --accent-ink: #ffffff; --accent-soft: #dde9f6;
-  --up: #b3402f; --down: #2f8f5b;
-  --chip-bg: #ffffff; --chip-border: #d3dbe4; --chip-on-bg: #2f6fb0; --chip-on-fg: #ffffff;
-  --num-font: ui-monospace, "SF Mono", Menlo, Consolas, "Roboto Mono", monospace;
-  --radius: 10px; --shadow: 0 1px 3px rgba(28,48,78,.10); --shadow-lg: 0 10px 28px rgba(28,48,78,.16);
+  --bg: #eef5f8; --text: #102a43; --muted: #50697b; --muted2: #7d93a3;
+  --card: #ffffff; --line: #c3d7e4; --line2: #e4eff6;
+  --accent: #147b95; --accent-strong: #08647d; --accent-ink: #ffffff; --accent-soft: #d7edf4;
+  --secondary: #e3a147;
+  --up: #b3402f; --down: #176a4b;
+  --chip-bg: #ffffff; --chip-border: #c3d7e4; --chip-on-bg: #147b95; --chip-on-fg: #ffffff;
+  --nav-bg: #102a43; --nav-surface: #183c54; --nav-text: #eff8ff; --nav-muted: #b7cfdf; --nav-line: #3c6079; --nav-active: #0d647c;
+  --num-font: "Bahnschrift", "DIN Alternate", "Segoe UI", "Microsoft JhengHei", sans-serif;
+  --display-font: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --radius: 14px; --shadow: 0 1px 2px rgba(21,63,88,.06), 0 4px 14px rgba(21,63,88,.07); --shadow-lg: 0 12px 34px rgba(21,63,88,.14);
+  color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #121820; --text: #e6ecf2; --muted: #93a1b0; --muted2: #6f7e8d;
-  --card: #1a222c; --line: #2a3543; --line2: #202a35;
-  --accent: #5b9bde; --accent-ink: #0c141d; --accent-soft: #23303f;
-  --up: #e0705a; --down: #46bd82;
-  --chip-bg: #202a35; --chip-border: #33404e; --chip-on-bg: #5b9bde; --chip-on-fg: #0c141d;
-  --radius: 10px; --shadow: 0 1px 3px rgba(0,0,0,.4); --shadow-lg: 0 12px 30px rgba(0,0,0,.5);
+  --bg: #091823; --text: #edf6fc; --muted: #acc5d6; --muted2: #7f9bb0;
+  --card: #102838; --line: #2c4b60; --line2: #163444;
+  --accent: #6bd5ec; --accent-strong: #96e6f4; --accent-ink: #052535; --accent-soft: #173e51;
+  --secondary: #f3bc6d;
+  --up: #ff9b8a; --down: #88dfb1;
+  --chip-bg: #102838; --chip-border: #2c4b60; --chip-on-bg: #6bd5ec; --chip-on-fg: #052535;
+  --nav-bg: #0b1f2e; --nav-surface: #14364b; --nav-text: #effaff; --nav-muted: #aecada; --nav-line: #31566d; --nav-active: #174e65;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25); --shadow-lg: 0 12px 34px rgba(0,0,0,.45);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
-body { font-family: -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+body { font-family: "Segoe UI", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif;
   margin: 0; background: var(--bg); color: var(--text); line-height: 1.55;
   -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
   transition: background .2s, color .2s;
-  background-image: radial-gradient(1200px 420px at 100% -8%, var(--accent-soft) 0%, transparent 60%); background-attachment: fixed; }
+  background-image: linear-gradient(180deg, var(--accent-soft) 0, transparent 360px); background-repeat: no-repeat; }
 a { color: var(--accent); text-underline-offset: 2px; }
 a:hover { text-decoration: underline; }
-.wrap { max-width: 920px; margin: 28px auto; padding: 0 20px; }
+.wrap { max-width: 1040px; margin: 18px auto 32px; padding: 0 20px; }
 
 .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
 .nav { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
@@ -267,7 +275,7 @@ th .arrow { opacity: .5; font-size: 10px; }
 
 /* 追蹤欄（收藏/狀態/備註 + 日曆/Gmail） */
 .mkfav { cursor: pointer; font-size: 15px; }
-.mkfav.on { color: #f1c40f; }
+.mkfav.on { color: var(--secondary); }
 .mkcell { min-width: 180px; }
 .mkcell .mkstat { font-size: 12px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
 .mkcell .mknote { font-size: 12px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); width: 96px; margin-left: 4px; }
@@ -447,3 +455,88 @@ th .arrow { opacity: .5; font-size: 10px; }
 .bimicbtn { flex: 1; padding: 12px; font-size: 15px; font-weight: 600; }
 /* 單顆翻譯鈕 */
 .bitr { padding: 12px 16px; font-size: 16px; font-weight: 600; white-space: nowrap; }
+
+/* ===================================================================
+   深海商務（Harbor）外觀：浮動導覽、標題分隔線、卡片頂部主色線、線條圖示
+   （放在檔尾覆蓋上面的同名規則；只改外觀，不改版面結構）
+   =================================================================== */
+.ic { width: 1.12em; height: 1.12em; flex: none; vertical-align: -.2em; margin-right: .42em; pointer-events: none;
+  fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ic.only, .dbmini .ic, .theme-btn .ic, .mkact .ic, .mkfav .ic, .star .ic { margin-right: 0; }
+.ic.fill, .mkfav.on .ic, .star .ic { fill: currentColor; }
+.star { color: var(--secondary); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 浮動導覽列 */
+.topbar { align-items: center; gap: 8px; padding: 7px 8px 7px 10px; margin-bottom: 22px; border-radius: 18px;
+  background: linear-gradient(110deg, var(--nav-bg), var(--nav-surface)); border: 1px solid var(--nav-line);
+  box-shadow: 0 12px 34px rgba(16,42,67,.22); position: sticky; top: 10px; z-index: 60; }
+.nav { gap: 2px; }
+.nav a, .navdrop > summary { display: inline-flex; align-items: center; font-size: 13px; padding: 7px 11px; border-radius: 10px;
+  border: 1px solid transparent; background: transparent; color: var(--nav-muted); }
+.nav a:hover, .navdrop > summary:hover { color: var(--nav-text); background: rgba(255,255,255,.07); border-color: transparent; text-decoration: none; }
+.nav a.on, .navdrop > summary.on { background: var(--nav-active); color: #ffffff; border-color: var(--nav-line);
+  box-shadow: inset 0 -2px 0 var(--secondary); }
+.nav a.on:hover { color: #ffffff; }
+.navdrop[open] > summary { color: var(--nav-text); border-color: var(--nav-line); }
+.navdrop > summary .ic.chev { width: .9em; height: .9em; margin: 0 0 0 .3em; opacity: .8; }
+.navmenu { background: var(--nav-surface); border: 1px solid var(--nav-line); border-radius: 12px; top: calc(100% + 8px);
+  box-shadow: 0 14px 34px rgba(0,0,0,.28); min-width: 164px; }
+.navmenu a { color: var(--nav-text); }
+.navmenu a.on { background: var(--nav-active); }
+.gauth { margin-left: auto; margin-right: 4px; }
+.gauth .guser { color: var(--nav-text); display: inline-flex; align-items: center; }
+.gauth .gbtn { border-color: var(--nav-line); background: transparent; color: var(--nav-muted); border-radius: 9px; }
+.gauth .gbtn:hover { color: var(--nav-text); }
+.gauth .gnote { color: var(--nav-muted); }
+.theme-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0;
+  border-radius: 10px; border: 1px solid var(--nav-line); background: transparent; color: var(--nav-text); font-size: 17px; }
+.theme-btn:hover { background: rgba(255,255,255,.08); }
+
+/* 頁首：展示字體、底部分隔線 */
+.eyebrow { letter-spacing: 2px; color: var(--accent); }
+h1, h2, .hft, .hcard .ht { font-family: var(--display-font); }
+h1 { font-size: 31px; font-weight: 750; letter-spacing: -.02em; color: var(--text); display: flex; align-items: center; }
+h1 .ic { color: var(--accent); width: .95em; height: .95em; margin-right: .35em; stroke-width: 1.7; }
+.sub { padding-bottom: 14px; border-bottom: 2px solid var(--line); margin-bottom: 22px; }
+.ai h2, .panel h3, .octitle, .dbdialog h3 { display: flex; align-items: center; flex-wrap: wrap; }
+.ai h2 .ic, .panel h3 .ic, .erp-sechead h3 .ic, .ai .lbl .ic { color: var(--accent); }
+
+/* 卡片：統一圓角，數據卡加頂部主色線 */
+.card, .stat, .okpi, .mpanel, .panel, .ai, .hcard, .hfcard, .hq, .qresult .qr, .ocard, .dbtablewrap, .erp-sec { border-radius: var(--radius); }
+.card, .stat, .okpi { border-top: 3px solid var(--accent); }
+.stat.warn, .okpi.warn { border-top-color: var(--up); }
+.stat-v, .okpi-v, .card .v, .fig .fval, .hcard .big, .qresult .qv { font-family: var(--num-font); letter-spacing: 0; }
+.stat-v, .okpi-v { color: var(--text); }
+.stat-k, .okpi-l, .card .k { display: flex; align-items: center; letter-spacing: .3px; }
+.stat-k .ic, .okpi-l .ic, .card .k .ic { color: var(--accent); }
+.hfcard::before, .hcard::before { top: 0; right: 0; bottom: auto; width: auto; height: 3px; }
+.hfic, .hqi, .hcard .he { color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); }
+.hfic .ic { width: 26px; height: 26px; margin: 0; stroke-width: 1.6; }
+.hqi .ic { width: 20px; height: 20px; margin: 0; }
+.hcard .he .ic { width: 24px; height: 24px; margin: 0; }
+.hfcta, .hcard .hcta { display: inline-flex; align-items: center; }
+.ic.after { margin: 0 0 0 .35em; }
+
+/* 按鈕、分頁、表格：方圓角控制項（取代膠囊） */
+.dbbtn, .dbtab, .dbmini, .aimodebtn, .qrow button, .btnbar, .btnbar button { border-radius: 9px; }
+.dbbtn, .dbtab, .aimodebtn { display: inline-flex; align-items: center; justify-content: center; }
+.dbtab { font-size: 13.5px; color: var(--muted); }
+.dbtab:hover { color: var(--accent); border-color: var(--accent); }
+.dbtab.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); box-shadow: inset 0 -2px 0 var(--secondary); }
+.dbmini { display: inline-flex; align-items: center; gap: 4px; color: var(--text); padding: 5px 8px; }
+.dbmini:hover { color: var(--accent); }
+.dbtable th { background: var(--line2); color: var(--muted); font-size: 12.5px; }
+.dbbanner { display: flex; align-items: center; background: color-mix(in srgb, var(--secondary) 12%, var(--card));
+  border-color: color-mix(in srgb, var(--secondary) 45%, var(--line)); }
+.dbbanner .ic { color: color-mix(in srgb, var(--secondary) 70%, var(--text)); }
+.dbsearch, .dbfilter, .toolbar input, .toolbar select, .dbfield input, .dbfield select, .qform select, .qform input { border-radius: 9px; }
+.mkact { color: var(--muted); display: inline-flex; }
+.mkact:hover { color: var(--accent); }
+.mkfav { color: var(--muted2); display: inline-flex; vertical-align: middle; }
+.ock-meta span { display: inline-flex; align-items: center; }
+.rtag .ic { margin-right: .25em; }
+@media (max-width: 640px) {
+  .topbar { position: static; }
+  h1 { font-size: 26px; }
+}

@@ -11,13 +11,14 @@
   var E = window.ErpEngine;
   var LOCAL_KEY = "erp_world_local";
   var TABS = [
-    ["home", "📊 總覽"], ["items", "📦 料號庫存"], ["receive", "🚚 進貨"], ["quotes", "🧾 報價單"],
-    ["orders", "🛒 銷售訂單"], ["mfg", "🏭 BOM／工單"], ["crm", "👥 客戶／商機"], ["moves", "📜 異動紀錄"]
+    ["home", ic("bars") + "總覽"], ["items", ic("box") + "料號庫存"], ["receive", ic("truck") + "進貨"], ["quotes", ic("file") + "報價單"],
+    ["orders", ic("cart") + "銷售訂單"], ["mfg", ic("factory") + "BOM／工單"], ["crm", ic("users") + "客戶／商機"], ["moves", ic("list") + "異動紀錄"]
   ];
   var S = { tab: "home", world: null, mode: "local", backend: null, backendErr: "", loading: false, busy: false, metal: {} };
   var mount;
 
   // ---------- 小工具 ----------
+  function ic(name) { return '<svg class="ic" aria-hidden="true"><use href="assets/icons.svg#' + name + '"/></svg>'; }
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   function nt(n) { return "NT$ " + (Number(n) || 0).toLocaleString("zh-TW", { maximumFractionDigits: 2 }); }
   function num(n) { return (Number(n) || 0).toLocaleString("zh-TW", { maximumFractionDigits: 3 }); }
@@ -83,7 +84,7 @@
     }
     return p.then(function (r) {
       S.busy = false; paintBusy();
-      if (!r || r.error) { alert("⚠️ " + (r ? r.error : "連線失敗，請稍後再試（這筆沒有寫入）")); return null; }
+      if (!r || r.error) { alert((r ? r.error : "連線失敗，請稍後再試（這筆沒有寫入）")); return null; }
       render();
       return r.result || true;
     });
@@ -103,14 +104,14 @@
     var w = W();
     var tabs = TABS.map(function (t) { return '<button class="dbtab' + (t[0] === S.tab ? " on" : "") + '" data-tab="' + t[0] + '">' + t[1] + "</button>"; }).join("");
     var mode = S.mode === "cloud"
-      ? '<div class="erp-mode cloud">☁️ 公司正式資料（Google 試算表 ERP_ 分頁，多人共用）</div>'
-      : '<div class="erp-mode local">🧪 本機試用模式：資料只存在這個瀏覽器，不會進公司試算表。'
+      ? '<div class="erp-mode cloud">' + ic("db") + '公司正式資料（Google 試算表 ERP_ 分頁，多人共用）</div>'
+      : '<div class="erp-mode local">' + ic("info") + '本機試用模式：資料只存在這個瀏覽器，不會進公司試算表。'
         + (S.backendErr ? "（" + esc(S.backendErr) + "，見「說明 → ERP 設定」）" : bridge() && bridge().configured() ? "登入 Google 後改用公司正式資料。" : "")
         + "</div>";
     var tools = '<div class="erp-tools">'
-      + '<span id="erpBusy" class="erp-busy" style="display:none">⏳ 處理中…</span>'
-      + btn("reload", "↻ 重新整理") + btn("backup", "⬇ 備份 JSON") + btn("health", "🩺 資料健檢")
-      + (S.mode === "local" ? btn("reset-local", "🧹 清空試用資料") : "")
+      + '<span id="erpBusy" class="erp-busy" style="display:none">' + ic("clock") + '處理中…</span>'
+      + btn("reload", ic("refresh") + "重新整理") + btn("backup", ic("download") + "備份 JSON") + btn("health", ic("shield") + "資料健檢")
+      + (S.mode === "local" ? btn("reset-local", ic("eraser") + "清空試用資料") : "")
       + "</div>";
     var body = S.loading ? '<div class="dbloading">載入公司 ERP 資料中…</div>' : (VIEW[S.tab] || VIEW.home)(w);
     mount.innerHTML = mode + tools + '<div class="dbtabs erp-tabs">' + tabs + "</div>" + body;
@@ -131,7 +132,7 @@
     return '<div class="dbtablewrap"><table class="dbtable erp-table"><thead><tr>' + head + "</tr></thead><tbody>" + body + "</tbody></table></div>"
       + (rows.length ? "" : '<div class="dbempty">' + (opts.empty || "目前沒有資料") + "</div>");
   }
-  function searchBox(ph) { return '<input class="dbsearch erp-search" placeholder="🔍 ' + esc(ph || "搜尋…") + '">'; }
+  function searchBox(ph) { return '<input class="dbsearch erp-search" placeholder="' + esc(ph || "搜尋…") + '">'; }
   function kpi(label, val, cls, sub) {
     return '<div class="okpi ' + (cls || "") + '"><div class="okpi-l">' + label + '</div><div class="okpi-v">' + esc(val) + "</div>"
       + (sub ? '<div class="erp-kpisub">' + sub + "</div>" : "") + "</div>";
@@ -148,49 +149,49 @@
   VIEW.home = function (w) {
     var r = E.report(w, today());
     var emptyWorld = !w.items.length && !w.customers.length;
-    var guide = emptyWorld ? section("🚀 第一次使用：四步驟開始",
+    var guide = emptyWorld ? section(ic("play") + "第一次使用：四步驟開始",
       '<ol class="erp-steps"><li><b>建料號</b>：原料（kg）、成品（件）都要建，進貨與出貨才算得出成本。</li>'
       + "<li><b>進貨</b>：照實際進價登錄，系統用先進先出（FIFO）自動算庫存成本。</li>"
       + "<li><b>建客戶 → 報價 → 接受轉訂單</b>：也可以直接開訂單。</li>"
       + "<li><b>出貨、收款</b>；要自己生產的，先建 BOM 再開工單。</li></ol>"
       + '<div class="erp-row">' + btn("tab", "＋ 先建第一個料號", "items", "primary")
-      + (S.mode === "local" ? btn("demo", "🧪 載入示範資料（只在本機）") : "") + "</div>") : "";
+      + (S.mode === "local" ? btn("demo", ic("info") + "載入示範資料（只在本機）") : "") + "</div>") : "";
     var kp = '<div class="okpis erp-kpis">'
-      + kpi("💰 本月銷售", nt(r.sales_month), "", "依出貨認列")
-      + kpi("📈 本月毛利", nt(r.gp_month), r.gp_month < 0 ? "warn" : "", r.gm_month == null ? "—" : "毛利率 " + r.gm_month + "%")
-      + kpi("📦 庫存價值", nt(r.inventory_value), "", "FIFO 成本")
-      + kpi("🧾 應收帳款", nt(r.receivable), "", "已出貨未收")
-      + kpi("🚚 未出貨訂單", r.open_orders + " 張", r.overdue_orders.length ? "warn" : "", r.overdue_orders.length ? "逾期 " + r.overdue_orders.length + " 張" : "無逾期")
-      + kpi("🏭 進行中工單", r.wo_active + " 張", "", "")
-      + kpi("📝 有效報價", r.quotes_open + " 張", r.quotes_expiring.length ? "warn" : "", r.quotes_expiring.length ? "7 天內到期 " + r.quotes_expiring.length + " 張" : "")
-      + kpi("⚠️ 缺料品項", r.shortage.length + " 項", r.shortage.length ? "warn" : "", "訂單/工單需要 > 現有")
+      + kpi(ic("cash") + "本月銷售", nt(r.sales_month), "", "依出貨認列")
+      + kpi(ic("chart") + "本月毛利", nt(r.gp_month), r.gp_month < 0 ? "warn" : "", r.gm_month == null ? "—" : "毛利率 " + r.gm_month + "%")
+      + kpi(ic("box") + "庫存價值", nt(r.inventory_value), "", "FIFO 成本")
+      + kpi(ic("file") + "應收帳款", nt(r.receivable), "", "已出貨未收")
+      + kpi(ic("truck") + "未出貨訂單", r.open_orders + " 張", r.overdue_orders.length ? "warn" : "", r.overdue_orders.length ? "逾期 " + r.overdue_orders.length + " 張" : "無逾期")
+      + kpi(ic("factory") + "進行中工單", r.wo_active + " 張", "", "")
+      + kpi(ic("file") + "有效報價", r.quotes_open + " 張", r.quotes_expiring.length ? "warn" : "", r.quotes_expiring.length ? "7 天內到期 " + r.quotes_expiring.length + " 張" : "")
+      + kpi(ic("alert") + "缺料品項", r.shortage.length + " 項", r.shortage.length ? "warn" : "", "訂單/工單需要 > 現有")
       + "</div>";
     var short = r.shortage.length ? table([
       { l: "料號", v: "sku" }, { l: "品名", v: "name" }, { l: "類別", v: "kind" },
       { l: "缺多少", r: 1, v: function (x) { return '<b class="erp-bad">' + num(x.short) + "</b>"; } },
-      { l: "建議", v: function (x) { return x.has_bom ? mini("wo-new-for", "🏭 開工單", x.id) : mini("receive-for", "🚚 進貨", x.id); } }
-    ], r.shortage) : '<div class="dbempty">沒有缺料 👍</div>';
+      { l: "建議", v: function (x) { return x.has_bom ? mini("wo-new-for", ic("factory") + "開工單", x.id) : mini("receive-for", ic("truck") + "進貨", x.id); } }
+    ], r.shortage) : '<div class="dbempty">沒有缺料</div>';
     var low = r.low_stock.length ? table([
       { l: "料號", v: "sku" }, { l: "品名", v: "name" }, { l: "現有", r: 1, v: function (x) { return num(x.on_hand); } }, { l: "安全庫存", r: 1, v: function (x) { return num(x.safety); } }
     ], r.low_stock) : '<div class="dbempty">都在安全庫存以上</div>';
-    var due = r.overdue_orders.concat([]).map(function (o) { return '<li>' + mini("order-view", "🛒 " + esc(o.no), o.id) + ' 交期 <b class="erp-bad">' + esc(o.due) + "</b></li>"; })
-      .concat(r.quotes_expiring.map(function (q) { return "<li>" + mini("quote-view", "🧾 " + esc(q.no), q.id) + " 報價 " + esc(q.valid_until) + " 到期</li>"; }));
+    var due = r.overdue_orders.concat([]).map(function (o) { return '<li>' + mini("order-view", ic("cart") + esc(o.no), o.id) + ' 交期 <b class="erp-bad">' + esc(o.due) + "</b></li>"; })
+      .concat(r.quotes_expiring.map(function (q) { return "<li>" + mini("quote-view", ic("file") + esc(q.no), q.id) + " 報價 " + esc(q.valid_until) + " 到期</li>"; }));
     var funnel = E.STAGES.map(function (s) {
       var x = r.pipeline[s], mx = 1; E.STAGES.forEach(function (k) { mx = Math.max(mx, r.pipeline[k].n); });
       return '<div class="dbrow"><div class="dblabel">' + s + '</div><div class="dbtrack"><div class="dbbar" style="width:' + Math.round(x.n / mx * 100) + '%"></div></div><div class="dbval">' + x.n + " · " + nt(x.amount) + "</div></div>";
     }).join("");
-    var metal = (S.metal.copper || S.metal.aluminum) ? '<div class="erp-metal">🔩 原料參考價（LME 換算）：'
+    var metal = (S.metal.copper || S.metal.aluminum) ? '<div class="erp-metal">' + ic("ingot") + '原料參考價（LME 換算）：'
       + (S.metal.copper ? "銅 NT$ " + num(S.metal.copper) + "/kg　" : "") + (S.metal.aluminum ? "鋁 NT$ " + num(S.metal.aluminum) + "/kg" : "")
       + (S.metal.updated ? '　<span class="erp-muted">更新 ' + esc(S.metal.updated) + "</span>" : "") + "</div>" : "";
     return guide + kp + metal
-      + '<div class="erp-grid2">' + section("⚠️ 缺料（需要補料或生產）", short) + section("📉 低於安全庫存", low) + "</div>"
-      + '<div class="erp-grid2">' + section("⏰ 要注意的單據", due.length ? '<ul class="erp-list">' + due.join("") + "</ul>" : '<div class="dbempty">沒有逾期或快到期的單據</div>')
-      + section("🎯 銷售漏斗（商機）", '<div class="dbbars erp-funnel">' + funnel + "</div>") + "</div>";
+      + '<div class="erp-grid2">' + section(ic("alert") + "缺料（需要補料或生產）", short) + section(ic("bars") + "低於安全庫存", low) + "</div>"
+      + '<div class="erp-grid2">' + section(ic("clock") + "要注意的單據", due.length ? '<ul class="erp-list">' + due.join("") + "</ul>" : '<div class="dbempty">沒有逾期或快到期的單據</div>')
+      + section(ic("target") + "銷售漏斗（商機）", '<div class="dbbars erp-funnel">' + funnel + "</div>") + "</div>";
   };
 
   VIEW.items = function (w) {
     var rows = w.items.slice().sort(function (a, b) { return String(a.sku).localeCompare(String(b.sku)); });
-    return '<div class="dbtoolbar">' + searchBox("搜尋料號、品名…") + btn("item-new", "＋ 新增料號", null, "primary") + btn("csv-items", "⬇ 匯出 CSV") + "</div>"
+    return '<div class="dbtoolbar">' + searchBox("搜尋料號、品名…") + btn("item-new", ic("plus") + "新增料號", null, "primary") + btn("csv-items", ic("download") + "匯出 CSV") + "</div>"
       + table([
         { l: "料號", v: "sku" }, { l: "品名", v: function (x) { return esc(x.name) + (x.active === false ? " " + chip("停用", "muted") : "") + (x.metal ? " " + chip(x.metal === "copper" ? "銅" : "鋁", "info") : ""); } },
         { l: "類別", v: "kind" }, { l: "單位", v: "unit" },
@@ -200,13 +201,13 @@
         { l: "平均成本", r: 1, v: function (x) { return nt(avgCost(x)); } },
         { l: "庫存價值", r: 1, v: function (x) { return nt(E.stockValue(w, x.id)); } },
         { l: "售價", r: 1, v: function (x) { return x.price ? nt(x.price) : ""; } },
-        { l: "", v: function (x) { return mini("item-edit", "✏️", x.id, "編輯") + mini("item-adjust", "⚖️", x.id, "盤點調整") + mini("item-lots", "🔍", x.id, "成本批次"); } }
+        { l: "", v: function (x) { return mini("item-edit", ic("edit"), x.id, "編輯") + mini("item-adjust", ic("scale"), x.id, "盤點調整") + mini("item-lots", ic("search"), x.id, "成本批次"); } }
       ], rows, { empty: "還沒有料號。先建原料與成品，進貨、報價、訂單都會用到。", search: function (x) { return x.sku + " " + x.name + " " + x.note; }, rowCls: function (x) { return x.active === false ? "erp-off" : ""; } });
   };
 
   VIEW.receive = function (w) {
     var rows = w.receipts.slice().reverse();
-    return '<div class="dbtoolbar">' + searchBox("搜尋單號、供應商…") + btn("receive-new", "＋ 新增進貨單", null, "primary") + "</div>"
+    return '<div class="dbtoolbar">' + searchBox("搜尋單號、供應商…") + btn("receive-new", ic("plus") + "新增進貨單", null, "primary") + "</div>"
       + table([
         { l: "單號", v: function (x) { return mini("receive-view", esc(x.no), x.id); } }, { l: "日期", v: "date" }, { l: "供應商", v: "supplier" },
         { l: "品項", v: function (x) { return esc(x.lines.map(function (l) { return l.name + "×" + num(l.qty); }).join("、")); } },
@@ -217,7 +218,7 @@
   var QTONE = { "草稿": "muted", "已發出": "info", "已成交": "ok", "已取代": "muted" };
   VIEW.quotes = function (w) {
     var rows = w.quotes.slice().reverse();
-    return '<div class="dbtoolbar">' + searchBox("搜尋單號、客戶…") + btn("quote-new", "＋ 新增報價單", null, "primary") + "</div>"
+    return '<div class="dbtoolbar">' + searchBox("搜尋單號、客戶…") + btn("quote-new", ic("plus") + "新增報價單", null, "primary") + "</div>"
       + table([
         { l: "單號", v: function (x) { return mini("quote-view", esc(x.no), x.id); } }, { l: "日期", v: "date" },
         { l: "客戶", v: function (x) { return esc(custName(x.customer_id)); } },
@@ -225,10 +226,10 @@
         { l: "有效至", v: function (x) { return x.valid_until && x.status === "已發出" && x.valid_until < today() ? '<span class="erp-bad">' + esc(x.valid_until) + " 已過期</span>" : esc(x.valid_until); } },
         { l: "狀態", v: function (x) { return chip(x.status, QTONE[x.status]); } },
         { l: "", v: function (x) {
-          if (x.status === "草稿") return mini("quote-edit", "✏️", x.id, "編輯") + mini("quote-issue", "📤 發出", x.id) + mini("quote-del", "🗑️", x.id, "刪除");
-          if (x.status === "已發出") return mini("quote-accept", "✅ 客戶接受", x.id) + mini("quote-print", "🖨️", x.id, "列印");
-          if (x.status === "已成交") return mini("order-view", "🛒 看訂單", x.so_id) + mini("quote-print", "🖨️", x.id, "列印");
-          return mini("quote-print", "🖨️", x.id, "列印");
+          if (x.status === "草稿") return mini("quote-edit", ic("edit"), x.id, "編輯") + mini("quote-issue", ic("arrow") + "發出", x.id) + mini("quote-del", ic("trash"), x.id, "刪除");
+          if (x.status === "已發出") return mini("quote-accept", ic("check") + "客戶接受", x.id) + mini("quote-print", ic("printer"), x.id, "列印");
+          if (x.status === "已成交") return mini("order-view", ic("cart") + "看訂單", x.so_id) + mini("quote-print", ic("printer"), x.id, "列印");
+          return mini("quote-print", ic("printer"), x.id, "列印");
         } }
       ], rows, { empty: "還沒有報價單。", search: function (x) { return x.no + " " + custName(x.customer_id); } });
   };
@@ -237,7 +238,7 @@
   function payTone(s) { return { "未收款": "warn", "部分收款": "info", "已收清": "ok" }[s]; }
   VIEW.orders = function (w) {
     var rows = w.orders.slice().reverse();
-    return '<div class="dbtoolbar">' + searchBox("搜尋單號、客戶、品名…") + btn("order-new", "＋ 新增銷售訂單", null, "primary") + btn("csv-orders", "⬇ 匯出 CSV") + "</div>"
+    return '<div class="dbtoolbar">' + searchBox("搜尋單號、客戶、品名…") + btn("order-new", ic("plus") + "新增銷售訂單", null, "primary") + btn("csv-orders", ic("download") + "匯出 CSV") + "</div>"
       + table([
         { l: "單號", v: function (x) { return mini("order-view", esc(x.no), x.id); } }, { l: "日期", v: "date" },
         { l: "客戶", v: function (x) { return esc(custName(x.customer_id)); } },
@@ -246,11 +247,11 @@
         { l: "出貨", v: function (x) { var s = E.orderState(x); return chip(s, stTone(s)); } },
         { l: "收款", v: function (x) { if (x.cancelled) return ""; var s = E.payState(x); return chip(s, payTone(s)); } },
         { l: "", v: function (x) {
-          if (x.cancelled) return mini("order-view", "🔍", x.id, "詳情");
+          if (x.cancelled) return mini("order-view", ic("search"), x.id, "詳情");
           var s = E.orderState(x);
-          return (s === "未出貨" || s === "部分出貨" ? mini("order-ship", "🚚 出貨", x.id) : "")
-            + (E.payState(x) !== "已收清" ? mini("order-pay", "💵 收款", x.id) : "")
-            + mini("order-view", "🔍", x.id, "詳情");
+          return (s === "未出貨" || s === "部分出貨" ? mini("order-ship", ic("truck") + "出貨", x.id) : "")
+            + (E.payState(x) !== "已收清" ? mini("order-pay", ic("cash") + "收款", x.id) : "")
+            + mini("order-view", ic("search"), x.id, "詳情");
         } }
       ], rows, { empty: "還沒有銷售訂單。", search: function (x) { return x.no + " " + custName(x.customer_id) + " " + x.lines.map(function (l) { return l.name + " " + l.sku; }).join(" "); } });
   };
@@ -259,23 +260,23 @@
   VIEW.mfg = function (w) {
     var boms = w.boms.filter(function (b) { return b.active; });
     var wos = w.workorders.slice().reverse();
-    return section("🧩 BOM（產品用料表，每次修改自動升版）", table([
+    return section(ic("layers") + "BOM（產品用料表，每次修改自動升版）", table([
       { l: "成品", v: function (b) { var it = itemOf(b.item_id); return esc(it ? it.sku + " " + it.name : "?"); } },
       { l: "版本", v: function (b) { return "v" + b.revision; } },
       { l: "用料（每 1 單位）", v: function (b) { return esc(b.components.map(function (c) { var ci = itemOf(c.item_id); return (ci ? ci.name : c.name) + " " + num(c.qty) + (ci ? ci.unit : ""); }).join("、")); } },
       { l: "估算材料成本", r: 1, v: function (b) { return nt(b.components.reduce(function (s, c) { var ci = itemOf(c.item_id); return s + (ci ? avgCost(ci) : 0) * c.qty; }, 0)); } },
-      { l: "", v: function (b) { return mini("bom-edit", "✏️ 改版", b.item_id) + mini("wo-new-for", "🏭 開工單", b.item_id); } }
-    ], boms, { empty: "還沒有 BOM。自己生產的成品，先定義每 1 件要用哪些料。" }), btn("bom-new", "＋ 新增 BOM", null, "primary"))
-      + section("🏭 工單（計畫 → 預留用料 → 開工 → 完工入庫）", table([
+      { l: "", v: function (b) { return mini("bom-edit", ic("edit") + "改版", b.item_id) + mini("wo-new-for", ic("factory") + "開工單", b.item_id); } }
+    ], boms, { empty: "還沒有 BOM。自己生產的成品，先定義每 1 件要用哪些料。" }), btn("bom-new", ic("plus") + "新增 BOM", null, "primary"))
+      + section(ic("factory") + "工單（計畫 → 預留用料 → 開工 → 完工入庫）", table([
         { l: "單號", v: "no" }, { l: "成品", v: function (o) { return esc(o.bom.sku + " " + o.bom.name) + ' <span class="erp-muted">v' + o.bom.revision + "</span>"; } },
         { l: "數量", r: 1, v: function (o) { return num(o.qty); } }, { l: "交期", v: "due" },
         { l: "狀態", v: function (o) { return chip(o.status, WTONE[o.status]); } },
         { l: "實際成本", r: 1, v: function (o) { return o.status === "完工" ? nt(o.actual_cost) + '<div class="erp-muted">單位 ' + nt(o.actual_cost / o.qty) + "</div>" : ""; } },
         { l: "", v: function (o) {
-          var b = { "計畫": mini("wo-reserve", "📥 預留用料", o.id), "已備料": mini("wo-start", "▶️ 開工", o.id), "生產中": mini("wo-complete", "✅ 完工", o.id) }[o.status] || "";
-          return b + (["計畫", "已備料", "生產中"].indexOf(o.status) >= 0 ? mini("wo-cancel", "✖", o.id, "取消工單") : "") + mini("wo-view", "🔍", o.id, "用料明細");
+          var b = { "計畫": mini("wo-reserve", ic("inbox") + "預留用料", o.id), "已備料": mini("wo-start", ic("play") + "開工", o.id), "生產中": mini("wo-complete", ic("check") + "完工", o.id) }[o.status] || "";
+          return b + (["計畫", "已備料", "生產中"].indexOf(o.status) >= 0 ? mini("wo-cancel", ic("x"), o.id, "取消工單") : "") + mini("wo-view", ic("search"), o.id, "用料明細");
         } }
-      ], wos, { empty: "還沒有工單。" }), btn("wo-new", "＋ 新增工單", null, "primary"));
+      ], wos, { empty: "還沒有工單。" }), btn("wo-new", ic("plus") + "新增工單", null, "primary"));
   };
 
   VIEW.crm = function (w) {
@@ -287,22 +288,22 @@
         + (cards.map(function (d) {
           var late = d.next_date && d.next_date < today() && st !== "成交" && st !== "失單";
           return '<div class="ocardk' + (late ? " od" : "") + '" data-a="deal-view" data-id="' + esc(d.id) + '"><div class="ock-cust">' + esc(d.name) + '</div><div class="ock-prod">' + esc(custName(d.customer_id)) + "</div>"
-            + '<div class="ock-meta">' + (d.amount ? nt(d.amount) : "") + (d.next_date ? ' <span class="' + (late ? "od" : "") + '">📅 ' + esc(d.next_date) + "</span>" : "") + "</div></div>";
+            + '<div class="ock-meta">' + (d.amount ? nt(d.amount) : "") + (d.next_date ? ' <span class="' + (late ? "od" : "") + '">' + ic("calendar") + esc(d.next_date) + "</span>" : "") + "</div></div>";
         }).join("") || '<div class="ock-empty">尚無</div>') + "</div>";
     }).join("") + "</div>";
-    return section("🎯 商機看板（點卡片看跟進紀錄）", board, btn("deal-new", "＋ 新增商機", null, "primary"))
-      + section("👥 客戶", '<div class="dbtoolbar">' + searchBox("搜尋客戶、統編、電話…") + btn("csv-customers", "⬇ 匯出 CSV") + "</div>" + table([
+    return section(ic("target") + "商機看板（點卡片看跟進紀錄）", board, btn("deal-new", ic("plus") + "新增商機", null, "primary"))
+      + section(ic("users") + "客戶", '<div class="dbtoolbar">' + searchBox("搜尋客戶、統編、電話…") + btn("csv-customers", ic("download") + "匯出 CSV") + "</div>" + table([
         { l: "名稱", v: "name" }, { l: "統編", v: "tax_id" }, { l: "聯絡人", v: "contact" }, { l: "電話", v: "phone" }, { l: "Email", v: "email" },
         { l: "來源", v: "source" },
         { l: "訂單", r: 1, v: function (c) { return stats[c.id] ? stats[c.id].n : ""; } },
         { l: "累計出貨", r: 1, v: function (c) { return stats[c.id] ? nt(stats[c.id].amt) : ""; } },
-        { l: "", v: function (c) { return mini("cust-edit", "✏️", c.id, "編輯") + mini("deal-new-for", "🎯", c.id, "新增商機") + mini("quote-new-for", "🧾", c.id, "開報價"); } }
-      ], w.customers, { empty: "還沒有客戶。" }), btn("cust-new", "＋ 新增客戶", null, "primary"));
+        { l: "", v: function (c) { return mini("cust-edit", ic("edit"), c.id, "編輯") + mini("deal-new-for", ic("target"), c.id, "新增商機") + mini("quote-new-for", ic("file"), c.id, "開報價"); } }
+      ], w.customers, { empty: "還沒有客戶。" }), btn("cust-new", ic("plus") + "新增客戶", null, "primary"));
   };
 
   VIEW.moves = function (w) {
     var rows = w.moves.slice().reverse();
-    return '<div class="dbtoolbar">' + searchBox("搜尋料號、單號、類別…") + btn("csv-moves", "⬇ 匯出 CSV") + "</div>"
+    return '<div class="dbtoolbar">' + searchBox("搜尋料號、單號、類別…") + btn("csv-moves", ic("download") + "匯出 CSV") + "</div>"
       + table([
         { l: "日期", v: "date" },
         { l: "料號", v: function (m) { var it = itemOf(m.item_id); return esc(it ? it.sku : "?"); } },
@@ -337,7 +338,7 @@
   function lineRow(f, r) {
     return '<div class="erp-line">' + f.cols.map(function (c) {
       return '<label class="erp-lcol' + (c.wide ? " wide" : "") + '"><span>' + esc(c.l) + "</span>" + inputHtml(c, r[c.k] != null ? r[c.k] : "", 'data-c="' + c.k + '"' + (c.fill ? ' data-fill="' + c.fill + '"' : "")) + "</label>";
-    }).join("") + '<button type="button" class="dbmini erp-ldel" title="移除這列">✖</button></div>';
+    }).join("") + '<button type="button" class="dbmini erp-ldel" title="移除這列">' + ic("x") + '</button></div>';
   }
   function fieldHtml(f) {
     if (f.type === "html") return '<div class="erp-fhtml">' + f.html + "</div>";
@@ -401,8 +402,8 @@
   }
   // titleHtml：可含狀態標籤；呼叫端要自行 esc 使用者輸入的文字
   function info(titleHtml, html, extra) { return form({ titleHtml: titleHtml, fields: [{ type: "html", html: html }], extra: extra, wide: true }); }
-  function needCustomers() { if (!W().customers.length) { alert("請先建立客戶（👥 客戶／商機 → ＋ 新增客戶）。"); S.tab = "crm"; render(); return false; } return true; }
-  function needItems() { if (!W().items.length) { alert("請先建立料號（📦 料號庫存 → ＋ 新增料號）。"); S.tab = "items"; render(); return false; } return true; }
+  function needCustomers() { if (!W().customers.length) { alert("請先建立客戶（客戶／商機 → ＋ 新增客戶）。"); S.tab = "crm"; render(); return false; } return true; }
+  function needItems() { if (!W().items.length) { alert("請先建立料號（料號庫存 → ＋ 新增料號）。"); S.tab = "items"; render(); return false; } return true; }
 
   // ---------- 料號 ----------
   function itemForm(it) {
@@ -427,7 +428,7 @@
         var h = ov.querySelector('[data-hint="metal"]'); if (h) h.textContent = metalHint(t.value);
         var c = ov.querySelector('[data-f="std_cost"]'); if (c && !c.value && S.metal[t.value]) c.value = Math.round(S.metal[t.value] * 100) / 100;
       },
-      extra: editing ? [{ l: "🗑️ 刪除", cls: "erp-danger", fn: function (close) { if (confirm("確定刪除料號 " + it.sku + "？（已有異動的料號不能刪，請改停用）")) act("item.delete", { id: it.id }).then(function (r) { if (r) close(); }); } }] : [],
+      extra: editing ? [{ l: ic("trash") + "刪除", cls: "erp-danger", fn: function (close) { if (confirm("確定刪除料號 " + it.sku + "？（已有異動的料號不能刪，請改停用）")) act("item.delete", { id: it.id }).then(function (r) { if (r) close(); }); } }] : [],
       submit: function (v) { if (editing) v.id = it.id; return act("item.save", v); }
     });
   }
@@ -489,7 +490,7 @@
         { k: "address", l: "地址", value: c.address }, { k: "source", l: "來源", value: c.source, ph: "例：客戶開發雷達、展覽、介紹" },
         { k: "note", l: "備註", type: "textarea", value: c.note }
       ],
-      extra: editing ? [{ l: "🗑️ 刪除", cls: "erp-danger", fn: function (close) { if (confirm("確定刪除客戶 " + c.name + "？")) act("customer.delete", { id: c.id }).then(function (r) { if (r) close(); }); } }] : [],
+      extra: editing ? [{ l: ic("trash") + "刪除", cls: "erp-danger", fn: function (close) { if (confirm("確定刪除客戶 " + c.name + "？")) act("customer.delete", { id: c.id }).then(function (r) { if (r) close(); }); } }] : [],
       submit: function (v) { if (editing) v.id = c.id; return act("customer.save", v); }
     });
   }
@@ -507,15 +508,15 @@
         { k: "next_date", l: "下次跟進日", type: "date", value: d.next_date },
         { k: "note", l: "備註", type: "textarea", value: d.note }
       ],
-      extra: editing ? [{ l: "🗑️ 刪除", cls: "erp-danger", fn: function (close) { if (confirm("確定刪除商機？")) act("deal.delete", { id: d.id }).then(function (r) { if (r) close(); }); } }] : [],
+      extra: editing ? [{ l: ic("trash") + "刪除", cls: "erp-danger", fn: function (close) { if (confirm("確定刪除商機？")) act("deal.delete", { id: d.id }).then(function (r) { if (r) close(); }); } }] : [],
       submit: function (v) { if (editing) { v.id = d.id; } return act("deal.save", v); }
     });
   }
   function dealView(d) {
     var fu = (d.followups || []).slice().reverse().map(function (f) { return "<li><b>" + esc(f.date) + "</b> " + esc(f.note) + ' <span class="erp-muted">' + esc(f.by) + "</span></li>"; }).join("");
-    var qs = W().quotes.filter(function (q) { return q.deal_id === d.id; }).map(function (q) { return mini("quote-view", "🧾 " + esc(q.no) + " " + esc(q.status), q.id); }).join(" ");
+    var qs = W().quotes.filter(function (q) { return q.deal_id === d.id; }).map(function (q) { return mini("quote-view", ic("file") + esc(q.no) + " " + esc(q.status), q.id); }).join(" ");
     form({
-      title: "🎯 " + d.name, wide: true,
+      title: d.name, wide: true,
       intro: "客戶：<b>" + esc(custName(d.customer_id)) + "</b>　階段：" + chip(d.stage) + "　預估：" + nt(d.amount)
         + (d.next_date ? "　下次跟進：" + esc(d.next_date) : "") + (d.lost_reason ? "<br>失單原因：" + esc(d.lost_reason) : "")
         + (qs ? '<div style="margin-top:6px">報價：' + qs + "</div>" : ""),
@@ -525,8 +526,8 @@
         { k: "next_date", l: "下次跟進日", type: "date", value: d.next_date }
       ],
       extra: [
-        { l: "✏️ 編輯", fn: function (close) { close(); dealForm(d); } },
-        { l: "🧾 開報價", fn: function (close) { close(); quoteForm(null, d.customer_id, d.id); } }
+        { l: ic("edit") + "編輯", fn: function (close) { close(); dealForm(d); } },
+        { l: ic("file") + "開報價", fn: function (close) { close(); quoteForm(null, d.customer_id, d.id); } }
       ],
       ok: "記錄跟進",
       submit: function (v) { return act("deal.followup", { id: d.id, note: v.note, next_date: v.next_date }); }
@@ -541,7 +542,7 @@
     var calc = lsGet("db_quotes", [])[0];
     form({
       title: editing ? "編輯報價單 " + q.no : "新增報價單", wide: true,
-      intro: calc ? "💡 最近一筆報價試算：" + esc(calc.material) + " " + esc(calc.weight) + "kg → 建議報價 <b>" + nt(calc.quote) + "</b>（可填入單價）" : "",
+      intro: calc ? ic("info") + "最近一筆報價試算：" + esc(calc.material) + " " + esc(calc.weight) + "kg → 建議報價 <b>" + nt(calc.quote) + "</b>（可填入單價）" : "",
       fields: [
         { k: "customer_id", l: "客戶", type: "select", opts: custOpts(), value: q.customer_id, req: 1 },
         { k: "deal_id", l: "商機", type: "select", opts: deals, value: q.deal_id },
@@ -565,10 +566,10 @@
     ].concat(withCost || []), lines);
   }
   function quoteView(q) {
-    var extra = [{ l: "🖨️ 列印／存 PDF", fn: function () { printQuote(q); } }];
-    if (q.status === "草稿") extra.push({ l: "📤 發出", fn: function (close) { close(); doIssue(q); } });
-    if (q.status === "已發出") extra.push({ l: "✅ 客戶接受", fn: function (close) { close(); acceptForm(q); } });
-    info("🧾 報價單 " + esc(q.no) + " " + chip(q.status, QTONE[q.status]),
+    var extra = [{ l: ic("printer") + "列印／存 PDF", fn: function () { printQuote(q); } }];
+    if (q.status === "草稿") extra.push({ l: ic("arrow") + "發出", fn: function (close) { close(); doIssue(q); } });
+    if (q.status === "已發出") extra.push({ l: ic("check") + "客戶接受", fn: function (close) { close(); acceptForm(q); } });
+    info(ic("file") + "報價單 " + esc(q.no) + " " + chip(q.status, QTONE[q.status]),
       "<p>客戶：<b>" + esc(custName(q.customer_id)) + "</b>　報價日：" + esc(q.date) + "　有效至：" + esc(q.valid_until || "—") + "</p>"
       + docLines(q.lines) + '<p class="erp-total">合計 ' + nt(q.total) + "</p>" + (q.note ? "<p>" + esc(q.note) + "</p>" : ""), extra);
   }
@@ -613,7 +614,7 @@
         var it = itemOf(l.item_id), left = Math.round((l.qty - l.shipped) * 1000) / 1000;
         return { k: "L" + l.line, l: l.sku + " " + l.name + "　未出 " + num(left) + "／現有 " + num(it ? it.on_hand : 0), type: "num", value: Math.max(0, Math.min(left, it ? it.on_hand : 0)) };
       }).concat([{ k: "date", l: "出貨日", type: "date", value: today() }]),
-      extra: [{ l: "🖨️ 出貨單", fn: function (close, collect) { printDelivery(o, collect()); } }],
+      extra: [{ l: ic("printer") + "出貨單", fn: function (close, collect) { printDelivery(o, collect()); } }],
       ok: "確認出貨",
       submit: function (v) {
         var lines = rest.map(function (l) { return { line: l.line, qty: Number(v["L" + l.line]) || 0 }; }).filter(function (x) { return x.qty > 0; });
@@ -654,17 +655,17 @@
       (l.cost_layers || []).forEach(function (ly) { cost += (ly.qty - ly.returned) * ly.unit_cost; });
     });
     var pays = (o.payments || []).map(function (p) { return "<li>" + esc(p.date) + "　" + nt(p.amount) + "　" + esc(p.note) + ' <span class="erp-muted">' + esc(p.by) + "</span></li>"; }).join("");
-    var extra = [{ l: "🖨️ 出貨單", fn: function () { printDelivery(o); } }];
+    var extra = [{ l: ic("printer") + "出貨單", fn: function () { printDelivery(o); } }];
     if (!o.cancelled) {
-      if (st === "未出貨" || st === "部分出貨") extra.push({ l: "🚚 出貨", fn: function (close) { close(); shipForm(o); } });
-      if (o.lines.some(function (l) { return l.shipped > l.returned; })) extra.push({ l: "↩️ 退貨", fn: function (close) { close(); returnForm(o); } });
-      if (o.paid - o.refunded > 0) extra.push({ l: "💸 退款", fn: function (close) {
+      if (st === "未出貨" || st === "部分出貨") extra.push({ l: ic("truck") + "出貨", fn: function (close) { close(); shipForm(o); } });
+      if (o.lines.some(function (l) { return l.shipped > l.returned; })) extra.push({ l: ic("undo") + "退貨", fn: function (close) { close(); returnForm(o); } });
+      if (o.paid - o.refunded > 0) extra.push({ l: ic("cash") + "退款", fn: function (close) {
         var a = prompt("退款金額（已收 " + (o.paid - o.refunded) + "）", ""); if (a) act("order.refund", { id: o.id, amount: a }).then(function (r) { if (r) close(); });
       } });
-      extra.push({ l: "📅 改交期", fn: function (close) { var d = prompt("新交期（YYYY-MM-DD）", o.due || today()); if (d) act("order.update", { id: o.id, due: d }).then(function (r) { if (r) close(); }); } });
-      if (st === "未出貨") extra.push({ l: "✖ 取消訂單", cls: "erp-danger", fn: function (close) { if (confirm("確定取消 " + o.no + "？會釋放預留庫存。")) act("order.cancel", { id: o.id }).then(function (r) { if (r) close(); }); } });
+      extra.push({ l: ic("calendar") + "改交期", fn: function (close) { var d = prompt("新交期（YYYY-MM-DD）", o.due || today()); if (d) act("order.update", { id: o.id, due: d }).then(function (r) { if (r) close(); }); } });
+      if (st === "未出貨") extra.push({ l: ic("x") + "取消訂單", cls: "erp-danger", fn: function (close) { if (confirm("確定取消 " + o.no + "？會釋放預留庫存。")) act("order.cancel", { id: o.id }).then(function (r) { if (r) close(); }); } });
     }
-    info("🛒 銷售訂單 " + esc(o.no) + " " + chip(st, stTone(st)) + (o.cancelled ? "" : " " + chip(E.payState(o), payTone(E.payState(o)))),
+    info(ic("cart") + "銷售訂單 " + esc(o.no) + " " + chip(st, stTone(st)) + (o.cancelled ? "" : " " + chip(E.payState(o), payTone(E.payState(o)))),
       "<p>客戶：<b>" + esc(custName(o.customer_id)) + "</b>　下單：" + esc(o.date) + "　交期：" + esc(o.due || "—") + (o.quote_id ? "　來自報價" : "") + "</p>"
       + docLines(o.lines, [
         { l: "已出", r: 1, v: function (l) { return num(l.shipped); } },
@@ -694,7 +695,7 @@
   }
   function woForm(itemId, qty) {
     var withBom = W().items.filter(function (i) { return E.activeBom(W(), i.id); });
-    if (!withBom.length) { alert("請先建立 BOM（🏭 BOM／工單 → ＋ 新增 BOM）。"); S.tab = "mfg"; render(); return; }
+    if (!withBom.length) { alert("請先建立 BOM（BOM／工單 → ＋ 新增 BOM）。"); S.tab = "mfg"; render(); return; }
     form({
       title: "新增工單",
       fields: [
@@ -712,7 +713,7 @@
       var ci = itemOf(c.item_id), need = c.qty * o.qty;
       return { name: (ci ? ci.sku + " " : "") + c.name, per: c.qty, need: need, have: ci ? ci.on_hand : 0, unit: ci ? ci.unit : "" };
     });
-    info("🏭 工單 " + esc(o.no) + " " + chip(o.status, WTONE[o.status]),
+    info(ic("factory") + "工單 " + esc(o.no) + " " + chip(o.status, WTONE[o.status]),
       "<p>" + esc(o.bom.sku + " " + o.bom.name) + "（BOM v" + o.bom.revision + "）× <b>" + num(o.qty) + "</b>　交期 " + esc(o.due || "—") + "</p>"
       + table([{ l: "用料", v: "name" }, { l: "每單位", r: 1, v: function (r) { return num(r.per); } },
         { l: "共需", r: 1, v: function (r) { return num(r.need) + " " + esc(r.unit); } },
@@ -737,7 +738,7 @@
       + "table{width:100%;border-collapse:collapse;margin:14px 0}th,td{border:1px solid #999;padding:6px 8px;font-size:13px;text-align:left}td.r,th.r{text-align:right}"
       + ".meta{display:flex;justify-content:space-between;font-size:14px}.tot{text-align:right;font-size:16px;font-weight:700}.sign{display:flex;justify-content:space-between;margin-top:48px}"
       + "@media print{button{display:none}}</style></head><body>" + inner
-      + '<p><button onclick="window.print()">🖨️ 列印 / 另存 PDF</button></p></body></html>');
+      + '<p><button onclick="window.print()">列印 / 另存 PDF</button></p></body></html>');
     win.document.close();
   }
   function plainLines(rows) {
@@ -798,7 +799,7 @@
     "backup": function () { download("九上ERP備份_" + (S.mode === "cloud" ? "公司" : "本機") + "_" + today() + ".json", JSON.stringify(W(), null, 1)); },
     "health": function () {
       var errs = E.check(W());
-      alert(errs.length ? "⚠️ 發現 " + errs.length + " 個不一致（多半是有人直接改了試算表）：\n\n" + errs.join("\n") : "✅ 資料一致：每個料號的帳面數量都等於成本批次加總。");
+      alert(errs.length ? "發現 " + errs.length + " 個不一致（多半是有人直接改了試算表）：\n\n" + errs.join("\n") : "資料一致：每個料號的帳面數量都等於成本批次加總。");
     },
     "reset-local": function () { if (confirm("清空這個瀏覽器裡的 ERP 試用資料？（不影響公司試算表）")) { S.world = E.empty(); saveLocal(); render(); } },
     "demo": demo,
@@ -810,7 +811,7 @@
     "receive-for": function (id) { receiveForm(itemOf(id)); },
     "receive-view": function (id) {
       var r = byId("receipts", id);
-      info("🚚 進貨單 " + esc(r.no), "<p>供應商：<b>" + esc(r.supplier) + "</b>　日期：" + esc(r.date) + "</p>" + table([
+      info(ic("truck") + "進貨單 " + esc(r.no), "<p>供應商：<b>" + esc(r.supplier) + "</b>　日期：" + esc(r.date) + "</p>" + table([
         { l: "料號", v: "sku" }, { l: "品名", v: "name" }, { l: "數量", r: 1, v: function (l) { return num(l.qty); } },
         { l: "單價", r: 1, v: function (l) { return nt(l.unit_cost); } }, { l: "小計", r: 1, v: function (l) { return nt(l.qty * l.unit_cost); } }
       ], r.lines) + '<p class="erp-total">合計 ' + nt(r.total) + "</p>" + (r.note ? "<p>" + esc(r.note) + "</p>" : ""));
