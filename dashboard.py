@@ -314,7 +314,27 @@ def render_help_html() -> str:
 {_HEAD}
 <title>九上科技 · 使用說明</title>
 <style>
-  .help {{ max-width: 900px; }}
+  .help-layout {{ display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 22px; align-items: start; }}
+  .help-main {{ min-width: 0; }}
+  .help-main > .q:first-child {{ margin-top: 0; }}
+  .help-toc {{ position: sticky; top: calc(var(--topbar-h) + 24px); background: var(--card); border: 1px solid var(--line);
+    border-top: 3px solid var(--accent); padding: 12px 0 10px; max-height: calc(100vh - var(--topbar-h) - 48px); overflow-y: auto; }}
+  .help-toc .tt {{ font-family: var(--utility-font); font-size: 11px; letter-spacing: .16em; color: var(--muted); padding: 2px 16px 8px; }}
+  .help-toc .tg {{ font-size: 11.5px; font-weight: 700; color: var(--muted2); padding: 12px 16px 4px; border-top: 1px solid var(--line2); margin-top: 6px; }}
+  .help-toc a {{ display: flex; align-items: center; padding: 7px 16px 7px 13px; font-size: 13.5px; color: var(--text);
+    text-decoration: none; border-left: 3px solid transparent; }}
+  .help-toc a .ic {{ color: var(--muted); width: 16px; height: 16px; margin-right: 9px; }}
+  .help-toc a:hover {{ background: var(--line2); color: var(--accent); text-decoration: none; }}
+  .help-toc a.on {{ border-left-color: var(--secondary); color: var(--accent); background: var(--accent-soft); font-weight: 600; }}
+  .help-toc a.on .ic {{ color: var(--accent); }}
+  .help .groups {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 14px 0 6px; }}
+  .help .group {{ border: 1px solid var(--line); border-left: 4px solid var(--secondary); background: var(--bg); padding: 12px 14px; }}
+  .help .group b {{ display: flex; align-items: center; font-size: 15px; color: var(--text); }}
+  .help .group b .ic {{ color: var(--accent); }}
+  .help .group span {{ display: block; color: var(--muted); font-size: 13px; line-height: 1.75; margin-top: 4px; }}
+  @media (min-width: 1100px) {{ .help .jumpbox {{ display: none; }} }}
+  @media (max-width: 1099px) {{ .help-layout {{ grid-template-columns: minmax(0, 1fr); }} .help-toc {{ display: none; }} }}
+  @media (max-width: 640px) {{ .help .groups {{ grid-template-columns: 1fr; }} }}
   .help .q {{ background: var(--card); border: 1px solid var(--line); border-radius: 16px;
     padding: 20px 22px; margin: 16px 0; box-shadow: var(--shadow); color: var(--text); }}
   .help h2 {{ font-size: 1.18rem; margin: 4px 0 10px; color: var(--text); }}
@@ -381,16 +401,25 @@ def render_help_html() -> str:
     <h1>{_ic('book')}使用說明</h1>
     <div class="sub">一頁看懂整個網站怎麼用 · 可展開／可試玩 · 更新於 {now}</div>
 
+  <div class="help-layout">
+  <div class="help-main">
     <div class="q">
       <h2>這是什麼？</h2>
       <p>這是一套幫九上科技的<b>免費小型 ERP</b>：一邊自動盯原料行情；一邊管報價、訂單、進銷存與生產（ERP），還有 AI 助手（含中越對話）。資料每天自動更新，不用開電腦、不用付費、不用維護。</p>
-      <p>左側選單分三組：<b>總覽</b>（今日總覽、原料行情）、<b>營運</b>（報價試算、訂單看板、ERP 作業）、<b>工具</b>（AI 助手、資料庫、使用說明）。手機上選單在頁面上方，可左右滑動。</p>
+      <div class="groups">
+        <div class="group"><b>{_ic('bars')}總覽</b><span>今日總覽、原料行情：每天打開先看這兩頁。</span></div>
+        <div class="group"><b>{_ic('factory')}營運</b><span>報價試算、訂單看板、ERP 作業：從報價到出貨收款。</span></div>
+        <div class="group"><b>{_ic('wrench')}工具</b><span>AI 助手、資料庫、使用說明：查資料、管名單、看教學。</span></div>
+      </div>
+      <p class="muted" style="margin-top:10px">選單在左側；手機上在頁面上方，可左右滑動。</p>
+      <div class="jumpbox">
       <p class="muted">點下面任一顆，直接跳到該功能的詳細說明：</p>
       <div class="jump">
         <a href="#start">新手上路</a><a href="#f-login">登入</a><a href="#f-home">{_ic('home')}首頁</a><a href="#f-metals">{_ic('ingot')}原料</a>
-        <a href="#f-quote">{_ic('calc')}報價</a><a href="#f-orders">{_ic('box')}訂單</a>
+        <a href="#f-quote">{_ic('calc')}報價</a><a href="#f-orders">{_ic('box')}訂單</a><a href="#f-erp">{_ic('factory')}ERP</a>
         <a href="#f-ai">{_ic('bot')}助手</a><a href="#f-vn">中越對話</a><a href="#f-notebook">{_ic('notebook')}NotebookLM</a><a href="#f-email">早報信</a>
         <a href="#db">{_ic('db')}資料庫/試算表</a><a href="#freq">更新頻率/費用</a><a href="#faq">常見問題</a>
+      </div>
       </div>
     </div>
 
@@ -484,7 +513,7 @@ def render_help_html() -> str:
       <details class="acc" id="f-erp">
         <summary>{_ic('factory')}ERP 作業 <span class="sm">— 庫存成本、進貨、報價、訂單、工單、客戶</span><span class="chev">▾</span></summary>
         <div class="acc-body">
-          <p><b>這是什麼：</b>完整的進銷存＋生產：料號庫存用<b>先進先出（FIFO）</b>自動算成本；報價 → 訂單 → 出貨 → 收款一路串起來；自己生產的用 <b>BOM＋工單</b>把用料成本轉進成品；總覽直接看本月銷售、毛利、庫存價值、應收、缺料。從上方「訂單 ▾ → ERP 作業」進入。</p>
+          <p><b>這是什麼：</b>完整的進銷存＋生產：料號庫存用<b>先進先出（FIFO）</b>自動算成本；報價 → 訂單 → 出貨 → 收款一路串起來；自己生產的用 <b>BOM＋工單</b>把用料成本轉進成品；總覽直接看本月銷售、毛利、庫存價值、應收、缺料。從左側選單的「ERP 作業」進入。</p>
           <p><b>建議順序：</b></p>
           <ul>
             <li><b>料號庫存</b>：先建原料（kg）與成品（件）。原料可勾「銅／鋁」，會顯示 LME 參考價。</li>
@@ -583,7 +612,7 @@ def render_help_html() -> str:
       <div class="tip">一句話：<b>正常使用完全免費、不會超量</b>；唯一要節制的是 NotebookLM 的「語音摘要」別每天狂生成。</div>
     </div>
 
-    <div class="q">
+    <div class="q" id="try">
       <h2>{_ic('calc')}試玩看看：報價怎麼算</h2>
       <p class="muted">拉一拉、選一選，數字會即時變。這只是<b>示範</b>用近似料價；實際報價頁會帶入當天最新原料價。</p>
       <div class="demo">
@@ -666,7 +695,7 @@ def render_help_html() -> str:
       </details>
       <details class="acc">
         <summary>看不到最新資料？<span class="chev">▾</span></summary>
-        <div class="acc-body"><p>按 <kbd>Ctrl</kbd> + <kbd>F5</kbd>（Mac 是 <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>）強制重新整理一次即可。原料價<b>一天更新兩次</b>；供應商／客戶名單<b>每月更新一次</b>；訂單／報價／名單是你一存就即時同步。詳見上面「各功能多久更新一次」。</p></div>
+        <div class="acc-body"><p>按 <kbd>Ctrl</kbd> + <kbd>F5</kbd>（Mac 是 <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>）強制重新整理一次即可。原料價<b>一天更新兩次</b>；訂單／報價／名單是你一存就即時同步。詳見上面「各功能多久更新一次」。</p></div>
       </details>
       <details class="acc">
         <summary>要錢嗎？<span class="chev">▾</span></summary>
@@ -680,8 +709,41 @@ def render_help_html() -> str:
 
     <div class="foot">有任何看不懂的地方，回到這頁再看一次就好。全部免費、自動更新。</div>
   </div>
+    <aside class="help-toc" aria-label="本頁目錄">
+      <div class="tt">本頁目錄</div>
+      <a href="#start">{_ic('play')}新手上路</a>
+      <div class="tg">功能說明</div>
+      <a href="#f-login">{_ic('user')}登入</a>
+      <a href="#f-home">{_ic('home')}今日總覽</a>
+      <a href="#f-metals">{_ic('ingot')}原料行情</a>
+      <a href="#f-quote">{_ic('calc')}報價試算</a>
+      <a href="#f-orders">{_ic('clipboard')}訂單看板</a>
+      <a href="#f-erp">{_ic('factory')}ERP 作業</a>
+      <a href="#f-ai">{_ic('bot')}AI 助手</a>
+      <a href="#f-vn">{_ic('languages')}中越對話</a>
+      <a href="#f-notebook">{_ic('notebook')}NotebookLM</a>
+      <a href="#f-email">{_ic('mail')}每日早報信</a>
+      <div class="tg">其他</div>
+      <a href="#freq">{_ic('clock')}更新頻率／費用</a>
+      <a href="#try">{_ic('calc')}試玩報價</a>
+      <a href="#db">{_ic('db')}資料庫與試算表</a>
+      <a href="#faq">{_ic('info')}常見問題</a>
+    </aside>
+  </div>
+  </div>
   <script>
   (function(){{
+    // 目錄：跳到手風琴段落時自動展開；捲動時標示目前讀到哪一節
+    function openTarget(){{ var id=location.hash.slice(1); var el=id&&document.getElementById(id);
+      if(el&&el.tagName==="DETAILS"){{ el.open=true; }} }}
+    window.addEventListener("hashchange",openTarget); openTarget();
+    var tocLinks=Array.prototype.slice.call(document.querySelectorAll(".help-toc a"));
+    var tocTargets=tocLinks.map(function(a){{ return document.getElementById(a.getAttribute("href").slice(1)); }});
+    var tocTick=false;
+    function markToc(){{ tocTick=false; var cur=0;   // 最後一個頂端已捲過頂欄下緣的段落
+      tocTargets.forEach(function(t,i){{ if(t&&t.getBoundingClientRect().top<=120)cur=i; }});
+      tocLinks.forEach(function(a,i){{ a.classList.toggle("on",i===cur); }}); }}
+    if(tocLinks.length){{ window.addEventListener("scroll",function(){{ if(!tocTick){{ tocTick=true; requestAnimationFrame(markToc); }} }},{{ passive:true }}); markToc(); }}
     // 報價示範
     var mat=document.getElementById("dMat"), w=document.getElementById("dW"),
         mul=document.getElementById("dMul"), mx=document.getElementById("dMx"),
