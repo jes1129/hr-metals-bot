@@ -17,12 +17,17 @@ var ERP_LOG_COLS = ["ts", "by", "action", "key", "result", "payload"];
 var GAS_BUILD = "2026.10.14";
 var GAS_API = 1;
 
+function erpBackup_() {                                // 備份狀態讀不到也不能讓版本查詢失敗
+  try { return typeof backupStatus_ === "function" ? backupStatus_() : null; } catch (e) { return null; }
+}
+
 function erpVersion_() {
   return { ok: true, build: GAS_BUILD, api: {
     erp: GAS_API,
     alerts: typeof SA_API !== "undefined" ? SA_API : null,       // 沒貼 sched-alerts.gs → null（網頁會提示尚未安裝）
-    digest: typeof EMAIL_API !== "undefined" ? EMAIL_API : null
-  } };
+    digest: typeof EMAIL_API !== "undefined" ? EMAIL_API : null,
+    backup: typeof BK_API !== "undefined" ? BK_API : null
+  }, backup: erpBackup_() };
 }
 
 function erpDispatch_(action, p, email) {
@@ -98,8 +103,8 @@ function erpAct_(p, email) {
 }
 
 // ---------- 讀 ----------
-function erpLoad_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+function erpLoad_(src) {                     // src 不填 = 現在這份試算表；備份還原演練會傳入備份檔
+  var ss = src || SpreadsheetApp.getActiveSpreadsheet();
   var w = ErpEngine.empty();
   Object.keys(ErpEngine.TABLES).forEach(function (t) {
     var def = ErpEngine.TABLES[t];

@@ -50,9 +50,23 @@ function metalsSignalText_() {
     ((d.health && d.health.items) || []).forEach(function (i) {
       if (i.level !== "green") warn.push((i.level === "red" ? "🔴 " : "🟡 ") + i.name + "：" + i.display + (i.msg ? "（" + i.msg + "）" : ""));
     });
+    var bs = backupWarn_(); if (bs) warn.push(bs);
     if (warn.length) lines.push("", "⚠️ 資料來源警示：報價先別直接照用", warn.join("\n"));
     return lines.join("\n");
   } catch (e) { return "【原料行情】暫時取不到（網站資料讀不到，請確認排程是否正常）。"; }
+}
+
+// 備份自檢：早報是「另一個觸發器」，備份壞了或根本沒裝，這裡才看得到（backup.gs 要先貼進去）
+function backupWarn_() {
+  if (typeof backupStatus_ !== "function") return "💾 備份功能尚未安裝（貼上 backup.gs 並執行 installBackupTrigger），目前資料沒有自動備份。";
+  try {
+    var b = backupStatus_();
+    if (!b.installed || b.backupDays === null) return "💾 還沒有任何成功的備份紀錄，請執行 backupNow。";
+    if (b.backupDays >= 3) return "🔴 已經 " + b.backupDays + " 天沒有成功備份（正常每天一次）" + (b.failStreak ? "，連續失敗 " + b.failStreak + " 次" : "") + "。";
+    if (b.backupDays >= 2) return "🟡 已經 " + b.backupDays + " 天沒有成功備份。";
+    if (b.drillDays === null || b.drillDays > 90) return "🟡 還原演練" + (b.drillDays === null ? "從來沒做過" : "已超過 " + b.drillDays + " 天沒做") + "，請執行 restoreDrill。";
+  } catch (e) { return "💾 備份狀態讀不到：" + e; }
+  return "";
 }
 
 // ---- 排程風險（排程頁存在小表 sched_kri：格子前面有「~」避免被當數字，資料切段 kri.0、kri.1…）----

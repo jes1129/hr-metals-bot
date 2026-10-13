@@ -78,8 +78,8 @@
 
   // ---------- 變更控制：網頁版本 vs Apps Script 版本 ----------
   // UI_VERSION 每次發佈改一次；NEED 是「網頁需要後端至少第幾版」。後端對不上就在頁尾與頂端警告，避免新網頁配舊後端悄悄出錯。
-  var UI_VERSION = "2026.10.14", NEED = { erp: 1, alerts: 1, digest: 1 };
-  var NEED_NAME = { erp: ["ERP 後端", "google-apps-script-erp.gs"], alerts: ["排程自動通知", "sched-alerts.gs"], digest: ["每日早報", "email-notify.gs"] };
+  var UI_VERSION = "2026.10.14", NEED = { erp: 1, alerts: 1, digest: 1, backup: 1 };
+  var NEED_NAME = { erp: ["ERP 後端", "google-apps-script-erp.gs"], alerts: ["排程自動通知", "sched-alerts.gs"], digest: ["每日早報", "email-notify.gs"], backup: ["每日備份", "backup.gs"] };
   function verBuild() { var l = document.querySelector('link[href*="style.css?v="]'); var m = l && /v=(\d+)/.exec(l.getAttribute("href")); return m ? m[1] : ""; }
   function verCheck() {
     dbCall("appVersion").then(function (r) {
@@ -93,17 +93,24 @@
           else if (have < NEED[k]) bad.push(nm[0] + "版本太舊（後端 " + have + "，網頁需要 " + NEED[k] + "）：請重貼 " + nm[1]);
         });
       }
+      var bk = r && r.ok ? r.backup : null, bkTxt = "";
+      if (bk) {
+        bkTxt = " · 最近備份 " + (bk.backupDays == null ? "—" : bk.backupDays === 0 ? "今天" : bk.backupDays + " 天前");
+        if (bk.backupDays == null || bk.backupDays >= 3) bad.push("已經" + (bk.backupDays == null ? "沒有任何" : " " + bk.backupDays + " 天沒有") + "成功備份");
+        else if (bk.backupDays >= 2) note.push("備份已 " + bk.backupDays + " 天沒更新");
+        if (bk.drillDays == null || bk.drillDays > 90) note.push("還原演練" + (bk.drillDays == null ? "從未做過" : "已 " + bk.drillDays + " 天沒做") + "（執行 restoreDrill）");
+      }
       var foot = document.querySelector(".foot"), line = document.getElementById("verLine");
       if (!line && foot) { line = document.createElement("div"); line.id = "verLine"; line.className = "verline"; foot.parentNode.insertBefore(line, foot.nextSibling); }
       if (line) {
         line.className = "verline" + (bad.length ? " bad" : note.length ? " note" : "");
-        line.textContent = "網頁版本 " + UI_VERSION + (verBuild() ? "（建置 " + verBuild() + "）" : "") + " · 後端版本 " + (r && r.ok ? r.build : "舊版") +
+        line.textContent = "網頁版本 " + UI_VERSION + (verBuild() ? "（建置 " + verBuild() + "）" : "") + " · 後端版本 " + (r && r.ok ? r.build : "舊版") + bkTxt +
           (bad.length ? " ｜ ⚠ " + bad.join("；") : note.length ? " ｜ " + note.join("；") : " ｜ 版本一致");
       }
       var bar = document.getElementById("verBar");
       if (bad.length) {
         if (!bar) { bar = document.createElement("div"); bar.id = "verBar"; bar.className = "verbar"; document.body.insertBefore(bar, document.body.firstChild); }
-        bar.textContent = "⚠ 網頁與後端版本不一致：" + bad.join("；");
+        bar.textContent = "⚠ 系統警示：" + bad.join("；");
       } else if (bar) bar.remove();
     });
   }

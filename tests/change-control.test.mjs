@@ -6,7 +6,7 @@ import vm from "node:vm";
 import { execFileSync } from "node:child_process";
 
 const read = (f) => fs.readFileSync(new URL("../" + f, import.meta.url), "utf8");
-const GS = ["google-apps-script.gs", "google-apps-script-erp.gs", "sched-alerts.gs", "email-notify.gs", "notebooklm-export.gs", "gas/erp-adapter.gs"];
+const GS = ["google-apps-script.gs", "google-apps-script-erp.gs", "sched-alerts.gs", "email-notify.gs", "backup.gs", "notebooklm-export.gs", "gas/erp-adapter.gs"];
 
 test("每個 Apps Script 檔案語法正確（貼上去才不會整個壞掉）", () => {
   for (const f of GS) assert.doesNotThrow(() => new vm.Script(read(f), { filename: f }), f);
@@ -30,15 +30,15 @@ test("appVersion：回報 ERP 版本；沒貼的檔案回 null", () => {
   const only = load(["google-apps-script-erp.gs"]);
   const r = only.erpDispatch_("appVersion", {}, "a@b.c");
   assert.equal(r.ok, true);
-  assert.deepEqual({ ...r.api }, { erp: 1, alerts: null, digest: null });
-  const all = load(["google-apps-script-erp.gs", "sched-alerts.gs", "email-notify.gs"]);
-  assert.deepEqual({ ...all.erpDispatch_("appVersion", {}, "a@b.c").api }, { erp: 1, alerts: 1, digest: 1 });
+  assert.deepEqual({ ...r.api }, { erp: 1, alerts: null, digest: null, backup: null });
+  const all = load(["google-apps-script-erp.gs", "sched-alerts.gs", "email-notify.gs", "backup.gs"]);
+  assert.deepEqual({ ...all.erpDispatch_("appVersion", {}, "a@b.c").api }, { erp: 1, alerts: 1, digest: 1, backup: 1 });
 });
 
 test("網頁需要的後端版本（app.js 的 NEED）不能高於程式碼裡的實際版本", () => {
   const app = read("docs/assets/app.js");
   const need = JSON.parse(/NEED = (\{[^}]*\})/.exec(app)[1].replace(/(\w+):/g, '"$1":'));
-  const all = load(["google-apps-script-erp.gs", "sched-alerts.gs", "email-notify.gs"]);
+  const all = load(["google-apps-script-erp.gs", "sched-alerts.gs", "email-notify.gs", "backup.gs"]);
   const have = all.erpDispatch_("appVersion", {}, "x").api;
   for (const k of Object.keys(need)) assert.ok(have[k] >= need[k], `${k}: 網頁需要 ${need[k]}，後端檔只有 ${have[k]}`);
 });
