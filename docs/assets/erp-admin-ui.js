@@ -232,8 +232,9 @@
     var res = w.reservations.filter(function (r) { return r.date >= d; }).sort(function (a, b) { return (a.date + a.start).localeCompare(b.date + b.start); });
     return section(ic("wrench") + "設備", table([
       { l: "編號", v: "code" }, { l: "名稱", v: function (e) { return esc(e.name) + (e.active === false ? " " + chip("停用", "muted") : ""); } }, { l: "位置", v: "location" },
+      { l: "保養", v: function (e) { if (!(e.maint_days > 0)) return '<span class="erp-muted">不追蹤</span>'; var nx = X.nextMaint ? X.nextMaint(e) : ""; return esc(e.last_maint || "從未") + '<div class="erp-muted">下次 ' + esc(nx || "現在") + "</div>"; } },
       { l: "今天", v: function (e) { var n = w.reservations.filter(function (r) { return r.equipment_id === e.id && r.date === today() && r.status === "預約中"; }); return n.length ? chip(n.map(function (r) { return r.start + "–" + r.end; }).join("、"), "info") : '<span class="erp-muted">空閒</span>'; } },
-      { l: "", v: function (e) { return mini("equip-edit", ic("edit"), e.id, "編輯") + (e.active !== false ? mini("res-new-for", ic("calendar") + "預約", e.id) : ""); } }
+      { l: "", v: function (e) { return mini("equip-edit", ic("edit"), e.id, "編輯") + (e.active !== false ? mini("res-new-for", ic("calendar") + "預約", e.id) : "") + (e.maint_days > 0 ? mini("equip-maint", ic("wrench") + "已保養", e.id, "記錄今天已完成保養") : ""); } }
     ], w.equipment, { empty: "還沒有設備（例：三次元量測儀、堆高機、會議室、公務車）" }), btn("equip-new", ic("plus") + "新增設備", null, "primary"))
       + section(ic("calendar") + "預約（" + d + " 起）", '<div class="dbtoolbar"><label class="erp-inline">從 <input type="date" class="dbfilter" data-a-change="res-date" value="' + esc(d) + '"></label></div>' + table(resCols(), res, { empty: "沒有預約" }),
         btn("res-new", ic("plus") + "新增預約", null, "primary"));
@@ -242,6 +243,7 @@
     var editing = !!e; e = e || {};
     U.form({ title: editing ? "編輯設備" : "新增設備", fields: [
       { k: "name", l: "名稱", req: 1, value: e.name }, { k: "code", l: "設備編號", value: e.code }, { k: "location", l: "位置", value: e.location },
+      { k: "maint_days", l: "保養週期（天，0＝不追蹤）", type: "num", value: e.maint_days || 0 }, { k: "last_maint", l: "上次保養日", type: "date", value: e.last_maint || "" },
       editing ? { k: "active", l: "狀態", type: "check", text: "可預約", value: e.active !== false } : null, { k: "note", l: "備註", type: "textarea", value: e.note }].filter(Boolean),
       submit: function (v) { if (editing) v.id = e.id; return U.act("equipment.save", v); } });
   }
@@ -284,6 +286,7 @@
   H["unit-new"] = function () { unitForm(null); };
   H["unit-edit"] = function (id) { unitForm(U.byId("units", id)); };
   H["staff-new"] = function () { staffForm(null); };
+  H["equip-maint"] = function (id) { return U.act("equipment.maintained", { id: id }); };
   H["staff-edit"] = function (id) { staffForm(U.byId("staff", id)); };
   H["csv-staff"] = function () { U.csv("員工", ["編號", "姓名", "單位", "職稱", "電話", "Email", "到職日", "狀態"], W().staff.map(function (s) { return [s.code, s.name, unitName(s.unit_id), s.title, s.phone, s.email, s.hire_date, s.active === false ? "停用" : "在職"]; })); };
   H["week-prev"] = function () { U.S.week = addDays(U.S.week || monday(today()), -7); U.render(); };

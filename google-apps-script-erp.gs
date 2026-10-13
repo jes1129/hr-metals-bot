@@ -1,7 +1,7 @@
 /**
  * 九上科技儀表板 — ERP 後端（Google Apps Script 第二個檔案）
  *
- * ⚠️ 自動產生，請勿手改：來源是 docs/assets/erp-engine.js + erp-admin.js + erp-roles.js + gas/erp-adapter.gs，
+ * ⚠️ 自動產生，請勿手改：來源是 docs/assets/erp-engine.js + erp-admin.js + erp-roles.js + sched-kri.js + biz-kri.js + gas/erp-adapter.gs，
  *    修改後執行 python scripts/build_erp_gas.py 重新產生。
  *
  * 安裝：在同一個 Apps Script 專案按「＋ → 指令碼」新增檔案（名稱例：erp），把本檔全部貼進去；
@@ -934,7 +934,7 @@
     shifts: { sheet: "ERP_班表", cols: ["id", "staff_id", "date", "start", "end", "break_min", "status", "note", "created"], num: ["break_min"] },
     attendance: { sheet: "ERP_出勤", cols: ["id", "staff_id", "date", "clock_in", "clock_out", "break_min", "status", "void_reason", "note", "by", "created"], num: ["break_min"] },
     requests: { sheet: "ERP_申請", cols: ["id", "no", "staff_id", "kind", "leave_type", "start_date", "start_time", "end_date", "end_time", "hours", "reason", "status", "created_by", "reviewer", "review_note", "history", "created"], num: ["hours"], json: ["history"] },
-    equipment: { sheet: "ERP_設備", cols: ["id", "code", "name", "location", "active", "note", "created"], bool: ["active"] },
+    equipment: { sheet: "ERP_設備", cols: ["id", "code", "name", "location", "active", "note", "created", "maint_days", "last_maint"], bool: ["active"], num: ["maint_days"] },
     reservations: { sheet: "ERP_設備預約", cols: ["id", "equipment_id", "staff_id", "date", "start", "end", "purpose", "status", "by", "created"] },
     notices: { sheet: "ERP_公告", cols: ["id", "title", "body", "pinned", "status", "by", "created", "updated"], bool: ["pinned"] }
   };
@@ -1114,8 +1114,19 @@
     var e = p.id ? find(w, "equipment", p.id, "設備") : { id: ctx.newId("G"), active: true, created: today(ctx) };
     e.name = name; e.code = code; e.location = str(p.location, 60); e.note = str(p.note, 300);
     if (p.active !== undefined) e.active = !!p.active;
+    // 保養週期（天；0 或空＝不追蹤）與上次保養日：風險儀表板「設備保養逾期」用
+    if (p.maint_days !== undefined && p.maint_days !== "") { var md = Number(p.maint_days); need(isFinite(md) && md >= 0 && md <= 3650, "保養週期要是 0–3650 天"); e.maint_days = Math.round(md); }
+    else if (e.maint_days === undefined || p.maint_days === "") e.maint_days = 0;
+    if (p.last_maint !== undefined) { need(p.last_maint === "" || isDate(p.last_maint), "上次保養日格式要是 YYYY-MM-DD"); e.last_maint = p.last_maint; }
+    else if (e.last_maint === undefined) e.last_maint = "";
     if (!p.id) w.equipment.push(e);
     touch(ctx, "equipment", e);
+    return e.id;
+  };
+  A["equipment.maintained"] = function (w, p, ctx) {                       // 按一下＝今天（或指定日）已完成保養
+    var e = find(w, "equipment", p.id, "設備");
+    var d = p.date ? needDate(p.date, "保養日期") : today(ctx);
+    e.last_maint = d; touch(ctx, "equipment", e);
     return e.id;
   };
   A["reservation.save"] = function (w, p, ctx) {
@@ -1192,7 +1203,11 @@
     refs: { staff: { unit_id: "units" }, shifts: { staff_id: "staff" }, attendance: { staff_id: "staff" },
       requests: { staff_id: "staff" }, reservations: { equipment_id: "equipment" } }
   });
-  E.admin = { UNIT_KINDS: UNIT_KINDS, REQ_KINDS: REQ_KINDS, LEAVE_TYPES: LEAVE_TYPES, REQ_STATUS: REQ_STATUS,
+  function nextMaint(e) {                                  // 下次該保養的日期；沒追蹤或從未保養回傳 ""（從未保養＝現在就該做）
+    if (!(e.maint_days > 0) || !isDate(e.last_maint)) return "";
+    var d = new Date(e.last_maint + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + e.maint_days); return d.toISOString().slice(0, 10);
+  }
+  E.admin = { nextMaint: nextMaint, UNIT_KINDS: UNIT_KINDS, REQ_KINDS: REQ_KINDS, LEAVE_TYPES: LEAVE_TYPES, REQ_STATUS: REQ_STATUS,
     diff: diff, workHours: workHours, weekday: weekday, span: span };
   if (typeof module !== "undefined" && module.exports) module.exports = E;
 })(typeof window !== "undefined" ? window : this);
@@ -1290,6 +1305,420 @@
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.ErpRoles = api;
 })(typeof window !== "undefined" ? window : this);
+
+/*
+ * sched-kri.js — 生產排程的「風險 → 監控指標(KRI) → 容忍度門檻 → 觸發 → 處理」
+ *   做法對應 COSO《Achieving Effective Internal Control Over GenAI》(2026)的內控觀念（會演進的風險登錄表、
+ *   連結 KRI 的觸發點、多指標容忍度、預測漂移＝連續超標才升級、監控本身也要被監控），
+ *   但這裡監控的是「排程引擎的預測」，不是生成式 AI。純計算、不碰畫面：瀏覽器與 Node 測試共用。
+ *
+ *   evaluate(ctx, tol) → 每個指標一筆 {id, risk, name, value, display, level: green|yellow|red|na, y, r, msg, action…}
+ *   gate(items)        → 採用新排程前的檢查：有紅燈要填原因＋二次確認，有黃燈要勾選確認
+ *   transitions(prev, items) → 燈號變化（觸發紀錄）
+ *   snapshot(items, extra)   → 存進試算表給首頁、選單紅點、每日早報讀
+ *
+ *   ctx = { nowMin, grace(分鐘，預設 120), stageName(sid),
+ *           orders:[{id, planned, predEnd, actEnd, actInferred, stages:[{sid, pred:[s,e]|null, act:{s,e,inferred}|null}]}],
+ *           plan:{ageDays|null, fresh, cfgChanged}, stats:{hasDue, late, onTimeRate, maxLate, outCost, shaky}, util }
+ *   時間都是「工作分鐘」。
+ */
+(function (root) {
+  "use strict";
+
+  // dir: "hi"＝數字越大越糟（≥ 黃／紅門檻就亮燈）；"lo"＝數字越小越糟（< 黃／紅門檻就亮燈）
+  var DEFS = [
+    { id: "D1", grp: "預測漂移", risk: "排程預測和現場脫節", name: "最近一張完工的預測誤差", unit: "小時", dir: "hi", y: 2, r: 4, owner: "生管", action: "reopt", actionLabel: "重新最佳化",
+      hint: "預測誤差＝實際完工 − 排程預計完工（早或晚都算）。超過門檻代表工時設定可能不準。" },
+    { id: "D2", grp: "預測漂移", risk: "排程預測和現場脫節", name: "連續幾張完工誤差超標", unit: "張", dir: "hi", y: 1, r: 2, owner: "生管", action: "fresh", actionLabel: "從頭排程",
+      hint: "從最近一張往前數，連續幾張的誤差都超過第一項的黃燈門檻。連續超標就是「漂移」，要修正而不是繼續用。" },
+    { id: "D3", grp: "預測漂移", risk: "工時設定失準", name: "某一站實際工時和設定的偏差", unit: "%", dir: "hi", y: 10, r: 20, owner: "生管", action: "factory", actionLabel: "檢查工廠設定",
+      hint: "各站已回報的「實際耗時 ÷ 排程耗時」平均，取偏差最大的站。偏差大就該回「工廠設定」改每件分鐘。" },
+    { id: "D4", grp: "預測漂移", risk: "現場沒有回報進度", name: "預計完工已過、卻還沒回報的單", unit: "張", dir: "hi", y: 1, r: 3, owner: "班長", action: "report", actionLabel: "去回報進度",
+      hint: "預計完工已超過寬限時間（預設 2 小時）仍沒有完工回報；ERP 工單完工會自動帶入。" },
+    { id: "D5", grp: "預測漂移", risk: "監控本身失靈（沒人回報）", name: "各站完工回報率", unit: "%", dir: "lo", y: 90, r: 70, owner: "班長", action: "report", actionLabel: "去回報進度",
+      hint: "預計完工已過寬限時間的「站」裡，有幾成已回報（ERP 推定的不算）。回報率低，漂移監控就看不準。" },
+    { id: "P1", grp: "計畫新舊", risk: "排程過期", name: "距離上次採用排程", unit: "天", dir: "hi", y: 2, r: 4, owner: "生管", action: "reopt", actionLabel: "重新最佳化",
+      hint: "排程是某個時間點的計畫，太久沒更新就跟現場越差越遠。" },
+    { id: "P2", grp: "計畫新舊", risk: "新單沒有排進去", name: "還沒最佳化的新訂單", unit: "張", dir: "hi", y: 1, r: 3, owner: "生管", action: "reopt", actionLabel: "重新最佳化",
+      hint: "訂單清單有、但排程裡沒有的單，目前只是用現場做法暫排。" },
+    { id: "P3", grp: "計畫新舊", risk: "設定被改動", name: "工廠設定改過、排程還沒重排", unit: "項", dir: "hi", y: 1, r: null, owner: "生管", action: "fresh", actionLabel: "從頭排程",
+      hint: "站別、機台數、工時改過之後，原本的排程是依舊設定算的。" },
+    { id: "L1", grp: "領先指標（早期預警）", risk: "產能不夠接單（需求超過產能）", name: "未來 5 個工作日要交的單：工時需求 ÷ 產能", unit: "%", dir: "hi", y: 85, r: 100, owner: "生管", action: "board", actionLabel: "看各站忙碌、考慮外包",
+      hint: "最早的警訊：還沒延遲，但需求已經逼近產能。取各站裡最緊的一站；超過 100% 代表來不及。" },
+    { id: "L2", grp: "領先指標（早期預警）", risk: "交期緩衝被吃光", name: "未完工訂單的平均交期寬裕", unit: "小時", dir: "lo", y: 12, r: 4, owner: "業務", action: "board", actionLabel: "看延遲風險的單",
+      hint: "每張未完工的單，預計完工離交期還剩多少緩衝，取平均。緩衝一路縮小，就是延遲的前兆。" },
+    { id: "L3", grp: "領先指標（早期預警）", risk: "交期不穩", name: "未完工訂單的平均準時機率", unit: "%", dir: "lo", y: 90, r: 75, owner: "業務", action: "board", actionLabel: "看準時機率",
+      hint: "考慮加工時間誤差後，未完工的單平均有多大機會準時。比「準時率」更早反應。" },
+    { id: "L4", grp: "領先指標（早期預警）", risk: "外包依賴升高", name: "外包佔比（未完工訂單）", unit: "%", dir: "hi", y: 5, r: 15, owner: "老闆", action: "board", actionLabel: "看外包的單",
+      hint: "未完工的單裡，外包的件數佔幾成。越來越高，代表自家產能撐不住。" },
+    { id: "S1", grp: "交期", risk: "交期落空", name: "準時率", unit: "%", dir: "lo", y: 95, r: 85, owner: "業務", action: "board", actionLabel: "看延遲的單",
+      hint: "預計能準時完工的單 ÷ 有交期的單。" },
+    { id: "S2", grp: "交期", risk: "交期落空", name: "預計最大延遲", unit: "小時", dir: "hi", y: 2, r: 8, owner: "業務", action: "board", actionLabel: "看延遲的單",
+      hint: "預計延遲最久的那一張，晚了幾小時。" },
+    { id: "S3", grp: "交期", risk: "交期不穩（排得進但很險）", name: "準時機率偏低的單（< 70%）", unit: "張", dir: "hi", y: 1, r: 3, owner: "業務", action: "board", actionLabel: "看準時機率",
+      hint: "考慮加工時間誤差後，準時機率低於 70% 的單。" },
+    { id: "C1", grp: "產能與成本", risk: "產能撞牆", name: "瓶頸站忙碌程度", unit: "%", dir: "hi", y: 90, r: 97, owner: "生管", action: "board", actionLabel: "看各站忙碌",
+      hint: "最忙那一站的機台忙碌比例。逼近 100% 代表任何插單都會延遲。" },
+    { id: "C2", grp: "產能與成本", risk: "外包成本失控", name: "外包費合計", unit: "NT$", dir: "hi", y: 5000, r: 20000, owner: "老闆", action: "board", actionLabel: "看外包的單",
+      hint: "排程裡所有外包的費用合計。" }
+  ];
+  var LV = { na: -1, green: 0, yellow: 1, red: 2 };
+  var LABEL = { na: "—", green: "正常", yellow: "黃燈", red: "紅燈" };
+
+  function tolOf(def, tol) {
+    var t = tol && tol[def.id] || {};
+    return { y: t.y != null && isFinite(t.y) ? +t.y : def.y, r: t.r === null ? null : (t.r != null && isFinite(t.r) ? +t.r : def.r), owner: t.owner || def.owner };
+  }
+  function levelOf(v, def, t) {
+    if (v == null || !isFinite(v)) return "na";
+    if (def.dir === "hi") return t.r != null && v >= t.r ? "red" : v >= t.y ? "yellow" : "green";
+    return t.r != null && v < t.r ? "red" : v < t.y ? "yellow" : "green";
+  }
+  function hrs(min) { var h = Math.abs(min) / 60; return (h >= 10 ? h.toFixed(0) : h.toFixed(1)).replace(/\.0$/, ""); }
+  function pct0(x) { return Math.round(x) + "%"; }
+
+  function ids(list, n) { return list.slice(0, n || 3).join("、") + (list.length > (n || 3) ? "…" : ""); }
+
+  function evaluate(ctx, tol) {
+    var grace = ctx.grace != null ? ctx.grace : 120, now = ctx.nowMin || 0, orders = ctx.orders || [], out = [];
+    // ---- 預測誤差（完工的單；ERP 推定不算）
+    var done = orders.filter(function (o) { return o.actEnd != null && o.predEnd != null && !o.actInferred; })
+      .sort(function (a, b) { return a.actEnd - b.actEnd; });
+    var errs = done.map(function (o) { return { id: o.id, e: o.actEnd - o.predEnd }; });
+    var last = errs.length ? errs[errs.length - 1] : null;
+    var d1 = last ? Math.abs(last.e) / 60 : null;
+    var thr1 = tolOf(DEFS[0], tol).y * 60, run = 0;
+    for (var k = errs.length - 1; k >= 0 && Math.abs(errs[k].e) >= thr1; k--) run++;
+    // ---- 各站工時偏差
+    var ratio = {};
+    orders.forEach(function (o) {
+      o.stages.forEach(function (st) {
+        if (!st.act || st.act.inferred || st.act.s == null || st.act.e == null || !st.pred) return;
+        var pd = st.pred[1] - st.pred[0], ad = st.act.e - st.act.s;
+        if (pd > 1 && ad > 0) (ratio[st.sid] = ratio[st.sid] || []).push(ad / pd);
+      });
+    });
+    var d3 = null, d3sid = null, d3dir = 0;
+    Object.keys(ratio).forEach(function (sid) {
+      var a = ratio[sid], m = a.reduce(function (x, y) { return x + y; }, 0) / a.length, dev = Math.abs(m - 1) * 100;
+      if (d3 == null || dev > d3) { d3 = dev; d3sid = sid; d3dir = m - 1; }
+    });
+    // ---- 逾時沒回報
+    var overdue = orders.filter(function (o) { return o.predEnd != null && o.actEnd == null && o.predEnd + grace < now; }).map(function (o) { return o.id; });
+    var due = 0, rep = 0;
+    orders.forEach(function (o) {
+      o.stages.forEach(function (st) {
+        if (!st.pred || st.pred[1] + grace >= now) return;
+        due++; if (st.act && st.act.e != null && !st.act.inferred) rep++;
+      });
+    });
+    var st = ctx.stats || {}, pl = ctx.plan || {}, ld = ctx.lead || {};
+    var V = {
+      D1: d1 == null ? null : d1,
+      D2: errs.length ? run : null,
+      D3: d3,
+      D4: orders.some(function (o) { return o.predEnd != null; }) ? overdue.length : null,
+      D5: due ? rep / due * 100 : null,
+      P1: pl.ageDays == null ? null : pl.ageDays,
+      P2: pl.fresh == null ? null : pl.fresh,
+      P3: pl.cfgChanged == null ? null : (pl.cfgChanged ? 1 : 0),
+      S1: st.hasDue ? st.onTimeRate * 100 : null,
+      S2: st.hasDue ? Math.max(0, st.maxLate || 0) / 60 : null,
+      S3: st.shaky == null ? null : st.shaky,
+      L1: ld.load == null ? null : ld.load * 100,
+      L2: ld.slack == null ? null : ld.slack / 60,
+      L3: ld.prob == null ? null : ld.prob * 100,
+      L4: ld.outPct == null ? null : ld.outPct * 100,
+      C1: ctx.util == null ? null : ctx.util * 100,
+      C2: st.outCost == null ? null : st.outCost
+    };
+    DEFS.forEach(function (def) {
+      var t = tolOf(def, tol), v = V[def.id], lv = levelOf(v, def, t), disp = v == null ? "—" : def.id === "P1" ? v.toFixed(1).replace(/\.0$/, "") + " 天" : def.unit === "NT$" ? "NT$ " + Math.round(v).toLocaleString()
+        : def.unit === "小時" ? (v >= 10 ? v.toFixed(0) : v.toFixed(1)).replace(/\.0$/, "") + " 小時" : def.unit === "%" ? pct0(v) : def.unit === "項" ? (v ? "有" : "沒有") : Math.round(v) + " " + def.unit;
+      var msg = "";
+      if (lv === "yellow" || lv === "red") {
+        if (def.id === "D1") msg = "最近完工的 " + last.id + " 比預計" + (last.e > 0 ? "晚" : "早") + " " + hrs(last.e) + " 小時。";
+        else if (def.id === "D2") msg = "最近連續 " + run + " 張完工誤差都超過 " + hrs(thr1) + " 小時（" + ids(errs.slice(-run).reverse().map(function (x) { return x.id; })) + "）。";
+        else if (def.id === "D3") msg = "「" + ctx.stageName(d3sid) + "」實際工時比排程" + (d3dir > 0 ? "多" : "少") + " " + Math.round(Math.abs(d3dir) * 100) + "%，建議改工廠設定的每件分鐘。";
+        else if (def.id === "D4") msg = "超過預計完工 " + hrs(grace) + " 小時還沒回報：" + ids(overdue) + "。";
+        else if (def.id === "D5") msg = "已到期的站只有 " + pct0(v) + " 有回報（" + rep + "／" + due + "）。";
+        else if (def.id === "P1") msg = "已經 " + disp + "沒有更新排程。";
+        else if (def.id === "P2") msg = "有 " + v + " 張新訂單還沒排進去。";
+        else if (def.id === "P3") msg = "工廠設定在排程之後改過。";
+        else if (def.id === "S1") msg = "預計只有 " + pct0(v) + " 準時（" + ((st.hasDue || 0) - (st.late || 0)) + "／" + st.hasDue + " 張）。";
+        else if (def.id === "S2") msg = "最晚的一張預計晚 " + disp + "。";
+        else if (def.id === "S3") msg = v + " 張的準時機率低於 70%，加工稍慢就會延遲。";
+        else if (def.id === "L1") msg = "未來 5 個工作日要交的單，工時需求已達產能的 " + disp + (ld.loadName ? "（最緊的是「" + ld.loadName + "」）" : "") + "，再插單就會延遲。";
+        else if (def.id === "L2") msg = v < 0 ? "未完工訂單預計平均已經比交期晚 " + (Math.abs(v) >= 10 ? Math.abs(v).toFixed(0) : Math.abs(v).toFixed(1)).replace(/\.0$/, "") + " 小時。" : "未完工訂單平均只剩 " + disp + " 的交期緩衝。";
+        else if (def.id === "L3") msg = "未完工訂單平均準時機率只剩 " + disp + "。";
+        else if (def.id === "L4") msg = "未完工訂單有 " + disp + " 靠外包。";
+        else if (def.id === "C1") msg = "瓶頸站忙碌 " + disp + "，幾乎沒有彈性。";
+        else if (def.id === "C2") msg = "外包費合計 " + disp + "。";
+      }
+      out.push({ id: def.id, grp: def.grp, risk: def.risk, name: def.name, unit: def.unit, dir: def.dir, y: t.y, r: t.r, owner: t.owner, action: def.action, actionLabel: def.actionLabel,
+        hint: def.hint, value: v, display: disp, level: lv, msg: msg });
+    });
+    return out;
+  }
+
+  function worst(items) { var w = "green", seen = false; items.forEach(function (x) { if (x.level !== "na") seen = true; if (LV[x.level] > LV[w]) w = x.level; }); return seen ? w : "na"; }
+  function counts(items) { var c = { red: 0, yellow: 0, green: 0, na: 0 }; items.forEach(function (x) { c[x.level]++; }); return c; }
+
+  // 採用新排程前的檢查：紅燈＝要填原因＋二次確認；黃燈＝要勾選「我已看過」
+  function gate(items) {
+    var red = items.filter(function (x) { return x.level === "red"; }), yellow = items.filter(function (x) { return x.level === "yellow"; });
+    return { red: red, yellow: yellow, needReason: red.length > 0, needAck: red.length + yellow.length > 0, clear: !red.length && !yellow.length };
+  }
+  function thresholdText(x) {
+    return x.dir === "hi" ? "黃 ≥ " + fmtN(x.y, x) + (x.r != null ? "、紅 ≥ " + fmtN(x.r, x) : "") : "黃 < " + fmtN(x.y, x) + (x.r != null ? "、紅 < " + fmtN(x.r, x) : "");
+  }
+  function fmtN(v, x) { return (x.unit === "NT$" ? "NT$ " + Math.round(v).toLocaleString() : v + (x.unit === "%" ? "%" : x.unit === "項" ? "" : " " + x.unit)).trim(); }
+
+  // 燈號變化＝觸發紀錄（prev：{id: level}）
+  function transitions(prev, items) {
+    var ev = [];
+    items.forEach(function (x) {
+      var p = prev && prev[x.id]; if (p == null) p = "green";
+      if (x.level === "na" || p === x.level) return;
+      if (p === "na" && x.level === "green") return;
+      ev.push({ id: x.id, name: x.name, from: p, to: x.level, display: x.display, msg: x.msg, up: LV[x.level] > LV[p] });
+    });
+    return ev;
+  }
+  function levels(items) { var m = {}; items.forEach(function (x) { m[x.id] = x.level; }); return m; }
+
+  // 給首頁、選單紅點、每日早報用的精簡快照（orders：單號＋預計完工與實際完工的絕對時間 ms，早報在 Apps Script 端再算「逾時沒回報」）
+  function snapshot(items, extra) {
+    var c = counts(items), tol = {};
+    items.forEach(function (x) { tol[x.id] = { y: x.y, r: x.r, owner: x.owner, name: x.name, dir: x.dir, unit: x.unit }; });
+    return Object.assign({ v: 1, ts: Date.now(), worst: worst(items), red: c.red, yellow: c.yellow, green: c.green, tol: tol,
+      items: items.filter(function (x) { return x.level === "red" || x.level === "yellow"; }).map(function (x) { return { id: x.id, name: x.name, level: x.level, display: x.display, msg: x.msg, owner: x.owner, actionLabel: x.actionLabel }; }) }, extra || {});
+  }
+
+  // 趨勢（領先）：用歷史值判斷「正在惡化／改善」，並預估多久會碰到下一道門檻
+  //   hist：[{t(ms), v:{id: 數字}}]（舊→新）；items：evaluate 的結果；回傳 {id: {n, dir: none|flat|worse|better, eta:{to,days}|null, slopeDay}}
+  var DAY = 86400000;
+  function trends(hist, items) {
+    var out = {};
+    items.forEach(function (x) {
+      var pts = (hist || []).filter(function (p) { return p.v && p.v[x.id] != null; }).slice(-8).map(function (p) { return [p.t, p.v[x.id]]; });
+      var r = { n: pts.length, dir: "none", eta: null, slopeDay: 0 };
+      out[x.id] = r;
+      if (pts.length < 3 || x.value == null) return;
+      var span = pts[pts.length - 1][0] - pts[0][0];
+      if (span < 2 * 3600000) return;
+      var n = pts.length, t0 = pts[0][0], sx = 0, sy = 0, sxx = 0, sxy = 0;
+      pts.forEach(function (q) { var tx = (q[0] - t0) / DAY; sx += tx; sy += q[1]; sxx += tx * tx; sxy += tx * q[1]; });
+      var den = n * sxx - sx * sx, slope = den > 1e-12 ? (n * sxy - sx * sy) / den : 0;
+      r.slopeDay = slope;
+      var hi = x.dir === "hi", scale = Math.max(Math.abs(x.y), 1e-9), l3 = pts.slice(-3);
+      var worse = hi ? (l3[0][1] < l3[1][1] && l3[1][1] < l3[2][1]) : (l3[0][1] > l3[1][1] && l3[1][1] > l3[2][1]);
+      var better = hi ? (l3[0][1] > l3[1][1] && l3[1][1] > l3[2][1]) : (l3[0][1] < l3[1][1] && l3[1][1] < l3[2][1]);
+      var chg = Math.abs(l3[2][1] - l3[0][1]) / scale;
+      r.dir = worse && chg >= 0.03 ? "worse" : better && chg >= 0.03 ? "better" : "flat";
+      if (r.dir === "worse" && span >= 6 * 3600000 && Math.abs(slope) > 1e-9 && (hi ? slope > 0 : slope < 0)) {
+        var target = x.level === "green" ? x.y : (x.level === "yellow" && x.r != null ? x.r : null);
+        if (target != null) {
+          var dist = hi ? target - x.value : x.value - target, d = dist / Math.abs(slope);
+          if (dist > 0 && d <= 3) r.eta = { to: x.level === "green" ? "yellow" : "red", days: d };
+        }
+      }
+    });
+    return out;
+  }
+
+  var api = { trends: trends, DEFS: DEFS, LABEL: LABEL, LV: LV, evaluate: evaluate, worst: worst, counts: counts, gate: gate, transitions: transitions, levels: levels, snapshot: snapshot, tolOf: tolOf, thresholdText: thresholdText, levelOf: levelOf };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.SchedKri = api;
+})(typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : this);
+
+/*
+ * biz-kri.js — 全公司營運風險：風險 → 監控指標(KRI) → 黃／紅門檻 → 儀表板 → 通知
+ *   和排程風險（sched-kri.js）同一套框架：燈號、門檻、負責人、趨勢、通知中心與自動通知都共用；
+ *   差別只在資料來源是 ERP 的資料（world），不是排程預測。純規則與統計，沒有任何 AI。
+ *   瀏覽器（風險儀表板）、Apps Script（每 30 分鐘自動檢查）、Node 測試共用同一份。
+ *
+ *   evaluate(world, today, tol, opts) → 每個指標一筆
+ *       {id, grp, risk, name, value, display, level: green|yellow|red|na, y, r, owner, msg, action…, cat:"營運"}
+ *   opts: { seeCost: 這個職務看不看得到成本（false → 需要成本才能算的指標回 na）, terms: 帳款天數（預設 30）, minSales: 集中度最少要有的銷售額 }
+ *
+ *   id 的第一個字母：B＝營運（業務／財務／庫存／生產）、A＝行政與人事。和排程指標（D/P/L/S/C）不會撞號。
+ *   加班上限預設依勞動基準法第 32 條（延長工時每月 46 小時）設定；公司另有約定（工會同意、變形工時…）請在門檻設定自行調整。
+ */
+(function (root) {
+  "use strict";
+  var K = root.SchedKri || (typeof require === "function" ? require("./sched-kri.js") : null);
+
+  var DEFS = [
+    { id: "B1", grp: "業務與財務", risk: "接單虧損（賣得比成本低）", name: "負毛利訂單", unit: "張", dir: "hi", y: 1, r: 3, owner: "業務", needCost: true, action: "orders", actionLabel: "看這些訂單",
+      hint: "已出貨的訂單實際毛利為負，或還沒出貨的訂單售價低於標準成本。需要成本權限才看得到。" },
+    { id: "B2", grp: "業務與財務", risk: "應收帳款收不回來", name: "逾期應收金額", unit: "NT$", dir: "hi", y: 100000, r: 300000, owner: "會計", action: "orders", actionLabel: "催收",
+      hint: "已出貨、超過帳款天數（預設 30 天）還沒收齊的金額。" },
+    { id: "B3", grp: "業務與財務", risk: "應收帳款收不回來", name: "最久逾期天數", unit: "天", dir: "hi", y: 15, r: 45, owner: "會計", action: "orders", actionLabel: "催收",
+      hint: "逾期最久的那一筆已經超過帳款天數幾天。拖越久越難收。" },
+    { id: "B4", grp: "業務與財務", risk: "客戶過度集中", name: "最大客戶佔近 90 天銷售", unit: "%", dir: "hi", y: 40, r: 60, owner: "老闆", action: "customers", actionLabel: "看客戶",
+      hint: "最大客戶若佔太高，一旦流失或延遲付款，公司現金流會直接受影響。銷售額太少（資料不足）時不判斷。" },
+    { id: "B10", grp: "業務與財務", risk: "交期落空", name: "已逾期未出貨的訂單", unit: "張", dir: "hi", y: 1, r: 3, owner: "業務", action: "orders", actionLabel: "看逾期訂單",
+      hint: "交期已過、還沒出完的訂單。" },
+    { id: "B5", grp: "庫存與生產", risk: "缺料停工", name: "缺料品項", unit: "項", dir: "hi", y: 1, r: 5, owner: "倉管", action: "stock", actionLabel: "看缺料",
+      hint: "預留（接單與工單需要）超過現有庫存的品項數。" },
+    { id: "B6", grp: "庫存與生產", risk: "安全庫存不足", name: "低於安全庫存的品項", unit: "項", dir: "hi", y: 3, r: 8, owner: "倉管", action: "stock", actionLabel: "看庫存",
+      hint: "現有庫存低於所設安全庫存的品項數。" },
+    { id: "B7", grp: "庫存與生產", risk: "帳實不符／舞弊", name: "30 天內盤點調整金額佔庫存價值", unit: "%", dir: "hi", y: 1, r: 3, owner: "老闆", needCost: true, action: "stock", actionLabel: "看盤點調整",
+      hint: "盤點調整（盤盈盤虧）金額的絕對值合計 ÷ 庫存價值。常常大幅調整，代表帳實不符或有管理漏洞。需要成本權限。" },
+    { id: "B8", grp: "庫存與生產", risk: "工單成本失控", name: "工單用料成本超出標準的最大幅度", unit: "%", dir: "hi", y: 10, r: 20, owner: "生管", needCost: true, action: "wo", actionLabel: "看工單",
+      hint: "近 60 天完工的工單，實際用料成本比「BOM 用量 × 標準成本」多幾成，取最大的一張。需要成本權限。" },
+    { id: "B9", grp: "庫存與生產", risk: "工單拖延", name: "已逾期未完工的工單", unit: "張", dir: "hi", y: 1, r: 3, owner: "生管", action: "wo", actionLabel: "看工單",
+      hint: "交期已過、狀態還是計畫／已備料／生產中的工單。" },
+    { id: "A1", grp: "行政與人事", risk: "申請卡關", name: "送出後最久沒人簽核的申請", unit: "天", dir: "hi", y: 3, r: 7, owner: "行政", action: "requests", actionLabel: "去簽核",
+      hint: "狀態是「已送出」、還沒核准或退回的申請，等了幾天。" },
+    { id: "A2", grp: "行政與人事", risk: "設備故障／停機", name: "保養逾期的設備", unit: "台", dir: "hi", y: 1, r: 2, owner: "生管", action: "equip", actionLabel: "看設備",
+      hint: "設了保養週期的設備，超過「上次保養日＋週期」還沒保養（沒填上次保養日就從建立日起算）。" },
+    { id: "A3", grp: "行政與人事", risk: "加班超過法定上限", name: "本月核准加班最多的員工", unit: "小時", dir: "hi", y: 36, r: 46, owner: "行政", action: "requests", actionLabel: "看加班申請",
+      hint: "本月已核准的加班申請時數，取最多的員工。預設依勞基法第 32 條（延長工時每月 46 小時）；公司另有約定請在門檻設定調整。" }
+  ];
+
+  function sortedEq(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
+  function addDays(d, n) { var x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+  function diffDays(a, b) { return Math.round((Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / 86400000); }
+  function m0(n) { return Math.round(n); }
+  function ids(list, n) { return list.slice(0, n || 3).join("、") + (list.length > (n || 3) ? "…" : ""); }
+  function nt(n) { return "NT$ " + Math.round(n).toLocaleString("en-US"); }
+  function by(list, k) { var m = {}; (list || []).forEach(function (x) { m[x[k]] = x; }); return m; }
+
+  function evaluate(w, today, tol, opts) {
+    opts = opts || {};
+    var seeCost = opts.seeCost !== false, terms = opts.terms != null ? opts.terms : 30, minSales = opts.minSales != null ? opts.minSales : 50000;
+    var items = w.items || [], itemById = by(items, "id"), orders = (w.orders || []).filter(function (o) { return !o.cancelled; }), moves = w.moves || [];
+    var V = {}, M = {}, extra = {};                                  // V：數值；M：說明所需資料
+
+    // ---- 出貨日（以出貨異動日為準）、每張單的實際營收與成本
+    var ship = {}, act = {};
+    moves.forEach(function (m) {
+      if (m.type !== "銷貨出庫" && m.type !== "銷貨退回") return;
+      var a = act[m.ref] = act[m.ref] || { rev: 0, cost: 0 };
+      var o = orders.filter(function (x) { return x.no === m.ref; })[0];
+      var l = o && o.lines.filter(function (x) { return x.item_id === m.item_id; })[0];
+      if (l) { a.rev += -m.qty * l.price; a.cost += -m.value; }
+      if (m.type === "銷貨出庫" && (!ship[m.ref] || m.date < ship[m.ref])) ship[m.ref] = m.date;
+    });
+    // B1 負毛利
+    if (seeCost) {
+      var neg = [];
+      orders.forEach(function (o) {
+        var a = act[o.no], bad = false;
+        if (a && a.rev > 0 && a.cost > a.rev + 0.005) bad = true;
+        o.lines.forEach(function (l) { var rest = l.qty - l.shipped; var it = itemById[l.item_id]; if (rest > 0 && it && it.std_cost != null && l.price < it.std_cost) bad = true; });
+        if (bad) neg.push(o.no);
+      });
+      V.B1 = orders.length ? neg.length : null; M.B1 = neg;
+    }
+    // B2 / B3 逾期應收
+    var overdueAmt = 0, oldest = 0, oldestNo = "", od = [];
+    orders.forEach(function (o) {
+      var net = o.lines.reduce(function (s, l) { return s + (l.shipped - l.returned) * l.price; }, 0), owe = net - (o.paid - o.refunded), sd = ship[o.no];
+      if (owe > 0.5 && sd) { var late = diffDays(today, addDays(sd, terms)); if (late > 0) { overdueAmt += owe; od.push(o.no); if (late > oldest) { oldest = late; oldestNo = o.no; } } }
+    });
+    V.B2 = orders.length ? overdueAmt : null; M.B2 = od;
+    V.B3 = orders.length ? oldest : null; M.B3 = oldestNo;
+    // B4 客戶集中度（近 90 天出貨銷售）
+    var since = addDays(today, -90), byCust = {}, total = 0, oByNo = by(orders, "no");
+    moves.forEach(function (m) {
+      if ((m.type !== "銷貨出庫" && m.type !== "銷貨退回") || m.date < since) return;
+      var o = oByNo[m.ref], l = o && o.lines.filter(function (x) { return x.item_id === m.item_id; })[0]; if (!l) return;
+      var rev = -m.qty * l.price; byCust[o.customer_id] = (byCust[o.customer_id] || 0) + rev; total += rev;
+    });
+    var top = null; Object.keys(byCust).forEach(function (c) { if (!top || byCust[c] > byCust[top]) top = c; });
+    V.B4 = total >= minSales && top ? byCust[top] / total * 100 : null; M.B4 = top ? { cust: top, total: total } : null;
+    // B10 逾期未出貨
+    var late10 = orders.filter(function (o) {
+      var q = 0, sh = 0; o.lines.forEach(function (l) { q += l.qty; sh += l.shipped; });
+      return o.due && o.due < today && sh + 1e-9 < q;
+    }).map(function (o) { return o.no; });
+    V.B10 = orders.length ? late10.length : null; M.B10 = late10;
+    // B5 / B6 庫存
+    var short = items.filter(function (it) { return it.active !== false && it.reserved - it.on_hand > 1e-9; });
+    var low = items.filter(function (it) { return it.active !== false && it.safety > 0 && it.on_hand < it.safety; });
+    V.B5 = items.length ? short.length : null; M.B5 = short.map(function (x) { return x.name; });
+    V.B6 = items.length ? low.length : null; M.B6 = low.map(function (x) { return x.name; });
+    // B7 盤點調整 / 庫存價值
+    if (seeCost) {
+      var invVal = (w.lots || []).reduce(function (s, l) { return s + l.qty * l.unit_cost; }, 0), since30 = addDays(today, -30);
+      var adj = moves.filter(function (m) { return m.type === "盤點調整" && m.date >= since30; }).reduce(function (s, m) { return s + Math.abs(m.value); }, 0);
+      V.B7 = invVal > 0 ? adj / invVal * 100 : null; M.B7 = { adj: adj, inv: invVal };
+    }
+    // B8 工單成本超標
+    var wos = w.workorders || [];
+    if (seeCost) {
+      var since60 = addDays(today, -60), done = {}; moves.forEach(function (m) { if (m.type === "完工入庫") done[m.ref] = m.date; });
+      var worst = null;
+      wos.forEach(function (o) {
+        if (o.status !== "完工" || (done[o.no] || "") < since60) return;
+        var std = 0, ok = true;
+        ((o.bom && o.bom.components) || []).forEach(function (c) { var it = itemById[c.item_id]; if (!it || it.std_cost == null) ok = false; else std += c.qty * o.qty * it.std_cost; });
+        if (!ok || std <= 0) return;
+        var pct = (o.actual_cost - o.extra_cost - std) / std * 100;
+        if (!worst || pct > worst.pct) worst = { no: o.no, pct: pct };
+      });
+      V.B8 = worst ? Math.max(0, worst.pct) : null; M.B8 = worst;
+    }
+    // B9 工單逾期
+    var late9 = wos.filter(function (o) { return ["計畫", "已備料", "生產中"].indexOf(o.status) >= 0 && o.due && o.due < today; }).map(function (o) { return o.no; });
+    V.B9 = wos.length ? late9.length : null; M.B9 = late9;
+    // A1 申請卡關
+    var reqs = (w.requests || []).filter(function (r) { return r.status === "已送出"; }), maxAge = 0, maxReq = null;
+    reqs.forEach(function (r) {
+      var sub = r.created; (r.history || []).forEach(function (h) { if (/送出/.test(h.action) && h.date) sub = h.date; });
+      var age = sub ? diffDays(today, sub) : 0; if (age > maxAge) { maxAge = age; maxReq = r; }
+    });
+    V.A1 = (w.requests || []).length ? maxAge : null; M.A1 = { req: maxReq, n: reqs.length };
+    // A2 設備保養
+    var eq = (w.equipment || []).filter(function (e) { return e.active !== false && e.maint_days > 0; }), overEq = [];
+    eq.forEach(function (e) { var base = e.last_maint || e.created; if (base && addDays(base, e.maint_days) < today) overEq.push(e.name); });
+    V.A2 = eq.length ? overEq.length : null; M.A2 = overEq;
+    // A3 本月核准加班
+    var ym = today.slice(0, 7), hrs = {};
+    (w.requests || []).forEach(function (r) { if (r.kind === "加班" && r.status === "已核准" && String(r.start_date).slice(0, 7) === ym) hrs[r.staff_id] = (hrs[r.staff_id] || 0) + (Number(r.hours) || 0); });
+    var topS = null; Object.keys(hrs).forEach(function (s) { if (!topS || hrs[s] > hrs[topS]) topS = s; });
+    V.A3 = (w.requests || []).length ? (topS ? hrs[topS] : 0) : null; M.A3 = topS ? { id: topS, h: hrs[topS], name: ((by(w.staff, "id")[topS]) || {}).name || "" } : null;
+
+    var out = [];
+    DEFS.forEach(function (def) {
+      var t = K.tolOf(def, tol), v = V[def.id] === undefined ? null : V[def.id], lv = K.levelOf ? K.levelOf(v, def, t) : "na";
+      if (def.needCost && !seeCost) lv = "na";
+      var disp = v == null ? "—" : def.unit === "NT$" ? nt(v) : def.unit === "%" ? (Math.round(v * 10) / 10) + "%" : def.unit === "小時" ? (Math.round(v * 10) / 10) + " 小時" : Math.round(v) + " " + def.unit;
+      if (def.needCost && !seeCost) disp = "需成本權限";
+      var msg = "";
+      if (lv === "yellow" || lv === "red") {
+        if (def.id === "B1") msg = M.B1.length + " 張訂單虧損或定價低於成本：" + ids(M.B1) + "。";
+        else if (def.id === "B2") msg = "逾期未收 " + disp + "（" + M.B2.length + " 張：" + ids(M.B2) + "）。";
+        else if (def.id === "B3") msg = "訂單 " + M.B3 + " 已逾期 " + v + " 天。";
+        else if (def.id === "B4") msg = "最大客戶佔近 90 天銷售的 " + disp + "（約 " + nt(M.B4.total * v / 100) + "）。";
+        else if (def.id === "B10") msg = "交期已過還沒出完：" + ids(M.B10) + "。";
+        else if (def.id === "B5") msg = "缺料：" + ids(M.B5, 4) + "。";
+        else if (def.id === "B6") msg = "低於安全庫存：" + ids(M.B6, 4) + "。";
+        else if (def.id === "B7") msg = "近 30 天盤點調整 " + nt(M.B7.adj) + "，佔庫存價值 " + disp + "。";
+        else if (def.id === "B8") msg = "工單 " + M.B8.no + " 用料成本比標準多 " + disp + "。";
+        else if (def.id === "B9") msg = "交期已過還沒完工：" + ids(M.B9) + "。";
+        else if (def.id === "A1") msg = "有申請已等 " + v + " 天沒人簽核（共 " + M.A1.n + " 件待簽核）。";
+        else if (def.id === "A2") msg = "超過保養週期：" + ids(M.A2) + "。";
+        else if (def.id === "A3") msg = (M.A3.name || "有員工") + "本月已核准加班 " + disp + "，法定上限（預設）每月 46 小時。";
+      }
+      out.push({ id: def.id, grp: def.grp, risk: def.risk, name: def.name, unit: def.unit, dir: def.dir, y: t.y, r: t.r, owner: t.owner, action: def.action, actionLabel: def.actionLabel,
+        hint: def.hint, value: v, display: disp, level: lv, msg: msg, cat: "營運", needCost: !!def.needCost });
+    });
+    return out;
+  }
+
+  // 排序用：id 的自然順序（B1, B2, B3, B4, B5…, B10, A1…）
+  var ORDER = DEFS.map(function (d) { return d.id; });
+
+  var api = { DEFS: DEFS, ORDER: ORDER, evaluate: evaluate, tolOf: K.tolOf, levelOf: K.levelOf, worst: K.worst, counts: K.counts, transitions: K.transitions,
+    levels: K.levels, trends: K.trends, thresholdText: K.thresholdText, LABEL: K.LABEL, LV: K.LV };
+  void sortedEq; void m0;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.BizKri = api;
+})(typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : this);
 
 // ===========================================================================
 // ERP 後端（Apps Script 端）：把 ErpEngine 的資料放進試算表的 ERP_* 分頁
@@ -1663,4 +2092,42 @@ function installAccessTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === "accessReview") ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger("accessReview").timeBased().onMonthDay(1).atHour(9).inTimezone("Asia/Taipei").create();   // 每月 1 號觸發；實際只在 1、4、7、10 月寄出盤點信
   return "已安裝：每季（1、4、7、10 月 1 號 09:00）寄帳號盤點信。";
+}
+
+
+// ===========================================================================
+// 全公司營運風險（規則在 biz-kri.js）：給 sched-alerts.gs 的 checkSchedAlerts 每 30 分鐘呼叫。
+// 門檻與負責人存在 sched_cfg 的 biz_tol 列（網頁「風險儀表板 → 門檻設定」改）；歷史存在 biz_hist（趨勢與小曲線用）。
+// ===========================================================================
+var BIZ_HIST = "biz_hist";
+var BIZ_HIST_HDR = ["id", "t", "v"];
+var BIZ_HIST_KEEP = 400;                       // 約 18 個上班日（每 30 分鐘一筆）
+
+function bizTol_() {
+  try {
+    var r = tList_("sched_cfg").rows.filter(function (x) { return x.id === "biz_tol"; })[0];
+    return r ? JSON.parse(String(r.data).replace(/^~/, "")) : {};
+  } catch (e) { return {}; }
+}
+function bizItems_(now) {
+  var d = new Date(now), today = Utilities.formatDate(d, "Asia/Taipei", "yyyy-MM-dd");
+  var tol = bizTol_(), o = tol._opts || {};                        // _opts：帳款天數、集中度最低銷售額（網頁「門檻設定」）
+  return BizKri.evaluate(erpLoad_(), today, tol, { seeCost: true, terms: o.terms, minSales: o.minSales });
+}
+function bizCurrent_(now) {
+  var items = bizItems_(now), out = {};
+  try { bizHist_(items, now); } catch (e) {}
+  items.forEach(function (x) {
+    if (x.level !== "yellow" && x.level !== "red") return;
+    out[x.id] = { key: x.id, level: x.level, name: x.name, display: x.display, msg: x.msg || "", owner: x.owner || "老闆", action: x.actionLabel || "", cat: "營運" };
+  });
+  return out;
+}
+function bizHist_(items, now) {                 // 距離上一筆至少 25 分鐘才記一筆
+  var rows = tList_(BIZ_HIST).rows, last = 0;
+  rows.forEach(function (r) { var t = Number(r.t); if (t > last) last = t; });
+  if (now - last < 25 * 60000) return;
+  var v = {}; items.forEach(function (x) { if (x.value != null) v[x.id] = Math.round(x.value * 100) / 100; });
+  tUpsert_(BIZ_HIST, { id: "h" + now, t: now, v: JSON.stringify(v) }, BIZ_HIST_HDR, "營運風險");
+  rows.sort(function (a, b) { return Number(b.t) - Number(a.t); }).slice(BIZ_HIST_KEEP - 1).forEach(function (r) { tRemove_(BIZ_HIST, r.id); });
 }

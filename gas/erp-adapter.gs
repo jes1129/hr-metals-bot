@@ -371,3 +371,41 @@ function installAccessTrigger() {
   ScriptApp.newTrigger("accessReview").timeBased().onMonthDay(1).atHour(9).inTimezone("Asia/Taipei").create();   // 每月 1 號觸發；實際只在 1、4、7、10 月寄出盤點信
   return "已安裝：每季（1、4、7、10 月 1 號 09:00）寄帳號盤點信。";
 }
+
+
+// ===========================================================================
+// 全公司營運風險（規則在 biz-kri.js）：給 sched-alerts.gs 的 checkSchedAlerts 每 30 分鐘呼叫。
+// 門檻與負責人存在 sched_cfg 的 biz_tol 列（網頁「風險儀表板 → 門檻設定」改）；歷史存在 biz_hist（趨勢與小曲線用）。
+// ===========================================================================
+var BIZ_HIST = "biz_hist";
+var BIZ_HIST_HDR = ["id", "t", "v"];
+var BIZ_HIST_KEEP = 400;                       // 約 18 個上班日（每 30 分鐘一筆）
+
+function bizTol_() {
+  try {
+    var r = tList_("sched_cfg").rows.filter(function (x) { return x.id === "biz_tol"; })[0];
+    return r ? JSON.parse(String(r.data).replace(/^~/, "")) : {};
+  } catch (e) { return {}; }
+}
+function bizItems_(now) {
+  var d = new Date(now), today = Utilities.formatDate(d, "Asia/Taipei", "yyyy-MM-dd");
+  var tol = bizTol_(), o = tol._opts || {};                        // _opts：帳款天數、集中度最低銷售額（網頁「門檻設定」）
+  return BizKri.evaluate(erpLoad_(), today, tol, { seeCost: true, terms: o.terms, minSales: o.minSales });
+}
+function bizCurrent_(now) {
+  var items = bizItems_(now), out = {};
+  try { bizHist_(items, now); } catch (e) {}
+  items.forEach(function (x) {
+    if (x.level !== "yellow" && x.level !== "red") return;
+    out[x.id] = { key: x.id, level: x.level, name: x.name, display: x.display, msg: x.msg || "", owner: x.owner || "老闆", action: x.actionLabel || "", cat: "營運" };
+  });
+  return out;
+}
+function bizHist_(items, now) {                 // 距離上一筆至少 25 分鐘才記一筆
+  var rows = tList_(BIZ_HIST).rows, last = 0;
+  rows.forEach(function (r) { var t = Number(r.t); if (t > last) last = t; });
+  if (now - last < 25 * 60000) return;
+  var v = {}; items.forEach(function (x) { if (x.value != null) v[x.id] = Math.round(x.value * 100) / 100; });
+  tUpsert_(BIZ_HIST, { id: "h" + now, t: now, v: JSON.stringify(v) }, BIZ_HIST_HDR, "營運風險");
+  rows.sort(function (a, b) { return Number(b.t) - Number(a.t); }).slice(BIZ_HIST_KEEP - 1).forEach(function (r) { tRemove_(BIZ_HIST, r.id); });
+}

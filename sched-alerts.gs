@@ -18,6 +18,7 @@
  */
 
 var SA_URL = "https://jes1129.github.io/hr-metals-bot/schedule.html#tab=dash";
+var SA_URL_BIZ = "https://jes1129.github.io/hr-metals-bot/erp.html#tab=risk";   // 營運風險（ERP）儀表板
 var SA_ALERT_HDR = ["id", "level", "active", "first", "lastN", "nlevel", "ack", "ackBy", "ackAt", "esc", "name", "display", "msg", "owner", "t"];
 var SA_NOTICE_HDR = ["id", "t", "kind", "key", "level", "name", "display", "msg", "owner", "to", "read"];
 var SA_API = 1;                               // 版本（網頁會檢查；改了行為才加 1）
@@ -90,20 +91,26 @@ function sa_current_(snap, now) {
 function sa_mail_(to, subject, body) { GmailApp.sendEmail(to.join(","), subject, body); }
 // 同一次檢查有好幾個指標亮燈時，每個收件人只收「一封」，把全部列在裡面（避免信太多）
 function sa_lv_(c) { return c.level === "red" ? "紅燈" : "黃燈"; }
+function sa_cat_(c) { return c.cat || "排程"; }                                  // 來源：排程風險、營運風險（ERP）
+function sa_head_(list) {                                                      // 全是同一類 → 「排程風險」；混在一起 → 「風險」
+  var cats = {}; list.forEach(function (p) { cats[sa_cat_(p.c)] = 1; });
+  var k = Object.keys(cats); return k.length === 1 ? k[0] + "風險" : "風險";
+}
 function sa_subject_(list) {
-  if (list.length === 1) return "【排程風險・" + sa_lv_(list[0].c) + "】" + list[0].c.name + "（" + list[0].c.display + "）";
+  if (list.length === 1) return "【" + sa_cat_(list[0].c) + "風險・" + sa_lv_(list[0].c) + "】" + list[0].c.name + "（" + list[0].c.display + "）";
   var r = list.filter(function (p) { return p.c.level === "red"; }).length, y = list.length - r;
-  return "【排程風險】" + (r ? r + " 項紅燈" : "") + (r && y ? "、" : "") + (y ? y + " 項黃燈" : "");
+  return "【" + sa_head_(list) + "】" + (r ? r + " 項紅燈" : "") + (r && y ? "、" : "") + (y ? y + " 項黃燈" : "");
 }
 function sa_digest_(list, cfg) {
-  var lines = ["【排程風險通知】共 " + list.length + " 項：", ""];
+  var lines = ["【" + sa_head_(list) + "通知】共 " + list.length + " 項：", ""];
   list.forEach(function (p, i) {
     var c = p.c;
     lines.push((i + 1) + ". 【" + sa_lv_(c) + "】" + c.name + "（" + c.display + "）— " + p.why);
     if (c.msg) lines.push("   說明：" + c.msg);
     lines.push("   負責人：" + c.owner + (c.action ? "　建議：" + c.action : ""));
   });
-  lines.push("", "到儀表板查看並按「已知悉」：" + SA_URL, "",
+  var hasBiz = list.some(function (p) { return p.c.cat === "營運"; }), hasSch = list.some(function (p) { return p.c.cat !== "營運"; });
+  lines.push("", "到儀表板查看並按「已知悉」：" + (hasSch ? SA_URL : "") + (hasSch && hasBiz ? "（排程）　" : "") + (hasBiz ? SA_URL_BIZ + (hasSch ? "（營運）" : "") : ""), "",
     "（按「已知悉」之後，同一件事不會再重複通知；除非變得更糟。紅燈 " + cfg.escalateMin + " 分鐘沒人處理會再通知老闆一次。）");
   return lines.join("\n");
 }
@@ -120,8 +127,11 @@ function checkSchedAlerts(e) {
   put({ id: "_hb", active: 0, name: "heartbeat", t: now });                       // 心跳：讓網頁知道自動通知有在跑
   if (!cfg.enabled) return "自動通知已關閉";
   var snap = sa_blob_(sa_read_("sched_kri"), "kri");
-  if (!snap) return "排程頁還沒有存過燈號（先打開排程頁並排一次程）";
-  var cur = sa_current_(snap, now);
+  var biz = {};
+  if (typeof bizCurrent_ === "function") { try { biz = bizCurrent_(now); } catch (be) { console.log("營運風險檢查失敗：" + be); } }   // 全公司營運風險（ERP 資料），沒貼 ERP 檔就略過
+  if (!snap && typeof bizCurrent_ !== "function") return "排程頁還沒有存過燈號（先打開排程頁並排一次程）";
+  var cur = snap ? sa_current_(snap, now) : {};
+  Object.keys(biz).forEach(function (k) { cur[k] = biz[k]; });
 
   Object.keys(cur).forEach(function (k) {
     var c = cur[k], s = st[k], active = s && Number(s.active) === 1, rNew = sa_rank_(c.level), rPrev = active ? sa_rank_(s.nlevel) : 0;
@@ -153,7 +163,7 @@ function checkSchedAlerts(e) {
   if (escs.length) {                                                              // 升級：紅燈沒人處理，再通知老闆（也合併成一封）
     sa_emails_(cfg, "老闆").forEach(function (m) {
       if (sent >= SA_MAX_MAIL) return;
-      sa_mail_([m], "【排程風險・升級】" + (escs.length === 1 ? escs[0].name : escs.length + " 項紅燈") + " " + cfg.escalateMin + " 分鐘沒人處理",
+      sa_mail_([m], "【" + sa_head_(escs.map(function (c) { return { c: c }; })) + "・升級】" + (escs.length === 1 ? escs[0].name : escs.length + " 項紅燈") + " " + cfg.escalateMin + " 分鐘沒人處理",
         sa_digest_(escs.map(function (c) { return { c: c, why: "紅燈已經 " + cfg.escalateMin + " 分鐘沒有人按「已知悉」" }; }), cfg)); sent++;
     });
   }

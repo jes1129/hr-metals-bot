@@ -219,7 +219,7 @@
     return out;
   }
 
-  var api = { trends: trends, DEFS: DEFS, LABEL: LABEL, LV: LV, evaluate: evaluate, worst: worst, counts: counts, gate: gate, transitions: transitions, levels: levels, snapshot: snapshot, tolOf: tolOf, thresholdText: thresholdText };
+  var api = { trends: trends, DEFS: DEFS, LABEL: LABEL, LV: LV, evaluate: evaluate, worst: worst, counts: counts, gate: gate, transitions: transitions, levels: levels, snapshot: snapshot, tolOf: tolOf, thresholdText: thresholdText, levelOf: levelOf };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.SchedKri = api;
 })(typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : this);

@@ -294,6 +294,9 @@ def render_erp_html() -> str:
   <script src="assets/erp-admin.js?v={_VER}"></script>
   <script src="assets/erp.js?v={_VER}"></script>
   <script src="assets/erp-crm.js?v={_VER}"></script>
+  <script src="assets/sched-kri.js?v={_VER}"></script>
+  <script src="assets/biz-kri.js?v={_VER}"></script>
+  <script src="assets/erp-risk-ui.js?v={_VER}"></script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
@@ -329,6 +332,9 @@ def render_admin_html() -> str:
   <script src="assets/erp.js?v={_VER}"></script>
   <script src="assets/erp-admin-ui.js?v={_VER}"></script>
   <script src="assets/erp-access-ui.js?v={_VER}"></script>
+  <script src="assets/sched-kri.js?v={_VER}"></script>
+  <script src="assets/biz-kri.js?v={_VER}"></script>
+  <script src="assets/erp-risk-ui.js?v={_VER}"></script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""

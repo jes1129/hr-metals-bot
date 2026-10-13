@@ -3,6 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import os from "node:os";
+import path from "node:path";
 import { execFileSync } from "node:child_process";
 
 const read = (f) => fs.readFileSync(new URL("../" + f, import.meta.url), "utf8");
@@ -13,10 +15,11 @@ test("每個 Apps Script 檔案語法正確（貼上去才不會整個壞掉）"
 });
 
 test("google-apps-script-erp.gs 與來源同步（改了引擎／adapter 要重跑 scripts/build_erp_gas.py）", () => {
-  const before = read("google-apps-script-erp.gs");
-  execFileSync(process.platform === "win32" ? "python" : "python3", ["scripts/build_erp_gas.py"], { cwd: new URL("..", import.meta.url), env: { ...process.env, PYTHONUTF8: "1" }, stdio: "pipe" });
-  const after = read("google-apps-script-erp.gs");
-  assert.equal(after.replace(/\r\n/g, "\n"), before.replace(/\r\n/g, "\n"));
+  const out = path.join(os.tmpdir(), "erp-gas-check-" + process.pid + ".gs");
+  execFileSync(process.platform === "win32" ? "python" : "python3", ["scripts/build_erp_gas.py"], { cwd: new URL("..", import.meta.url), env: { ...process.env, PYTHONUTF8: "1", ERP_GAS_OUT: out }, stdio: "pipe" });
+  const fresh = fs.readFileSync(out, "utf8"); fs.unlinkSync(out);
+  const norm = (x) => x.replace(/\r/g, "");
+  assert.equal(norm(fresh), norm(read("google-apps-script-erp.gs")));
 });
 
 function load(files) {

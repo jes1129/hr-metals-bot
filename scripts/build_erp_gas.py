@@ -12,13 +12,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENGINE = os.path.join(ROOT, "docs", "assets", "erp-engine.js")
 ADMIN = os.path.join(ROOT, "docs", "assets", "erp-admin.js")
 ROLES = os.path.join(ROOT, "docs", "assets", "erp-roles.js")
+KRI = os.path.join(ROOT, "docs", "assets", "sched-kri.js")
+BIZ = os.path.join(ROOT, "docs", "assets", "biz-kri.js")
 ADAPTER = os.path.join(ROOT, "gas", "erp-adapter.gs")
-OUT = os.path.join(ROOT, "google-apps-script-erp.gs")
+OUT = os.environ.get("ERP_GAS_OUT") or os.path.join(ROOT, "google-apps-script-erp.gs")   # 測試會指到暫存檔，避免和其他測試搶同一個檔
 
 HEADER = """/**
  * 九上科技儀表板 — ERP 後端（Google Apps Script 第二個檔案）
  *
- * ⚠️ 自動產生，請勿手改：來源是 docs/assets/erp-engine.js + erp-admin.js + erp-roles.js + gas/erp-adapter.gs，
+ * ⚠️ 自動產生，請勿手改：來源是 docs/assets/erp-engine.js + erp-admin.js + erp-roles.js + sched-kri.js + biz-kri.js + gas/erp-adapter.gs，
  *    修改後執行 python scripts/build_erp_gas.py 重新產生。
  *
  * 安裝：在同一個 Apps Script 專案按「＋ → 指令碼」新增檔案（名稱例：erp），把本檔全部貼進去；
@@ -36,10 +38,14 @@ def main():
         admin = f.read()
     with open(ROLES, encoding="utf-8") as f:
         roles = f.read()
+    with open(KRI, encoding="utf-8") as f:
+        kri = f.read()
+    with open(BIZ, encoding="utf-8") as f:
+        biz = f.read()
     with open(ADAPTER, encoding="utf-8") as f:
         adapter = f.read()
     with open(OUT, "w", encoding="utf-8", newline="\n") as f:
-        f.write(HEADER + engine.rstrip() + "\n\n" + admin.rstrip() + "\n\n" + roles.rstrip() + "\n\n" + adapter)
+        f.write(HEADER + engine.rstrip() + "\n\n" + admin.rstrip() + "\n\n" + roles.rstrip() + "\n\n" + kri.rstrip() + "\n\n" + biz.rstrip() + "\n\n" + adapter)
     print("[build_erp_gas] 已產生", os.path.relpath(OUT, ROOT))
 
 
