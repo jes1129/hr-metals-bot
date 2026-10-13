@@ -39,8 +39,19 @@ function metalsSignalText_() {
       var arrow = (m.pct == null) ? "" : ((m.pct >= 0 ? " ▲" : " ▼") + Math.abs(m.pct).toFixed(1) + "%");
       lines.push("- " + m.name + "：" + (m.price_twd != null ? ("NT$ " + comma_(m.price_twd) + "/噸") : "—") + arrow);
     });
+    // 資料來源自檢：signals.json 自己帶的 health，加上「這份檔案本身是不是太舊」（機器人整個停擺時只有這裡看得到）
+    var warn = [];
+    var m = /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)$/.exec(d.updated || "");
+    if (m) {
+      var h = (Date.now() - Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 8, +m[5])) / 3600000;
+      if (h > 30) warn.push("🔴 原料資料已 " + Math.floor(h) + " 小時沒更新（正常一天更新兩次），排程可能停了，請看 GitHub Actions。");
+    }
+    ((d.health && d.health.items) || []).forEach(function (i) {
+      if (i.level !== "green") warn.push((i.level === "red" ? "🔴 " : "🟡 ") + i.name + "：" + i.display + (i.msg ? "（" + i.msg + "）" : ""));
+    });
+    if (warn.length) lines.push("", "⚠️ 資料來源警示：報價先別直接照用", warn.join("\n"));
     return lines.join("\n");
-  } catch (e) { return "【原料行情】暫時取不到。"; }
+  } catch (e) { return "【原料行情】暫時取不到（網站資料讀不到，請確認排程是否正常）。"; }
 }
 
 // ---- 排程風險（排程頁存在小表 sched_kri：格子前面有「~」避免被當數字，資料切段 kri.0、kri.1…）----

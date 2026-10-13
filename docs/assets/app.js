@@ -65,6 +65,17 @@
   // 給 erp.js 用的橋接：沿用同一個登入與後端呼叫（erp.js 不另做登入）
   window.__erpBridge = { call: dbCall, authed: function () { return !!(API && idToken); }, configured: function () { return !!(API && CLIENT_ID); }, user: function () { return gUser; } };
 
+  // ---------- 原料資料來源：頁面本身太久沒更新就亮警示（機器人整個停擺時，伺服器端的檢查也會一起停，所以由瀏覽器補這一關） ----------
+  (function dataStale() {
+    var b = document.getElementById("dhBox"); if (!b) return;
+    var m = /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)$/.exec(b.getAttribute("data-upd") || ""); if (!m) return;
+    var t = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 8, +m[5]), h = (Date.now() - t) / 3600000, day = new Date().getUTCDay();
+    if (h > 54 || (h > 30 && day !== 0 && day !== 1)) {         // 一天跑兩次；週日、週一早上容許較久
+      var lv = h > 54 ? "red" : "yellow";
+      b.hidden = false; b.insertAdjacentHTML("afterbegin", '<div class="dh-t dh-' + lv + '">原料報價已經 ' + Math.floor(h) + ' 小時沒有更新，排程可能停了，報價先別直接照用</div>');
+    }
+  })();
+
   // ---------- 排程風險燈號：選單紅點＋首頁燈號卡（資料來自排程頁存下的快照 sched_kri） ----------
   function kriSnap() { try { return JSON.parse(localStorage.getItem("sched_kri_v1")); } catch (e) { return null; } }
   function kriBadges() {

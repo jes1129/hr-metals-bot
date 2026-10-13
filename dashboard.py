@@ -125,7 +125,20 @@ def _hcard(href: str, emoji: str, title: str, lines: str, cta: str) -> str:
     )
 
 
-def render_home(history: dict, sup_total, sup_near, cust_total=None) -> str:
+def _health_box(health) -> str:
+    """首頁「原料資料來源」燈號：有黃／紅才顯示；另外前端會自己檢查頁面是不是太久沒更新。"""
+    upd = (health or {}).get("updated") or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    lis = ""
+    if health and health.get("level") != "green":
+        bad = [i for i in health["items"] if i["level"] != "green"]
+        lis = "".join(
+            f'<li><b class="dh-{i["level"]}">{"紅燈" if i["level"] == "red" else "黃燈"}</b> {i["name"]}：{i["display"]}'
+            f'<span>{i["msg"]}</span></li>' for i in bad)
+        lis = f'<div class="dh-t dh-{health["level"]}">原料資料來源有{health["red"] and "紅燈" or "黃燈"}，報價先別直接照用</div><ul>{lis}</ul>'
+    return f'<div id="dhBox" class="dhbox" data-upd="{upd}"{"" if lis else " hidden"}>{lis}</div>'
+
+
+def render_home(history: dict, sup_total, sup_near, cust_total=None, health=None) -> str:
     # 大焦點：最常用的兩張主卡（訂單、每日早報）
     def _feat(href, icon, title, note, cta, ext=False, cid=""):
         idattr = f' id="{cid}"' if cid else ""
@@ -186,6 +199,7 @@ def render_home(history: dict, sup_total, sup_near, cust_total=None) -> str:
     </div>
     <div class="stats-hint" id="stHint">登入後這裡會帶入你的即時數字（待出貨、逾期、本月訂單數）</div>
     <div id="pinBox"></div>
+    {_health_box(health)}
     <div id="kriBox"></div>
     <div class="hfeat">{feat}</div>
     <div class="hqlabel">快速前往</div>
