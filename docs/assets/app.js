@@ -63,7 +63,38 @@
     }).then(function (r) { return r.json(); }).catch(function () { return null; });
   }
   // 給 erp.js 用的橋接：沿用同一個登入與後端呼叫（erp.js 不另做登入）
-  window.__erpBridge = { call: dbCall, authed: function () { return !!(API && idToken); }, configured: function () { return !!(API && CLIENT_ID); } };
+  window.__erpBridge = { call: dbCall, authed: function () { return !!(API && idToken); }, configured: function () { return !!(API && CLIENT_ID); }, user: function () { return gUser; } };
+
+  // ---------- 排程風險燈號：選單紅點＋首頁燈號卡（資料來自排程頁存下的快照 sched_kri） ----------
+  function kriSnap() { try { return JSON.parse(localStorage.getItem("sched_kri_v1")); } catch (e) { return null; } }
+  function kriBadges() {
+    var s = kriSnap(), age = s ? (Date.now() - (s.ts || 0)) / 3600000 : 0, stale = !!s && age > 24;
+    var lvl = !s ? null : s.worst === "red" ? "red" : (s.worst === "yellow" || stale) ? "yellow" : "ok";
+    var link = document.querySelector('.side a[href="schedule.html"]');
+    if (link) {
+      var old = link.querySelector(".kri-dot"); if (old) old.parentNode.removeChild(old);
+      if (lvl === "red" || lvl === "yellow") {
+        var d = document.createElement("i"); d.className = "kri-dot " + lvl;
+        d.title = s.worst === "red" || s.worst === "yellow" ? "排程風險：" + (s.red || 0) + " 項紅燈、" + (s.yellow || 0) + " 項黃燈" : "排程風險資料已超過 24 小時沒有更新";
+        link.appendChild(d);
+      }
+    }
+    var box = document.getElementById("kriBox"); if (!box) return;
+    if (!s) { box.innerHTML = ""; return; }
+    var top = (s.items || []).slice(0, 3).map(function (x) { return "<li><b>" + escAttr(x.name) + "</b>（" + escAttr(x.display) + "）" + escAttr(x.msg || "") + "</li>"; }).join("");
+    box.innerHTML = '<a class="kri-card ' + lvl + '" href="schedule.html#tab=risk"><div class="kri-h">' + ic("alert") + "<b>排程風險燈號</b>"
+      + '<span class="kri-n">' + (s.red ? s.red + " 紅燈" : "") + (s.red && s.yellow ? "・" : "") + (s.yellow ? s.yellow + " 黃燈" : "") + (!s.red && !s.yellow ? "全部正常" : "") + "</span></div>"
+      + (top ? "<ul>" + top + "</ul>" : "") + (stale ? '<div class="kri-stale">燈號資料已 ' + Math.floor(age) + " 小時沒有更新（最近一次有人打開排程頁是 " + new Date(s.ts).toLocaleString("zh-TW", { hour12: false }) + "）。沒人更新，燈號就不準。</div>" : "") + "</a>";
+  }
+  function kriPull() {                                   // 登入後從公司試算表讀最新快照（小表，不必載入整份排程）
+    if (!API || !idToken) return;
+    dbCall("tList", { table: "sched_kri" }).then(function (d) {
+      if (!d || !d.rows || !d.rows.length) return;
+      var parts = d.rows.filter(function (r) { return /^kri\.\d+$/.test(String(r.id)); }).sort(function (a, b) { return +String(a.id).split(".")[1] - +String(b.id).split(".")[1]; });
+      try { localStorage.setItem("sched_kri_v1", JSON.stringify(JSON.parse(parts.map(function (r) { return String(r.data).replace(/^~/, ""); }).join("")))); } catch (e) { return; }
+      kriBadges();
+    });
+  }
   function cloudPull() {   // 登入後從試算表拉最新，覆蓋本機並刷新畫面
     dbCall("load", {}).then(function (d) {
       if (!d || d.error) return;
@@ -127,6 +158,7 @@
     if (window.__refreshHome) window.__refreshHome();
     if (window.__refreshErp) window.__refreshErp();
     if (window.__refreshSched) window.__refreshSched();
+    kriBadges(); if (gUser) kriPull();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
@@ -1055,6 +1087,7 @@
     if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
     if (document.getElementById("ordersView")) initOrders();     // 訂單 + 老闆儀表板
     if (document.getElementById("stShip")) initHome();            // 首頁今日數字看板
+    kriBadges();
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
     // 情報下拉：點空白處收起（原生 details 負責開關）
     document.addEventListener("click", function (e) {

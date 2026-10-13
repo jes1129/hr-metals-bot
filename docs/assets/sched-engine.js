@@ -928,6 +928,33 @@
     });
     return { lock: out, dropped: dropped, shifted: shifted };
   }
+  // 現場回報的實際進度（acts：[{id 訂單編號, sid 站別代號, start?, end（工作分鐘）}]）：
+  //   回報完工的站，把該站所有工序改成「實際完工」的時間（保留原本的先後比例）並凍結；機型與拆批也鎖住。
+  //   res 是「沒套用回報」的模擬結果（拿它的工序當比例）；L 是以編號表示的鎖（可為空）。回傳新的鎖。
+  function applyActuals(M, X, res, acts, L) {
+    var out = { now: L ? L.now : 0, sig: M.sig, fixed: Object.assign({}, L && L.fixed || {}), genes: JSON.parse(JSON.stringify(L && L.genes || {})) };
+    var oIdx = {}; M.orders.forEach(function (od, i) { oIdx[od.id] = i; });
+    (acts || []).forEach(function (a) {
+      var i = oIdx[a.id], s = -1, k, q; if (i == null || a.end == null) return;
+      for (k = 0; k < M.S; k++) if (M.stages[k].id === a.sid) s = k;
+      if (s < 0) return;
+      var ops = res.ops.filter(function (op) { return op.o === i && op.s === s; }); if (!ops.length) return;
+      var pS = Infinity, pE = -Infinity;
+      ops.forEach(function (op) { if (op.start < pS) pS = op.start; if (op.end > pE) pE = op.end; });
+      var aE = Math.max(0, a.end), aS = a.start != null ? Math.max(0, a.start) : (aE < pE ? Math.max(0, pS + (aE - pE)) : pS);
+      if (!(aS < aE)) aS = Math.max(0, aE - 1);
+      var k2 = (aE - aS) / Math.max(1e-9, pE - pS), od = M.orders[i];
+      ops.forEach(function (op) {
+        out.fixed[od.id + "|" + s + "|" + op.a] = { type: op.type, unit: op.unit, start: aS + (op.start - pS) * k2, end: aS + (op.end - pS) * k2,
+          setup: (op.setup || 0) * k2, kind: op.kind, streams: op.streams ? op.streams.map(function (t) { return aS + (t - pS) * k2; }) : null,
+          paused: null, prod: M.prodIds[od.product], actual: true };
+      });
+      var g = out.genes[od.id] || (out.genes[od.id] = { split: od.splits[X.split[i]], asg: [] });
+      for (q = 0; q < M.S; q++) if (g.asg[q] === undefined) g.asg[q] = null;
+      g.asg[s] = ops[0].type === -1 ? "out" : M.types[ops[0].type].id;
+    });
+    return out;
+  }
   function bindLock(M, L) {
     if (!L) return null;
     if (L.sig !== M.sig) throw new SchedError("工廠設定（站別或機台數）已經改過，無法接續進行中的排程；請先「重新排程（從頭）」。");
@@ -959,7 +986,7 @@
   var api = {
     SKIP: SKIP, OUT: OUT, AUTO: AUTO, SchedError: SchedError,
     calendar: calendar, compile: compile, simulate: simulate, optimize: optimize, analyze: analyze, risk: risk, lockSim: lockSim,
-    freezeAt: freezeAt, bindLock: bindLock, breakdown: breakdown, planGenes: planGenes, refIndex: refIndex,
+    freezeAt: freezeAt, bindLock: bindLock, breakdown: breakdown, applyActuals: applyActuals, VERSION: "2026.10.13", planGenes: planGenes, refIndex: refIndex,
     practicalX: practicalX, eddX: eddX, blankX: blankX, cloneX: cloneX, keyX: keyX, summarize: summarize, makeEval: makeEval,
     ocbaAlloc: ocbaAlloc, apcs: apcs, rngOf: rngOf
   };
