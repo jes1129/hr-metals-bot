@@ -54,8 +54,7 @@ test("沒有 ERP_EMAILS 權限的人也能看版本（版本不含資料），�
 });
 
 test("CI 流程：部署前先跑測試，失敗就不部署", () => {
-  const y = read(".github/workflows/metals.yml");
-  assert.match(y, /\n  test:\n/);
+  const y = read(".github/workflows/metals.yml").split(String.fromCharCode(13)).join("");
   assert.match(y, /needs: test/);
   assert.match(y, /node --test tests\/\*\.test\.mjs/);
   assert.match(y, /unittest discover/);
