@@ -647,3 +647,9 @@ h1 .ic { color: var(--accent); width: .95em; height: .95em; margin-right: .35em;
 .dhbox .dh-t.dh-yellow, .dhbox b.dh-yellow { color: #9a6b00; }
 .dhbox ul { margin: 6px 0 0; padding-left: 20px; font-size: 13px; line-height: 1.7; }
 .dhbox li span { color: var(--muted); margin-left: 8px; }
+
+/* 版本一致性 */
+.verline { margin-top: 8px; font-size: 12px; color: var(--muted); }
+.verline.note { color: #9a6b00; }
+.verline.bad { color: var(--up); font-weight: 700; }
+.verbar { background: var(--up); color: #fff; padding: 8px 16px; font-size: 13.5px; font-weight: 700; text-align: center; }

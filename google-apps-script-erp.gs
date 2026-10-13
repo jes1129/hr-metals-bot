@@ -1211,7 +1211,21 @@
 var ERP_LOG_SHEET = "ERP_操作紀錄";
 var ERP_LOG_COLS = ["ts", "by", "action", "key", "result", "payload"];
 
+// 版本：網頁（docs/assets/app.js 的 NEED）會用 appVersion 問後端「你是第幾版」，對不上就警告。
+// 改了後端的對外行為、而網頁需要新行為時，把 GAS_API 加 1，並同步改 app.js 的 NEED.erp。
+var GAS_BUILD = "2026.10.14";
+var GAS_API = 1;
+
+function erpVersion_() {
+  return { ok: true, build: GAS_BUILD, api: {
+    erp: GAS_API,
+    alerts: typeof SA_API !== "undefined" ? SA_API : null,       // 沒貼 sched-alerts.gs → null（網頁會提示尚未安裝）
+    digest: typeof EMAIL_API !== "undefined" ? EMAIL_API : null
+  } };
+}
+
 function erpDispatch_(action, p, email) {
+  if (action === "appVersion") return erpVersion_();                  // 任何通過登入的人都能看版本（不含資料）
   if (action !== "erpLoad" && action !== "erpAct" && action !== "erpImport") return null;   // 不是 ERP 的 action → 交回原本的 unknown action
   // ERP 含售價、成本、毛利：可在「專案設定 → 指令碼屬性」加 ERP_EMAILS（逗號分隔）限定誰能用；
   // 沒設 = 所有通過主檔白名單的人都能用。其他功能（訂單看板、資料庫…）不受影響。

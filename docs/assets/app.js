@@ -76,6 +76,39 @@
     }
   })();
 
+  // ---------- 變更控制：網頁版本 vs Apps Script 版本 ----------
+  // UI_VERSION 每次發佈改一次；NEED 是「網頁需要後端至少第幾版」。後端對不上就在頁尾與頂端警告，避免新網頁配舊後端悄悄出錯。
+  var UI_VERSION = "2026.10.14", NEED = { erp: 1, alerts: 1, digest: 1 };
+  var NEED_NAME = { erp: ["ERP 後端", "google-apps-script-erp.gs"], alerts: ["排程自動通知", "sched-alerts.gs"], digest: ["每日早報", "email-notify.gs"] };
+  function verBuild() { var l = document.querySelector('link[href*="style.css?v="]'); var m = l && /v=(\d+)/.exec(l.getAttribute("href")); return m ? m[1] : ""; }
+  function verCheck() {
+    dbCall("appVersion").then(function (r) {
+      var bad = [], note = [];
+      if (!r || !r.ok) {
+        bad.push("Apps Script 還沒有版本功能（太舊），請把最新的 google-apps-script-erp.gs 貼進去");
+      } else {
+        Object.keys(NEED).forEach(function (k) {
+          var have = r.api ? r.api[k] : null, nm = NEED_NAME[k];
+          if (have == null) note.push(nm[0] + "尚未安裝（" + nm[1] + "）");
+          else if (have < NEED[k]) bad.push(nm[0] + "版本太舊（後端 " + have + "，網頁需要 " + NEED[k] + "）：請重貼 " + nm[1]);
+        });
+      }
+      var foot = document.querySelector(".foot"), line = document.getElementById("verLine");
+      if (!line && foot) { line = document.createElement("div"); line.id = "verLine"; line.className = "verline"; foot.parentNode.insertBefore(line, foot.nextSibling); }
+      if (line) {
+        line.className = "verline" + (bad.length ? " bad" : note.length ? " note" : "");
+        line.textContent = "網頁版本 " + UI_VERSION + (verBuild() ? "（建置 " + verBuild() + "）" : "") + " · 後端版本 " + (r && r.ok ? r.build : "舊版") +
+          (bad.length ? " ｜ ⚠ " + bad.join("；") : note.length ? " ｜ " + note.join("；") : " ｜ 版本一致");
+      }
+      var bar = document.getElementById("verBar");
+      if (bad.length) {
+        if (!bar) { bar = document.createElement("div"); bar.id = "verBar"; bar.className = "verbar"; document.body.insertBefore(bar, document.body.firstChild); }
+        bar.textContent = "⚠ 網頁與後端版本不一致：" + bad.join("；");
+      } else if (bar) bar.remove();
+    });
+  }
+  window.__verCheck = verCheck;
+
   // ---------- 排程風險燈號：選單紅點＋首頁燈號卡（資料來自排程頁存下的快照 sched_kri） ----------
   function kriSnap() { try { return JSON.parse(localStorage.getItem("sched_kri_v1")); } catch (e) { return null; } }
   function kriBadges() {
@@ -237,7 +270,7 @@
     if (window.__refreshHome) window.__refreshHome();
     if (window.__refreshErp) window.__refreshErp();
     if (window.__refreshSched) window.__refreshSched();
-    kriBadges(); if (gUser) { kriPull(); noticePull(); } else ntPaint();
+    kriBadges(); if (gUser) { kriPull(); noticePull(); verCheck(); } else ntPaint();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入

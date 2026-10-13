@@ -20,6 +20,7 @@
 var SA_URL = "https://jes1129.github.io/hr-metals-bot/schedule.html#tab=dash";
 var SA_ALERT_HDR = ["id", "level", "active", "first", "lastN", "nlevel", "ack", "ackBy", "ackAt", "esc", "name", "display", "msg", "owner", "t"];
 var SA_NOTICE_HDR = ["id", "t", "kind", "key", "level", "name", "display", "msg", "owner", "to", "read"];
+var SA_API = 1;                               // 版本（網頁會檢查；改了行為才加 1）
 var SA_MAX_MAIL = 15;                       // 每次檢查最多寄幾封（免費 Gmail 一天約 100 封，避免爆量）
 
 function sa_rank_(lv) { return lv === "red" ? 2 : lv === "yellow" ? 1 : 0; }

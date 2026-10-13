@@ -20,7 +20,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 變更控制：程式有改動就先跑全部測試，不過就不部署（避免把壞掉的版本放上線）。
+  # 排程（cron）觸發時測試失敗不擋「更新報價」——否則程式沒變、卻因為測試壞了而讓資料停更；
+  # 但失敗會在 Actions 頁面標紅，不會被忽略。
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 前端與後端規則測試（Node）
+        run: node --test tests/*.test.mjs
+      - name: 資料來源監控測試（Python）
+        run: python -m unittest discover -s tests -p "test_*.py"
+
   build:
+    needs: test
+    if: ${{ always() && (needs.test.result == 'success' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

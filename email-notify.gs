@@ -13,6 +13,7 @@
  *   .addItem("📧 立即寄 ERP 早報", "sendDailyDigest")
  */
 
+var EMAIL_API = 1;                              // 版本（網頁會檢查；改了行為才加 1）
 var EMAIL_SIGNALS_URL = "https://jes1129.github.io/hr-metals-bot/signals.json";
 
 function getNotifyEmails_() {
