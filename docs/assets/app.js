@@ -63,7 +63,162 @@
     }).then(function (r) { return r.json(); }).catch(function () { return null; });
   }
   // 給 erp.js 用的橋接：沿用同一個登入與後端呼叫（erp.js 不另做登入）
-  window.__erpBridge = { call: dbCall, authed: function () { return !!(API && idToken); }, configured: function () { return !!(API && CLIENT_ID); } };
+  window.__erpBridge = { call: dbCall, authed: function () { return !!(API && idToken); }, configured: function () { return !!(API && CLIENT_ID); }, user: function () { return gUser; } };
+
+  // ---------- 原料資料來源：頁面本身太久沒更新就亮警示（機器人整個停擺時，伺服器端的檢查也會一起停，所以由瀏覽器補這一關） ----------
+  (function dataStale() {
+    var b = document.getElementById("dhBox"); if (!b) return;
+    var m = /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)$/.exec(b.getAttribute("data-upd") || ""); if (!m) return;
+    var t = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 8, +m[5]), h = (Date.now() - t) / 3600000, day = new Date().getUTCDay();
+    if (h > 54 || (h > 30 && day !== 0 && day !== 1)) {         // 一天跑兩次；週日、週一早上容許較久
+      var lv = h > 54 ? "red" : "yellow";
+      b.hidden = false; b.insertAdjacentHTML("afterbegin", '<div class="dh-t dh-' + lv + '">原料報價已經 ' + Math.floor(h) + ' 小時沒有更新，排程可能停了，報價先別直接照用</div>');
+    }
+  })();
+
+  // ---------- 變更控制：網頁版本 vs Apps Script 版本 ----------
+  // UI_VERSION 每次發佈改一次；NEED 是「網頁需要後端至少第幾版」。後端對不上就在頁尾與頂端警告，避免新網頁配舊後端悄悄出錯。
+  var UI_VERSION = "2026.10.14", NEED = { erp: 1, alerts: 1, digest: 1, backup: 1 };
+  var NEED_NAME = { erp: ["ERP 後端", "google-apps-script-erp.gs"], alerts: ["排程自動通知", "sched-alerts.gs"], digest: ["每日早報", "email-notify.gs"], backup: ["每日備份", "backup.gs"] };
+  function verBuild() { var l = document.querySelector('link[href*="style.css?v="]'); var m = l && /v=(\d+)/.exec(l.getAttribute("href")); return m ? m[1] : ""; }
+  function verCheck() {
+    dbCall("appVersion").then(function (r) {
+      var bad = [], note = [];
+      if (!r || !r.ok) {
+        bad.push("Apps Script 還沒有版本功能（太舊），請把最新的 google-apps-script-erp.gs 貼進去");
+      } else {
+        Object.keys(NEED).forEach(function (k) {
+          var have = r.api ? r.api[k] : null, nm = NEED_NAME[k];
+          if (have == null) note.push(nm[0] + "尚未安裝（" + nm[1] + "）");
+          else if (have < NEED[k]) bad.push(nm[0] + "版本太舊（後端 " + have + "，網頁需要 " + NEED[k] + "）：請重貼 " + nm[1]);
+        });
+      }
+      var bk = r && r.ok ? r.backup : null, bkTxt = "";
+      if (bk) {
+        bkTxt = " · 最近備份 " + (bk.backupDays == null ? "—" : bk.backupDays === 0 ? "今天" : bk.backupDays + " 天前");
+        if (bk.backupDays == null || bk.backupDays >= 3) bad.push("已經" + (bk.backupDays == null ? "沒有任何" : " " + bk.backupDays + " 天沒有") + "成功備份");
+        else if (bk.backupDays >= 2) note.push("備份已 " + bk.backupDays + " 天沒更新");
+        if (bk.drillDays == null || bk.drillDays > 90) note.push("還原演練" + (bk.drillDays == null ? "從未做過" : "已 " + bk.drillDays + " 天沒做") + "（執行 restoreDrill）");
+      }
+      var ac = r && r.ok ? r.access : null, acTxt = "";
+      if (ac) {
+        if (!ac.configured) note.push("權限控管尚未啟用（所有登入者權限相同，見行政工作台「帳號權限」）");
+        else acTxt = " · 你的職務：" + (ac.name || "—");
+      }
+      var foot = document.querySelector(".foot"), line = document.getElementById("verLine");
+      if (!line && foot) { line = document.createElement("div"); line.id = "verLine"; line.className = "verline"; foot.parentNode.insertBefore(line, foot.nextSibling); }
+      if (line) {
+        line.className = "verline" + (bad.length ? " bad" : note.length ? " note" : "");
+        line.textContent = "網頁版本 " + UI_VERSION + (verBuild() ? "（建置 " + verBuild() + "）" : "") + " · 後端版本 " + (r && r.ok ? r.build : "舊版") + bkTxt + acTxt +
+          (bad.length ? " ｜ ⚠ " + bad.join("；") : note.length ? " ｜ " + note.join("；") : " ｜ 版本一致");
+      }
+      var bar = document.getElementById("verBar");
+      if (bad.length) {
+        if (!bar) { bar = document.createElement("div"); bar.id = "verBar"; bar.className = "verbar"; document.body.insertBefore(bar, document.body.firstChild); }
+        bar.textContent = "⚠ 系統警示：" + bad.join("；");
+      } else if (bar) bar.remove();
+    });
+  }
+  window.__verCheck = verCheck;
+
+  // ---------- 排程風險燈號：選單紅點＋首頁燈號卡（資料來自排程頁存下的快照 sched_kri） ----------
+  function kriSnap() { try { return JSON.parse(localStorage.getItem("sched_kri_v1")); } catch (e) { return null; } }
+  function kriBadges() {
+    var s = kriSnap(), age = s ? (Date.now() - (s.ts || 0)) / 3600000 : 0, stale = !!s && age > 24;
+    var lvl = !s ? null : s.worst === "red" ? "red" : (s.worst === "yellow" || stale) ? "yellow" : "ok";
+    var link = document.querySelector('.side a[href="schedule.html"]');
+    if (link) {
+      var old = link.querySelector(".kri-dot"); if (old) old.parentNode.removeChild(old);
+      if (lvl === "red" || lvl === "yellow") {
+        var d = document.createElement("i"); d.className = "kri-dot " + lvl;
+        d.title = s.worst === "red" || s.worst === "yellow" ? "排程風險：" + (s.red || 0) + " 項紅燈、" + (s.yellow || 0) + " 項黃燈" : "排程風險資料已超過 24 小時沒有更新";
+        link.appendChild(d);
+      }
+    }
+    var box = document.getElementById("kriBox"); if (!box) return;
+    if (!s) { box.innerHTML = ""; return; }
+    var top = (s.items || []).slice(0, 3).map(function (x) { return "<li><b>" + escAttr(x.name) + "</b>（" + escAttr(x.display) + "）" + escAttr(x.msg || "") + "</li>"; }).join("");
+    box.innerHTML = '<a class="kri-card ' + lvl + '" href="schedule.html#tab=dash"><div class="kri-h">' + ic("alert") + "<b>排程風險燈號</b>"
+      + '<span class="kri-n">' + (s.red ? s.red + " 紅燈" : "") + (s.red && s.yellow ? "・" : "") + (s.yellow ? s.yellow + " 黃燈" : "") + (!s.red && !s.yellow ? "全部正常" : "") + (s.rising ? "・" + s.rising + " 項惡化中" : "") + "</span></div>"
+      + (top ? "<ul>" + top + "</ul>" : "") + ((s.soon || []).length ? '<div class="kri-soon">預警：' + s.soon.slice(0, 3).map(function (x) { return escAttr(x.name) + "預計 " + (x.days < 1 ? "不到 1" : x.days) + " 天後轉" + (x.to === "red" ? "紅燈" : "黃燈"); }).join("；") + "</div>" : "") + (stale ? '<div class="kri-stale">燈號資料已 ' + Math.floor(age) + " 小時沒有更新（最近一次有人打開排程頁是 " + new Date(s.ts).toLocaleString("zh-TW", { hour12: false }) + "）。沒人更新，燈號就不準。</div>" : "") + "</a>";
+  }
+  // ---------- 通知中心（鈴鐺）：sched-alerts.gs 每 30 分鐘檢查，結果寫進 sched_notice／sched_alert ----------
+  var NT_KEY = "sched_notice_v1";
+  var NOTICE_HDR = ["id", "t", "kind", "key", "level", "name", "display", "msg", "owner", "to", "read"];
+  var ALERT_HDR = ["id", "level", "active", "first", "lastN", "nlevel", "ack", "ackBy", "ackAt", "esc", "name", "display", "msg", "owner", "t"];
+  function ntGet() { try { return JSON.parse(localStorage.getItem(NT_KEY)) || {}; } catch (e) { return {}; } }
+  function ntSet(o) { try { localStorage.setItem(NT_KEY, JSON.stringify(o)); } catch (e) {} }
+  function ntWindow() { var d = new Date(Date.now() + 8 * 3600000), dow = d.getUTCDay(); return dow >= 1 && dow <= 5 && d.getUTCHours() >= 8 && d.getUTCHours() < 19; }
+  function ntAgo(ms) { var m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 60 ? m + " 分鐘前" : m < 1440 ? Math.floor(m / 60) + " 小時前" : Math.floor(m / 1440) + " 天前"; }
+  function ntUnread() { var st = ntGet(), k = kriSnap(); return (st.notices || []).filter(function (n) { return Number(n.read) !== 1 && n.kind !== "ok"; }).length + (k && k.soon ? k.soon.length : 0); }
+  function ntBell() {
+    var box = document.querySelector(".toplinks"); if (!box) return null;
+    var b = document.getElementById("noticeBtn");
+    if (!b) {
+      b = document.createElement("button"); b.type = "button"; b.id = "noticeBtn"; b.className = "tsearch np-btn"; b.setAttribute("aria-label", "通知中心");
+      b.innerHTML = ic("bell") + '<span class="np-badge" hidden></span>';
+      var after = document.getElementById("paletteBtn"); box.insertBefore(b, after ? after.nextSibling : box.firstChild);
+      b.addEventListener("click", function (e) { e.stopPropagation(); var p = document.getElementById("noticePanel"); if (p && p.style.display !== "none") { p.style.display = "none"; return; } ntPanel(true); noticePull(); });
+      document.addEventListener("click", function (e) { var p = document.getElementById("noticePanel"); if (p && p.style.display !== "none" && !p.contains(e.target)) p.style.display = "none"; });
+    }
+    return b;
+  }
+  function ntPaint() {
+    var b = ntBell(); if (!b) return;
+    b.hidden = !idToken;
+    var n = ntUnread(), bd = b.querySelector(".np-badge"); bd.hidden = !n; bd.textContent = n > 9 ? "9+" : n;
+    var st = ntGet(), red = (st.notices || []).some(function (x) { return Number(x.read) !== 1 && x.level === "red"; });
+    b.classList.toggle("red", red && n > 0);
+    var p = document.getElementById("noticePanel"); if (p && p.style.display !== "none") ntPanel(false);
+  }
+  function ntPanel(open) {
+    var p = document.getElementById("noticePanel");
+    if (!p) { p = document.createElement("div"); p.id = "noticePanel"; p.className = "np"; document.body.appendChild(p); p.addEventListener("click", function (e) {
+      var t = e.target.closest("[data-np]"); if (!t) return; var a = t.getAttribute("data-np");
+      if (a === "refresh") noticePull(); else if (a === "ack") { var q = t.getAttribute("data-v").split("|"); noticeAck(q[0], q[1]); }
+    }); }
+    var st = ntGet(), k = kriSnap(), hb = st.hb || 0, h = '<div class="np-h"><b>' + ic("bell") + "通知中心</b><button type=\"button\" class=\"np-b\" data-np=\"refresh\">重新整理</button></div>";
+    h += '<div class="np-hb ' + (!hb ? "bad" : (ntWindow() && Date.now() - hb > 100 * 60000 ? "bad" : "ok")) + '">'
+      + (!hb ? "自動通知排程還沒啟用（Apps Script 要貼上 sched-alerts.gs 並執行 installSchedAlertTrigger）。" : ntWindow() && Date.now() - hb > 100 * 60000 ? "自動通知已經 " + ntAgo(hb).replace("前", "") + "沒有執行，請確認 Apps Script 的觸發條件。" : "自動通知最近一次檢查：" + ntAgo(hb) + "（平日 08:00–18:59，每 30 分鐘）") + "</div>";
+    var soon = (k && k.soon) || [];
+    if (soon.length) h += '<div class="np-s">預警（趨勢，只在這裡提醒）</div>' + soon.map(function (x) { return '<div class="np-i soon"><b>' + escAttr(x.name) + "</b> 照目前速度，預計 " + (x.days < 1 ? "不到 1" : x.days) + " 天後轉" + (x.to === "red" ? "紅燈" : "黃燈") + "</div>"; }).join("");
+    var ns = (st.notices || []).slice(0, 20);
+    h += '<div class="np-s">通知</div>' + (ns.length ? ns.map(function (n) {
+      var unread = Number(n.read) !== 1 && n.kind !== "ok";
+      return '<div class="np-i ' + (n.level || "") + (unread ? " unread" : "") + '"><div class="np-t"><span class="np-lv ' + (n.level || "") + '">' + (n.kind === "ok" ? "恢復" : n.kind === "esc" ? "升級" : n.level === "red" ? "紅燈" : "黃燈") + "</span>" + escAttr(n.name) + (n.display ? "（" + escAttr(n.display) + "）" : "") + '<em>' + ntAgo(Number(n.t)) + "</em></div>"
+        + (n.msg ? '<div class="np-m">' + escAttr(n.msg) + "</div>" : "") + (n.to ? '<div class="np-m">已通知：' + escAttr(n.to) + "</div>" : "")
+        + (unread ? '<button type="button" class="np-b" data-np="ack" data-v="' + escAttr(n.id) + "|" + escAttr(n.key) + '">已知悉</button>' : "") + "</div>";
+    }).join("") : '<div class="np-m">還沒有通知。</div>') + '<a class="np-a" href="schedule.html#tab=dash">打開風險儀表板 →</a>';
+    p.innerHTML = h; if (open) p.style.display = "block";
+  }
+  function noticePull(cb) {
+    if (!API || !idToken) { ntPaint(); return; }
+    Promise.all([dbCall("tList", { table: "sched_notice" }), dbCall("tList", { table: "sched_alert" })]).then(function (r) {
+      var n = (r[0] && r[0].rows) || [], a = (r[1] && r[1].rows) || [], hb = 0, alerts = {};
+      a.forEach(function (x) { if (x.id === "_hb") hb = Number(x.t) || 0; else alerts[x.id] = x; });
+      n.sort(function (x, y) { return Number(y.t) - Number(x.t); });
+      ntSet({ ts: Date.now(), notices: n.slice(0, 40), alerts: alerts, hb: hb });
+      ntPaint(); if (cb) cb();
+    });
+  }
+  function noticeAck(id, key, cb) {                      // 已知悉：通知標已讀、這個警示標已處理（之後不再催，變更糟才再通知）
+    var st = ntGet(), now = Date.now(), who = gUser ? gUser.email : "";
+    (st.notices || []).forEach(function (n) {
+      if ((id && n.id === id) || (key && n.key === key)) { if (Number(n.read) !== 1) dbCall("tUpsert", { table: "sched_notice", row: { id: n.id, read: 1 }, header: NOTICE_HDR }); n.read = 1; }
+    });
+    if (key) { dbCall("tUpsert", { table: "sched_alert", row: { id: key, ack: 1, ackBy: who, ackAt: now }, header: ALERT_HDR }); if (st.alerts && st.alerts[key]) { st.alerts[key].ack = 1; st.alerts[key].ackBy = who; st.alerts[key].ackAt = now; } }
+    ntSet(st); ntPaint(); if (cb) cb();
+  }
+  window.__noticePull = noticePull; window.__noticeAck = noticeAck;
+  function kriPull() {                                   // 登入後從公司試算表讀最新快照（小表，不必載入整份排程）
+    if (!API || !idToken) return;
+    dbCall("tList", { table: "sched_kri" }).then(function (d) {
+      if (!d || !d.rows || !d.rows.length) return;
+      var parts = d.rows.filter(function (r) { return /^kri\.\d+$/.test(String(r.id)); }).sort(function (a, b) { return +String(a.id).split(".")[1] - +String(b.id).split(".")[1]; });
+      try { localStorage.setItem("sched_kri_v1", JSON.stringify(JSON.parse(parts.map(function (r) { return String(r.data).replace(/^~/, ""); }).join("")))); } catch (e) { return; }
+      kriBadges();
+    });
+  }
   function cloudPull() {   // 登入後從試算表拉最新，覆蓋本機並刷新畫面
     dbCall("load", {}).then(function (d) {
       if (!d || d.error) return;
@@ -127,6 +282,7 @@
     if (window.__refreshHome) window.__refreshHome();
     if (window.__refreshErp) window.__refreshErp();
     if (window.__refreshSched) window.__refreshSched();
+    kriBadges(); if (gUser) { kriPull(); noticePull(); verCheck(); } else ntPaint();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
@@ -1055,6 +1211,8 @@
     if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
     if (document.getElementById("ordersView")) initOrders();     // 訂單 + 老闆儀表板
     if (document.getElementById("stShip")) initHome();            // 首頁今日數字看板
+    kriBadges(); ntPaint();
+    setInterval(function () { if (!document.hidden && idToken) noticePull(); }, 300000);     // 通知中心每 5 分鐘更新
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
     // 情報下拉：點空白處收起（原生 details 負責開關）
     document.addEventListener("click", function (e) {

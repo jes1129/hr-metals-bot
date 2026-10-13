@@ -13,6 +13,7 @@ import os
 
 import config
 import dashboard
+import datahealth
 import metals
 
 DATA_DIR = os.environ.get("METALS_DATA_DIR", "/data")
@@ -31,6 +32,21 @@ def _build_signals(history):
         })
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     return {"updated": now, "metals": metals_list}
+
+
+def _health(history, daily):
+    """資料來源健康檢查；任何錯誤都不影響其他產出。"""
+    try:
+        h = datahealth.assess(history, daily)
+    except Exception as e:  # noqa: BLE001
+        print("[health] 檢查本身失敗：", e)
+        return None
+    print("[health]", datahealth.summary(h))
+    if h["red"]:
+        print("::error::原料資料來源有紅燈：" + datahealth.summary(h))      # Actions 上會顯示紅色註解
+    elif h["yellow"]:
+        print("::warning::" + datahealth.summary(h))
+    return h
 
 
 def _fetch_news(max_n=6):
@@ -91,6 +107,7 @@ def main():
 
     os.makedirs("docs", exist_ok=True)
     # 原料頁（含相關新聞）
+    health = _health(history, daily)
     with open(os.path.join("docs", "metals.html"), "w", encoding="utf-8") as f:
         f.write(dashboard.render_html(history, daily, news=_fetch_news()))
     # 報價試算頁（用最新原料現價）
@@ -123,7 +140,9 @@ def main():
         print("[run_metals] 生產排程頁產生失敗（略過，不影響其他頁）：", e)
     # 原料現況/突破訊號（供 email 早報讀取）
     with open(os.path.join("docs", "signals.json"), "w", encoding="utf-8") as f:
-        json.dump(_build_signals(history), f, ensure_ascii=False)
+        sig = _build_signals(history)
+        sig["health"] = health          # 早報信與首頁都讀這個
+        json.dump(sig, f, ensure_ascii=False)
 
     # 首頁總覽數字（跨 data 檔，可能落後數小時，可接受）
     sup = _read(os.path.join(DATA_DIR, "suppliers.json"), [])
@@ -132,7 +151,7 @@ def main():
     cust_total = len(cust) if isinstance(cust, list) else None
 
     with open(os.path.join("docs", "index.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_home(history, sup_total, sup_near, cust_total))
+        f.write(dashboard.render_home(history, sup_total, sup_near, cust_total, health=health))
     print("[run_metals] 已更新 docs/metals.html 與 docs/index.html（首頁）")
 
 

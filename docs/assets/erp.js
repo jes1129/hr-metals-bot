@@ -27,6 +27,9 @@
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   function nt(n) { return "NT$ " + (Number(n) || 0).toLocaleString("zh-TW", { maximumFractionDigits: 2 }); }
   function num(n) { return (Number(n) || 0).toLocaleString("zh-TW", { maximumFractionDigits: 3 }); }
+  // 職能分工：伺服器已把看不到的成本拿掉並在 world.meta.access 標明；這裡只負責顯示「—」，避免把拿掉的欄位當成 0 算出假的毛利
+  function seeCost() { var a = W().meta && W().meta.access; return !a || a.seeCost !== false; }
+  function ct(n) { return seeCost() ? nt(n) : "—"; }
   function z(n) { return (n < 10 ? "0" : "") + n; }
   function dstr(d) { return d.getFullYear() + "-" + z(d.getMonth() + 1) + "-" + z(d.getDate()); }
   function today() { return dstr(new Date()); }
@@ -158,8 +161,8 @@
     var r = E.report(w, today());
     var kp = '<div class="okpis erp-kpis">'
       + kpi(ic("cash") + "本月銷售", nt(r.sales_month), "", "依出貨認列")
-      + kpi(ic("chart") + "本月毛利", nt(r.gp_month), r.gp_month < 0 ? "warn" : "", r.gm_month == null ? "—" : "毛利率 " + r.gm_month + "%")
-      + kpi(ic("box") + "庫存價值", nt(r.inventory_value), "", "FIFO 成本")
+      + kpi(ic("chart") + "本月毛利", ct(r.gp_month), seeCost() && r.gp_month < 0 ? "warn" : "", !seeCost() || r.gm_month == null ? "—" : "毛利率 " + r.gm_month + "%")
+      + kpi(ic("box") + "庫存價值", ct(r.inventory_value), "", "FIFO 成本")
       + kpi(ic("file") + "應收帳款", nt(r.receivable), "", "已出貨未收")
       + kpi(ic("truck") + "未出貨訂單", r.open_orders + " 張", r.overdue_orders.length ? "warn" : "", r.overdue_orders.length ? "逾期 " + r.overdue_orders.length + " 張" : "無逾期")
       + kpi(ic("factory") + "進行中工單", r.wo_active + " 張", "", "")
@@ -271,7 +274,7 @@
         { l: "單號", v: "no" }, { l: "成品", v: function (o) { return esc(o.bom.sku + " " + o.bom.name) + ' <span class="erp-muted">v' + o.bom.revision + "</span>"; } },
         { l: "數量", r: 1, v: function (o) { return num(o.qty); } }, { l: "交期", v: "due" },
         { l: "狀態", v: function (o) { return chip(o.status, WTONE[o.status]); } },
-        { l: "實際成本", r: 1, v: function (o) { return o.status === "完工" ? nt(o.actual_cost) + '<div class="erp-muted">單位 ' + nt(o.actual_cost / o.qty) + "</div>" : ""; } },
+        { l: "實際成本", r: 1, v: function (o) { return o.status === "完工" ? ct(o.actual_cost) + '<div class="erp-muted">單位 ' + ct(o.actual_cost / o.qty) + "</div>" : ""; } },
         { l: "", v: function (o) {
           var b = { "計畫": mini("wo-reserve", ic("inbox") + "預留用料", o.id), "已備料": mini("wo-start", ic("play") + "開工", o.id), "生產中": mini("wo-complete", ic("check") + "完工", o.id) }[o.status] || "";
           return b + (["計畫", "已備料", "生產中"].indexOf(o.status) >= 0 ? mini("wo-cancel", ic("x"), o.id, "取消工單") : "") + mini("wo-view", ic("search"), o.id, "用料明細");
@@ -310,7 +313,7 @@
         { l: "品名", v: function (m) { var it = itemOf(m.item_id); return esc(it ? it.name : "?"); } },
         { l: "類別", v: "type" },
         { l: "數量", r: 1, v: function (m) { return '<span class="' + (m.qty < 0 ? "erp-bad" : "erp-good") + '">' + (m.qty > 0 ? "+" : "") + num(m.qty) + "</span>"; } },
-        { l: "成本金額", r: 1, v: function (m) { return nt(m.value); } },
+        { l: "成本金額", r: 1, v: function (m) { return ct(m.value); } },
         { l: "單據", v: "ref" }, { l: "備註", v: "note" }, { l: "經手人", v: "by" }
       ], rows, { empty: "還沒有庫存異動。進貨、出貨、工單、盤點都會自動記在這裡（不可修改，可追溯）。",
         search: function (m) { var it = itemOf(m.item_id); return it ? it.sku + " " + it.name : ""; } });
@@ -493,8 +496,8 @@
     var lots = E.itemLots(W(), it.id);
     info("成本批次（先進先出順序）· " + esc(it.sku + " " + it.name), lots.length ? table([
       { l: "順序", v: function (l, i) { return lots.indexOf(l) + 1; } }, { l: "日期", v: "date" }, { l: "來源", v: "src" }, { l: "單據", v: "ref" },
-      { l: "剩餘", r: 1, v: function (l) { return num(l.qty); } }, { l: "單位成本", r: 1, v: function (l) { return nt(l.unit_cost); } },
-      { l: "價值", r: 1, v: function (l) { return nt(l.qty * l.unit_cost); } }
+      { l: "剩餘", r: 1, v: function (l) { return num(l.qty); } }, { l: "單位成本", r: 1, v: function (l) { return ct(l.unit_cost); } },
+      { l: "價值", r: 1, v: function (l) { return ct(l.qty * l.unit_cost); } }
     ], lots) + '<div class="erp-muted" style="margin-top:8px">出貨或領料會先扣最上面（最早）的批次。</div>' : '<div class="dbempty">目前沒有庫存。</div>');
   }
 
@@ -759,7 +762,7 @@
       + table([{ l: "用料", v: "name" }, { l: "每單位", r: 1, v: function (r) { return num(r.per); } },
         { l: "共需", r: 1, v: function (r) { return num(r.need) + " " + esc(r.unit); } },
         { l: "現有", r: 1, v: function (r) { return '<span class="' + (r.have < r.need && o.status !== "完工" ? "erp-bad" : "") + '">' + num(r.have) + "</span>"; } }], rows)
-      + (o.status === "完工" ? '<div class="erp-sum"><span>用料成本 <b>' + nt(o.actual_cost - o.extra_cost) + "</b></span><span>加工費 <b>" + nt(o.extra_cost) + "</b></span><span>總成本 <b>" + nt(o.actual_cost) + "</b></span><span>單位成本 <b>" + nt(o.actual_cost / o.qty) + "</b></span></div>" : ""));
+      + (o.status === "完工" ? '<div class="erp-sum"><span>用料成本 <b>' + ct(o.actual_cost - o.extra_cost) + "</b></span><span>加工費 <b>" + ct(o.extra_cost) + "</b></span><span>總成本 <b>" + ct(o.actual_cost) + "</b></span><span>單位成本 <b>" + ct(o.actual_cost / o.qty) + "</b></span></div>" : ""));
   }
   function completeForm(o) {
     form({
@@ -944,7 +947,7 @@
 
   // 擴充模組（erp-crm.js、erp-admin-ui.js）用的介面
   window.__erpUI = {
-    E: E, S: S, VIEW: VIEW, H: H, OPEN: OPEN, TABS: TABS, page: function () { return PAGE; },
+    E: E, S: S, ct: ct, seeCost: seeCost, VIEW: VIEW, H: H, OPEN: OPEN, TABS: TABS, page: function () { return PAGE; },
     W: W, act: act, render: render, load: load, form: form, info: info, table: table, section: section, kpi: kpi, chip: chip,
     btn: btn, mini: mini, searchBox: searchBox, esc: esc, nt: nt, num: num, ic: ic, today: today, plusDays: plusDays,
     byId: byId, custName: custName, custOpts: custOpts, itemOpts: itemOpts, selectHtml: selectHtml, csv: csv, download: download,

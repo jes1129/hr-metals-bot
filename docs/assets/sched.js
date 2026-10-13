@@ -7,9 +7,9 @@
  */
 (function () {
   "use strict";
-  var E = window.SchedEngine, D = window.SchedData;
+  var E = window.SchedEngine, D = window.SchedData, K = window.SchedKri;
   var mount = document.getElementById("schedView");
-  if (!mount || !E || !D) return;
+  if (!mount || !E || !D || !K) return;
 
   var KEY = "sched_state_v1", VER = (document.currentScript && /v=([\w.-]+)/.exec(document.currentScript.src) || [])[1] || "";
   var WD = "日一二三四五六";
@@ -32,7 +32,7 @@
   };
   var NOISE = 0.15, RISK = 0.1;
 
-  var S = load() || fresh();
+  var S = ensureState(load() || fresh());
   var V = { tab: tabFromHash() || "board", preset: S.preset || "bal", out: S.out || "need", speed: "std", noise: !!S.noise, hl: null, zoom: window.innerWidth < 640 ? 4 : 1, show: "new", busy: null };
   var cur = null, pending = null, worker = null, runId = 0;
 
@@ -58,6 +58,14 @@
     var cfg = D.defaultConfig(); cfg.calendar.start = today();
     return { v: 1, cfg: cfg, orders: D.demoOrders(E.calendar(cfg.calendar)), plan: null, down: [], log: [], demo: true, preset: "bal" };
   }
+  function ensureState(s) {                            // 風險監控需要的欄位（舊資料也補齊）
+    s.act = s.act || {}; s.pred = s.pred || {}; s.tol = s.tol || {}; s.events = s.events || []; s.versions = s.versions || [];
+    s.cfgLog = s.cfgLog || []; s.lastLv = s.lastLv || {}; s.hist = s.hist || [];
+    s.notify = Object.assign({ enabled: true, boss: "", owners: {}, escalateMin: 30, repeatHours: 24 }, s.notify || {}); s.grace = s.grace != null ? s.grace : 120;
+    if (s.cfgPrev == null) s.cfgPrev = JSON.stringify(s.cfg);
+    return s;
+  }
+  function who() { var b = bridge(), u = b && b.user && b.user(); return u ? (u.email || u.name || "已登入") : "本機使用者"; }
   function load() {
     var s = lsGet(KEY);
     return s && s.v === 1 && s.cfg && s.orders ? s : null;
@@ -69,34 +77,48 @@
     if (cloud !== false && authed()) { clearTimeout(saveT); saveT = setTimeout(cloudSave, 800); }
   }
   // 試算表一格最多 5 萬字：大的資料切成 3 萬字一段（cfg.0、orders.0、plan.0、plan.1…），前面加「~」避免被當成數字
-  function blobRows(name, obj) {
-    var str = obj == null ? "" : JSON.stringify(obj), rows = [], k = 0;
+  function strRows(name, str) {
+    var rows = [], k = 0;
     for (var i = 0; i < str.length; i += 30000) rows.push({ id: name + "." + k++, data: "~" + str.slice(i, i + 30000) });
     return rows;
   }
+  function blobRows(name, obj) { return strRows(name, obj == null ? "" : JSON.stringify(obj)); }
   function blobGet(name, rows) {
     var parts = rows.filter(function (r) { return /^\w+\.\d+$/.test(r.id) && r.id.split(".")[0] === name; })
       .sort(function (a, b) { return +a.id.split(".")[1] - +b.id.split(".")[1]; });
     if (!parts.length) return null;
     try { return JSON.parse(parts.map(function (r) { return r.data; }).join("")); } catch (e) { return null; }
   }
-  function putRows(b, rows) {                        // 一次寫入；舊版後端沒有 tImport 就一筆一筆存
-    return b.call("tImport", { table: "sched", rows: rows, header: ["id", "data"] }).then(function (d) {
+  function putRows(b, rows, table) {                        // 一次寫入；舊版後端沒有 tImport 就一筆一筆存
+    return b.call("tImport", { table: table || "sched", rows: rows, header: ["id", "data"] }).then(function (d) {
       if (!(d && d.error && /unknown/i.test(String(d.error)))) return d;
       return rows.reduce(function (pr, r) {
-        return pr.then(function (ok) { return b.call("tUpsert", { table: "sched", row: r, header: ["id", "data"] }).then(function (x) { return ok && !!x && !x.error; }); });
+        return pr.then(function (ok) { return b.call("tUpsert", { table: table || "sched", row: r, header: ["id", "data"] }).then(function (x) { return ok && !!x && !x.error; }); });
       }, Promise.resolve(true)).then(function (ok) { return ok ? { ok: true } : { error: "tUpsert failed" }; });
     });
+  }
+  function syncVers(b) {                              // 離線時採用的版本，登入後補傳排程內容（回復用）
+    var loc = verLocal(); S.verSaved = S.verSaved || {};
+    S.versions.forEach(function (m) {
+      if (S.verSaved[m.id] || !loc[m.id]) return;
+      S.verSaved[m.id] = 1; putRows(b, strRows(m.id, loc[m.id]), "sched_ver");
+    });
+  }
+  function publishNotify() {                          // 自動通知的設定（Apps Script 每 30 分鐘讀這張小表）
+    var b = bridge(); if (!b || !b.authed()) return;
+    b.call("tUpsert", { table: "sched_cfg", row: { id: "notify", data: JSON.stringify(S.notify) }, header: ["id", "data"] });
   }
   function cloudSave() {
     var b = bridge(); if (!b || !b.authed()) return;
     var rows = blobRows("cfg", S.cfg)
       .concat(blobRows("orders", { orders: S.orders, down: S.down, log: S.log.slice(0, 40), preset: S.preset, noise: S.noise, out: S.out }))
-      .concat(blobRows("plan", S.plan));
+      .concat(blobRows("plan", S.plan))
+      .concat(blobRows("act", { act: S.act, pred: S.pred }))
+      .concat(blobRows("meta", { tol: S.tol, grace: S.grace, events: S.events.slice(0, 80), versions: S.versions, cfgLog: S.cfgLog, lastLv: S.lastLv, notify: S.notify }));
     var ids = rows.map(function (r) { return r.id; }), stale = (S.cloudIds || []).filter(function (id) { return ids.indexOf(id) < 0; });
     chain = chain.then(function () { return putRows(b, rows); }).then(function (d) {
       if (!d || d.error) { toast("存到公司試算表失敗（資料還在這台電腦裡），改動後會再試一次。", true); return; }
-      S.cloud = true; S.cloudIds = ids; lsSet(KEY, S); paintMode();
+      S.cloud = true; S.cloudIds = ids; lsSet(KEY, S); paintMode(); syncVers(b); publishNotify();
       return stale.reduce(function (pr, id) { return pr.then(function () { return b.call("tRemove", { table: "sched", id: id }); }); }, Promise.resolve());
     });
   }
@@ -113,12 +135,19 @@
       if (od.out) V.out = od.out;
       V.noise = !!od.noise;
       S.plan = blobGet("plan", rows); S.demo = false; S.cloud = true; S.cloudIds = ids;
-      lsSet(KEY, S); pending = null; V.lastOut = null; V.lastOutPlan = null; rebuild(); render();
+      var ac = blobGet("act", rows), me = blobGet("meta", rows);
+      S.act = ac && ac.act || {}; S.pred = ac && ac.pred || {};
+      S.tol = me && me.tol || {}; S.grace = me && me.grace != null ? me.grace : 120; S.events = me && me.events || []; S.versions = me && me.versions || [];
+      S.cfgLog = me && me.cfgLog || []; S.lastLv = me && me.lastLv || {}; S.cfgPrev = JSON.stringify(S.cfg);
+      S.notify = Object.assign({ enabled: true, boss: "", owners: {}, escalateMin: 30, repeatHours: 24 }, me && me.notify || {});
+      loadHist(b);
+      S.verSaved = {}; S.versions.forEach(function (m) { S.verSaved[m.id] = 1; });         // 公司端的版本清單裡的，視為排程內容都在 sched_ver
+      lsSet(KEY, S); pending = null; V.lastOut = null; V.lastOutPlan = null; rebuild(); render(); syncErp(true);
     });
   }
   window.__refreshSched = function () {            // 登入狀態改變時（app.js 會呼叫）
     var a = authed(); paintMode();
-    if (a && !wasAuthed) { wasAuthed = true; cloudLoad(); } else if (!a) wasAuthed = false;
+    if (a && !wasAuthed) { wasAuthed = true; kriLast = ""; cloudLoad(); setTimeout(function () { if (cur && cur.M) kriTick(); }, 2500); } else if (!a) wasAuthed = false;
   };
 
   // ===========================================================================
@@ -164,19 +193,19 @@
   // 依目前的設定與訂單，重建「目前採用的排程」的畫面資料
   function rebuild() {
     cur = null;
-    if (!S.plan) return;
+    if (!S.plan) { V.kri = null; return; }
     try {
       var cfg = planCfg(S.plan.start), M = E.compile(cfg, S.orders);
-      var X = xFromPlan(M, S.plan), lk = lockFor(M, S.plan.lock, S.plan.now0), down = downMap(M, S.down);
-      var base = E.lockSim(lk.lock); if (down) base.down = down;
-      var res = E.simulate(M, X, Object.assign({}, base, { collect: true }));
+      var X = xFromPlan(M, S.plan), down = downMap(M, S.down);
+      var sf = simFull(M, X, S.plan.lock, S.plan.now0, down), res = sf.res, base = sf.base, lk = sf.lk;
       var known = {}; (S.plan.seq || []).forEach(function (id) { known[id] = 1; });
       cur = { M: M, X: X, res: res, an: E.analyze(M, res), base: base, lockOk: lk.ok, lockErr: lk.err, plan: S.plan, down: down,
         fresh: M.orders.filter(function (od) { return !known[od.id]; }).map(function (od) { return od.id; }),
         gone: (S.plan.seq || []).filter(function (id) { return !M.orders.some(function (od) { return od.id === id; }); }),
         cfgChanged: !!(S.plan.cfgSig && S.plan.cfgSig !== hash(JSON.stringify(S.cfg))),
         risk: E.risk(M, X, base, S.plan.noise ? NOISE : RISK, M.n > 120 ? 20 : 40) };
-    } catch (e) { cur = { error: e.message }; }
+      kriTick();
+    } catch (e) { cur = { error: e.message }; V.kri = null; }
   }
   function planRecord(M, X, out, extra) {
     return Object.assign({
@@ -238,7 +267,7 @@
   // 最佳化（背景執行緒）
   // ===========================================================================
   function run(job, done) {
-    var id = ++runId, t0 = Date.now();
+    var id = ++runId, t0 = Date.now(); V.lastSeed = job.opts.seed;
     V.busy = { id: id, label: job.label, gen: 0, elapsed: 0, limit: job.opts.timeLimit, best: null, base: null, pts: [] };
     paintBusy();
     function finish(out) { if (id !== runId) return; V.busy = null; done(out); }
@@ -285,12 +314,22 @@
     var M;
     try { M = E.compile(cfg, S.orders); } catch (e) { toast(e.message, true); return; }
     if (!M.n) { toast("還沒有訂單：先到「訂單」新增，或載入範例。", true); return; }
-    var dm = downMap(M, S.down);
-    run({ label: "排程計算中", cfg: cfg, orders: S.orders, opts: opts({ now: now, down: dm }) }, function (out) {
+    var dm = downMap(M, S.down), lockL = null, acts = actsList(M);
+    if (acts.length) {                                  // 已回報完工的站照實際凍結，其餘從頭排
+      var X0 = E.practicalX(M), r0 = E.simulate(M, X0, { collect: true, now: now });
+      lockL = E.applyActuals(M, X0, r0, acts, { now: now, sig: M.sig, fixed: {}, genes: {} });
+    }
+    run({ label: "排程計算中", cfg: cfg, orders: S.orders, opts: opts({ now: now, down: dm, lock: lockL }) }, function (out) {
+      if (cur && cur.M) {                               // 已經有排程：先給前後對照，採用時走風險檢查
+        showPending({ desc: "重新排程（從頭）· " + PRESET[V.preset].label }, M, out, now, S.orders, S.down);
+        return;
+      }
       S.plan = planRecord(M, out.X, out, { now0: now, start: cfg.calendar.start });
-      S.plan.lock = null; V.lastOut = out; V.lastOutPlan = S.plan;
-      logAdd("重新排程（從頭）· " + PRESET[V.preset].label + " · " + S.orders.length + " 張單");
-      pending = null; save(); rebuild(); V.tab = "board"; render();
+      S.plan.lock = out.lockUsed || null; V.lastOut = out; V.lastOutPlan = S.plan;
+      logAdd("第一次排程 · " + PRESET[V.preset].label + " · " + S.orders.length + " 張單");
+      pending = null; save(); rebuild(); updatePred(cur.M, cur.res);
+      recordVersion({ desc: "第一次排程", after: E.summarize(cur.res), items: null, ack: null });
+      kriTick(); save(); V.tab = "board"; render(); syncErp(true);
       toast("排程完成：試了 " + out.evals.toLocaleString() + " 種排法（" + (out.elapsed / 1000).toFixed(1) + " 秒）");
     });
   }
@@ -321,29 +360,13 @@
     });
   }
   function showPending(ch, M1, out, now, orders, down) {
-    var lk = lockFor(M1, out.lockUsed, now), base = E.lockSim(lk.lock), dm = downMap(M1, down);
-    if (dm) base.down = dm;
-    var res = E.simulate(M1, out.X, Object.assign({}, base, { collect: true }));
+    var dm = downMap(M1, down), sf = simFull(M1, out.X, out.lockUsed, now, dm), res = sf.res, base = sf.base;
     pending = { ch: ch, M: M1, X: out.X, res: res, an: E.analyze(M1, res, now), out: out, now: now, orders: orders, down: down, base: base,
       risk: E.risk(M1, out.X, base, V.noise ? NOISE : RISK, M1.n > 120 ? 20 : 40) };
     V.show = "new"; V.tab = "board"; V.hl = null; render();
     var el = document.getElementById("cmpBox"); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  function adopt() {
-    if (!pending) return;
-    var p = pending, old = cur && cur.plan;
-    S.orders = p.orders; S.down = p.down;
-    S.plan = planRecord(p.M, p.X, p.out.heur ? p.out : null, { now0: p.now, start: p.M.cal.start });
-    S.plan.lock = p.out.lockUsed || null;
-    if (!p.out.heur && old) {                         // 取捨圖上換一個點：沿用原本的比較資料
-      S.plan.heur = old.heur; S.plan.baseF = old.baseF; S.plan.history = old.history; S.plan.stats = old.stats;
-      S.plan.pareto = (old.pareto || []).map(function (q, k) { return Object.assign({}, q, { best: k === p.ch.paretoIdx }); });
-    } else V.lastOut = p.out;
-    V.lastOutPlan = S.plan;
-    logAdd(p.ch.desc);
-    pending = null; S.demo = false; save(); rebuild(); render();
-    toast("已採用新排程。");
-  }
+  function adopt() { adoptGate(); }
   function discard() { pending = null; render(); toast("已放棄，維持原排程。"); }
   var SHIFT = 30;                                   // 完工時間挪動超過 30 分鐘才算「有變」
   function diffStats(P0, P1) {
@@ -351,26 +374,31 @@
     P0.M.orders.forEach(function (od, i) { idx0[od.id] = i; });
     P1.M.orders.forEach(function (od, i) {
       var j = idx0[od.id]; if (j == null) return;
-      var d = Math.abs(P1.res.C[i] - P0.res.C[j]); n++; sh += d; if (d > SHIFT) moved++;
+      var d = Math.abs(P1.res.C[i] - convP(P0, P1, P0.res.C[j])); n++; sh += d; if (d > SHIFT) moved++;
     });
     return { n: n, moved: moved, avg: n ? sh / n : 0 };
   }
-  function logAdd(text) { S.log.unshift({ ts: Date.now(), text: text }); S.log = S.log.slice(0, 60); }
+  function convP(P0, P1, m) { return P0.M.cal.start === P1.M.cal.start ? m : P1.M.cal.fromDate(P0.M.cal.toDate(m, true)); }   // 舊排程的時間換成新排程日曆的工作分鐘
+  function logAdd(text) { S.log.unshift({ ts: Date.now(), by: who(), text: text }); S.log = S.log.slice(0, 60); }
 
   // ===========================================================================
   // 畫面
   // ===========================================================================
-  var TABS = [["board", "排程看板", "gantt"], ["orders", "訂單", "clipboard"], ["factory", "工廠設定", "factory"], ["method", "方法說明", "book"]];
+  var TABS = [["board", "排程看板", "gantt"], ["report", "進度回報", "check"], ["dash", "風險儀表板", "bars"], ["risk", "門檻設定", "shield"], ["audit", "採用紀錄", "list"], ["orders", "訂單", "clipboard"], ["factory", "工廠設定", "factory"], ["method", "方法說明", "book"]];
   function render() {
     CM = null;
     if (!TABS.some(function (t) { return t[0] === V.tab; })) V.tab = "board";
     var h = '<div id="schedMode"></div>'
       + '<div class="dbtabs erp-tabs">' + TABS.map(function (t) { return '<button class="dbtab' + (V.tab === t[0] ? " on" : "") + '" data-tab="' + t[0] + '">' + ic(t[2]) + t[1] + "</button>"; }).join("") + "</div>"
-      + '<div id="schedBusy"></div><div id="schedBody"></div>';
+      + '<div id="schedAlert"></div><div id="schedBusy"></div><div id="schedBody"></div>';
     mount.innerHTML = h;
-    paintMode(); paintBusy();
+    paintMode(); paintBusy(); paintAlert();
     var body = document.getElementById("schedBody");
     if (V.tab === "board") body.innerHTML = board();
+    else if (V.tab === "report") body.innerHTML = reportTab();
+    else if (V.tab === "dash") { body.innerHTML = dashTab(); if (authed() && Date.now() - (V.ntAt || 0) > 60000 && window.__noticePull) { V.ntAt = Date.now(); window.__noticePull(function () { if (V.tab === "dash") render(); }); } }
+    else if (V.tab === "risk") body.innerHTML = riskTab();
+    else if (V.tab === "audit") body.innerHTML = auditTab();
     else if (V.tab === "orders") body.innerHTML = ordersTab();
     else if (V.tab === "factory") body.innerHTML = factoryTab();
     else body.innerHTML = methodTab();
@@ -515,12 +543,21 @@
     return parts.join(" → ");
   }
   function orderStatus(P, i, now) {
+    var od = P.M.orders[i], a = S.act[od.id] || {}, sids = stageIdsOf(P.M, od), la = a[sids[sids.length - 1]];
+    if (la && la.e != null) return ["ok", la.src === "erp" ? "已完工（ERP）" : "已完工"];
+    if (sids.some(function (sid) { return a[sid] && (a[sid].s != null || a[sid].e != null); })) return ["info", "生產中"];
     var ops = P.res.ops.filter(function (op) { return op.o === i; });
     if (!ops.length) return ["", ""];
     var C = P.res.C[i], first = Math.min.apply(null, ops.map(function (op) { return op.start; }));
-    if (C <= now + 1e-6) return ["ok", "已完工"];
+    if (C <= now + 1e-6) return ["warn", "預計已完工（未回報）"];
     if (first < now) return ["info", "生產中"];
     return ["muted", "待生產"];
+  }
+  function actCell(P, i, od, C) {                    // 預計完工；已回報就顯示實際完工與誤差
+    var cal = P.M.cal, a = S.act[od.id] || {}, sids = stageIdsOf(P.M, od), la = a[sids[sids.length - 1]];
+    if (!la || la.e == null) return fmtDT(cal, C, true);
+    var pr = S.pred[od.id], pe = pr && pr.c != null ? cal.fromDate(pr.c) : C, d = cal.fromDate(la.e) - pe;
+    return "✓ " + fmtDT(cal, cal.fromDate(la.e), true) + '<div class="' + (Math.abs(d) >= S.grace ? "erp-bad" : "erp-good") + ' erp-muted">與預計差 ' + signedH(d) + "</div>";
   }
   function fmtD(cal, m, asEnd) {
     var d = new Date(cal.toDate(m, asEnd));
@@ -537,7 +574,7 @@
       return '<tr data-o="' + i + '"' + (V.hl === i ? ' class="sc-hlrow"' : "") + '><td class="nw"><span class="sc-dot" style="background:' + color(od.id) + '"></span><b>' + esc(od.id) + "</b>"
         + (od.weight >= 3 ? ' <span class="erp-st warn">急</span>' : od.weight >= 2 ? ' <span class="erp-st info">重要</span>' : "") + '<div class="erp-muted">' + esc(src.customer || "") + "</div></td>"
         + '<td><div class="nw">' + esc(M.prodNames[od.product]) + '</div><div class="erp-muted">' + od.qty.toLocaleString() + " 件</div></td>"
-        + '<td class="nw">' + (od.due != null ? fmtD(cal, od.due, true) : "—") + '</td><td class="nw">' + fmtDT(cal, C, true) + "</td>"
+        + '<td class="nw">' + (od.due != null ? fmtD(cal, od.due, true) : "—") + '</td><td class="nw">' + actCell(P, i, od, C) + "</td>"
         + '<td>' + lateTxt + why + "</td>"
         + "<td>" + (rk ? '<div class="sc-prob" title="加工時間有 ±' + Math.round((P === cur && cur.plan.noise || V.noise ? NOISE : RISK) * 100) + '% 誤差時，模擬多次裡準時的比例"><i style="width:' + Math.round(rk.onTimeProb * 100) + "%;background:" + (rk.onTimeProb >= 0.9 ? "var(--down)" : rk.onTimeProb >= 0.6 ? "#d68a2e" : "var(--up)") + '"></i><span>' + pct(rk.onTimeProb) + "</span></div>" : "") + "</td>"
         + '<td><span class="erp-st ' + st[0] + '">' + st[1] + "</span></td>"
@@ -625,7 +662,7 @@
     M1.orders.forEach(function (od, i) {
       var j = idx0[od.id], c1 = p.res.C[i];
       if (j == null) { ch.push({ id: od.id, txt: "新加入", c0: null, c1: c1, due: od.due }); return; }
-      var c0 = cur.res.C[j];
+      var c0 = convP(cur, p, cur.res.C[j]);
       if (Math.abs(c1 - c0) > SHIFT) ch.push({ id: od.id, c0: c0, c1: c1, due: od.due, d: c1 - c0 });
     });
     M0.orders.forEach(function (od) { if (!M1.orders.some(function (x) { return x.id === od.id; })) ch.push({ id: od.id, txt: "已取消" }); });
@@ -634,9 +671,10 @@
     return '<div class="erp-sec sc-cmp" id="cmpBox"><div class="erp-sechead"><h3>' + ic("scale") + "重排結果：" + esc(p.ch.desc) + "</h3>"
       + '<div class="erp-row"><button class="dbbtn" data-act="discard">' + ic("undo") + '放棄</button><button class="dbbtn primary" data-act="adopt">' + ic("check") + "採用新排程</button></div></div>"
       + '<div class="erp-muted">發生時間：' + fmtDT(cal, p.now) + " · 這之前已開工的工序都固定不動 · 原有的 " + dsx.n + " 張單裡，完工時間挪動超過 " + SHIFT + " 分鐘的有 <b>" + dsx.moved + "</b> 張（平均挪動 " + fmtDur(cal, dsx.avg) + "）</div>"
+      + gateSummaryHtml()
       + '<div class="sc-cmpgrid"><table class="sc-mtable"><thead><tr><th></th><th>原排程</th><th>新排程</th></tr></thead><tbody>'
       + row("平均生產週期", a.meanF, b.meanF, function (v) { return fmtDur(cal, v); }, true)
-      + row("全部完工", a.makespan, b.makespan, function (v) { return fmtDT(cal, v, true); }, true)
+      + row("全部完工", convP(cur, p, a.makespan), b.makespan, function (v) { return fmtDT(cal, v, true); }, true)
       + row("延遲張數", s0.late.length, s1.late.length, function (v) { return v + " 張"; }, true)
       + row("最多晚", s0.maxLate, s1.maxLate, function (v) { return v > 0 ? fmtDur(cal, v) : "—"; }, true)
       + row("換線", a.setups, b.setups, function (v) { return v + " 次"; }, true)
@@ -652,7 +690,7 @@
   function logBox() {
     if (!S.log.length) return "";
     return '<div class="erp-sec"><div class="erp-sechead"><h3>' + ic("list") + "異動紀錄</h3></div><ul class=\"sc-log\">"
-      + S.log.slice(0, 10).map(function (l) { return "<li><span>" + fmtWhen(l.ts) + "</span>" + esc(l.text) + "</li>"; }).join("") + "</ul></div>";
+      + S.log.slice(0, 10).map(function (l) { return "<li><span>" + fmtWhen(l.ts) + "</span>" + (l.by ? "<em>" + esc(l.by) + "</em> " : "") + esc(l.text) + "</li>"; }).join("") + "</ul></div>";
   }
 
   // ---------------------------------------------------------------------------
@@ -859,6 +897,11 @@
       try { if (onOk(v) !== false) close(); } catch (err) { form.querySelector(".sc-err").textContent = err.message || String(err); }
     });
     fields.forEach(function (f) { if (f.onInput) form.addEventListener("input", function (e) { f.onInput(form, e); }); });
+    form.addEventListener("click", function (e) {      // 進度回報的「用預計」：一鍵把預計時間填進去
+      var bt = e.target.closest && e.target.closest("[data-fill]"); if (!bt) return;
+      var q = bt.getAttribute("data-fill").split("|"), f = form.elements;
+      if (f["s_" + q[0]]) f["s_" + q[0]].value = q[1]; if (f["e_" + q[0]]) f["e_" + q[0]].value = q[2];
+    });
     var first = form.querySelector("input,select"); if (first) first.focus();
     return form;
   }
@@ -1125,7 +1168,7 @@
   function cfgChanged() {
     try { E.compile(planCfg(), S.orders.filter(function (o) { return S.cfg.products.some(function (p) { return p.id === o.product; }); })); }
     catch (e) { toast("設定有問題：" + e.message, true); }
-    S.demo = false; save(); rebuild();
+    S.demo = false; logCfg(); save(); rebuild();
   }
   function editProduct(k) {
     var c = S.cfg, p = k == null ? { id: "", name: "", split: [50, 100], batch: 400, route: {} } : c.products[k];
@@ -1221,6 +1264,612 @@
   // ===========================================================================
   // 事件
   // ===========================================================================
+  // ===========================================================================
+  // 風險監控（KRI）：評估、觸發紀錄、警示列、給首頁／選單／早報用的快照
+  //   風險 → 監控指標(KRI) → 容忍度門檻(黃／紅) → 觸發（畫面警示、建議動作、紀錄）→ 處理
+  // ===========================================================================
+  function stageIdsOf(M, od) { return M.stages.filter(function (st, s) { return od.optType[s][0] !== E.SKIP; }).map(function (st) { return st.id; }); }
+  function stagePredOf(P, i, sid) {                  // 目前這個畫面的排程，這張單在這一站的預計 [開始, 完成]（工作分鐘）
+    var s = -1; P.M.stages.forEach(function (x, k) { if (x.id === sid) s = k; });
+    var ops = P.res.ops.filter(function (op) { return op.o === i && op.s === s; });
+    if (!ops.length) return null;
+    return [Math.min.apply(null, ops.map(function (o) { return o.start; })), Math.max.apply(null, ops.map(function (o) { return o.end; }))];
+  }
+  function actsList(M) {                             // 現場回報 → 引擎用的格式（工作分鐘）
+    var cal = M.cal, out = [];
+    M.orders.forEach(function (od) {
+      var a = S.act[od.id]; if (!a) return;
+      M.stages.forEach(function (st) {
+        var x = a[st.id]; if (!x || x.e == null) return;
+        out.push({ id: od.id, sid: st.id, start: x.s != null ? Math.max(0, cal.fromDate(x.s)) : undefined, end: Math.max(0, cal.fromDate(x.e)) });
+      });
+    });
+    return out;
+  }
+  // 依決策 X 模擬出排程；已回報完工的站，照實際時間凍結（機台提早／延後釋放、下游跟著動）
+  function simFull(M, X, lockL, now0, down) {
+    var lk = lockFor(M, lockL, now0), base = E.lockSim(lk.lock);
+    if (down) base.down = down;
+    var res = E.simulate(M, X, Object.assign({}, base, { collect: true })), acts = actsList(M);
+    if (acts.length) {
+      var L0 = lk.ok && lockL ? lockL : { now: now0 || 0, sig: M.sig, fixed: {}, genes: {} };
+      var lk2 = lockFor(M, E.applyActuals(M, X, res, acts, L0), now0);
+      if (lk2.ok) { base = E.lockSim(lk2.lock); if (down) base.down = down; res = E.simulate(M, X, Object.assign({}, base, { collect: true })); lk = lk2; }
+    }
+    return { res: res, base: base, lk: lk, acts: acts };
+  }
+  // ---------------------------------------------------------------------------
+  // 風險儀表板：歷史、趨勢、熱度圖、最近惡化、單一指標的曲線
+  // ---------------------------------------------------------------------------
+  function leadCtx(P) {                             // 領先指標：未來 5 個工作日的負荷、交期緩衝、準時機率、外包佔比
+    var M = P.M, cal = M.cal, per = cal.per, now = nowMin(cal), W = 5 * per, end = now + W, res = P.res;
+    var units = M.stages.map(function (st) { var n = 0; st.types.forEach(function (ti) { n += M.types[ti].count; }); return n; });
+    var done = M.orders.map(function (od) { var a = S.act[od.id] || {}, sids = stageIdsOf(M, od), la = a[sids[sids.length - 1]]; return !!(la && la.e != null); });
+    var load = M.stages.map(function () { return 0; }), slackSum = 0, slackN = 0, probSum = 0, probN = 0, outQ = 0, totQ = 0, outOrd = {};
+    res.ops.forEach(function (op) {
+      if (done[op.o]) return;
+      if (op.kind === "out") { outOrd[op.o] = 1; return; }
+      var od = M.orders[op.o];
+      if (od.due != null && od.due <= end && op.end > now) load[op.s] += op.end - Math.max(op.start, now);
+    });
+    M.orders.forEach(function (od, i) {
+      if (done[i]) return;
+      totQ += od.qty; if (outOrd[i]) outQ += od.qty;
+      if (od.due != null) { slackSum += od.due - res.C[i]; slackN++; if (P.risk && P.risk[i]) { probSum += P.risk[i].onTimeProb; probN++; } }
+    });
+    var best = null, name = "";
+    M.stages.forEach(function (st, s) { if (!units[s]) return; var r = load[s] / (units[s] * W); if (best == null || r > best) { best = r; name = st.name; } });
+    return { load: best, loadName: name, slack: slackN ? slackSum / slackN : null, prob: probN ? probSum / probN : null, outPct: totQ ? outQ / totQ : null };
+  }
+  function histPush(items, changed) {               // 每 30 分鐘最多記一筆（燈號有變就立刻記），最多留 600 筆
+    var now = Date.now(), last = S.hist[S.hist.length - 1];
+    if (last && now - last.t < 30 * 60000 && !changed) return false;
+    var v = {}; items.forEach(function (x) { if (x.value != null && isFinite(x.value)) v[x.id] = Math.round(x.value * 100) / 100; });
+    S.hist.push({ t: now, v: v });
+    if (S.hist.length > 600) { var old = S.hist.splice(0, 200).filter(function (p, k) { return k % 2 === 0; }); S.hist = old.concat(S.hist); }
+    return true;
+  }
+  var histT = null;
+  function publishHist() {
+    if (!authed()) return;
+    clearTimeout(histT);
+    histT = setTimeout(function () {
+      var b = bridge(); if (!b || !b.authed()) return;
+      var rows = strRows("hist", JSON.stringify(S.hist)), ids = rows.map(function (r) { return r.id; }), stale = (S.histIds || []).filter(function (id) { return ids.indexOf(id) < 0; });
+      putRows(b, rows, "sched_hist").then(function (d) { if (d && !d.error) { S.histIds = ids; stale.forEach(function (id) { b.call("tRemove", { table: "sched_hist", id: id }); }); } });
+    }, 2000);
+  }
+  function loadHist(b) {                            // 登入後讀回公司端累積的歷史（比較長的那份留下）
+    b.call("tList", { table: "sched_hist" }).then(function (d) {
+      if (!d || !d.rows || !d.rows.length) return;
+      var rows = d.rows.map(function (r) { return { id: String(r.id), data: String(r.data == null ? "" : r.data).replace(/^~/, "") }; }), arr = blobGet("hist", rows);
+      S.histIds = rows.map(function (r) { return r.id; });
+      if (arr && arr.length >= S.hist.length) { S.hist = arr; lsSet(KEY, S); if (cur && cur.M) { kriTick(); if (V.tab === "dash") render(); } }
+    });
+  }
+  function histOf(id, days) { var cut = Date.now() - days * 86400000; return S.hist.filter(function (p) { return p.t >= cut && p.v[id] != null; }).map(function (p) { return [p.t, p.v[id]]; }); }
+  function trendText(x, tr) {
+    if (!tr || tr.dir === "none") return '<span class="sc-tr none">資料累積中</span>';
+    var t = tr.dir === "worse" ? '<span class="sc-tr worse">▲ 惡化中</span>' : tr.dir === "better" ? '<span class="sc-tr better">▼ 改善中</span>' : '<span class="sc-tr flat">● 持平</span>';
+    if (tr.eta) t += ' <span class="sc-eta">預計 ' + (tr.eta.days < 1 ? "不到 1 天" : tr.eta.days.toFixed(1).replace(/\.0$/, "") + " 天") + "後轉" + (tr.eta.to === "red" ? "紅燈" : "黃燈") + "</span>";
+    return t;
+  }
+  function svgChart(x, w, h, days, big) {
+    var pts = histOf(x.id, days);
+    if (pts.length < 2) return '<span class="erp-muted">歷史累積中（每 30 分鐘記一筆）</span>';
+    var vs = pts.map(function (p) { return p[1]; }).concat([x.y]); if (x.r != null) vs.push(x.r);
+    var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs); if (mx - mn < 1e-9) { mx += 1; mn -= 1; }
+    var padv = (mx - mn) * 0.08; mn -= padv; mx += padv;
+    var L = big ? 44 : 2, R = big ? 8 : 2, T = big ? 8 : 3, B = big ? 22 : 3, t0 = pts[0][0], t1 = pts[pts.length - 1][0];
+    function X(t) { return L + (t - t0) / Math.max(1, t1 - t0) * (w - L - R); }
+    function Y(v) { return T + (mx - v) / (mx - mn) * (h - T - B); }
+    var d = pts.map(function (p, k) { return (k ? "L" : "M") + X(p[0]).toFixed(1) + "," + Y(p[1]).toFixed(1); }).join("");
+    var g = '<line class="ch-y" x1="' + L + '" x2="' + (w - R) + '" y1="' + Y(x.y) + '" y2="' + Y(x.y) + '"/>';
+    if (x.r != null) g += '<line class="ch-r" x1="' + L + '" x2="' + (w - R) + '" y1="' + Y(x.r) + '" y2="' + Y(x.r) + '"/>';
+    g += '<path class="ch-l" d="' + d + '"/><circle class="ch-d lv-' + x.level + '" cx="' + X(t1) + '" cy="' + Y(pts[pts.length - 1][1]) + '" r="' + (big ? 4 : 2.6) + '"/>';
+    if (big) {
+      g += '<text class="ch-t" x="' + (L - 4) + '" y="' + (Y(mx - padv) + 4) + '" text-anchor="end">' + (+(mx - padv).toFixed(1)) + '</text><text class="ch-t" x="' + (L - 4) + '" y="' + (Y(mn + padv) + 4) + '" text-anchor="end">' + (+(mn + padv).toFixed(1)) + "</text>"
+        + '<text class="ch-t" x="' + L + '" y="' + (h - 6) + '">' + esc(fmtWhen(t0)) + '</text><text class="ch-t" x="' + (w - R) + '" y="' + (h - 6) + '" text-anchor="end">' + esc(fmtWhen(t1)) + "</text>"
+        + '<text class="ch-ty" x="' + (w - R - 2) + '" y="' + (Y(x.y) - 3) + '" text-anchor="end">黃線 ' + x.y + "</text>" + (x.r != null ? '<text class="ch-tr" x="' + (w - R - 2) + '" y="' + (Y(x.r) - 3) + '" text-anchor="end">紅線 ' + x.r + "</text>" : "");
+    }
+    return '<svg class="sc-spark' + (big ? " big" : "") + '" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '">' + g + "</svg>";
+  }
+  function alertsBox() {                             // 自動通知送出的警示：誰收到、有沒有人處理
+    if (!authed()) return "";
+    var nt = lsGet("sched_notice_v1") || {}, al = nt.alerts || {}, hb = nt.hb || 0;
+    var act = Object.keys(al).map(function (k) { return al[k]; }).filter(function (x) { return Number(x.active) === 1; });
+    var rows = act.map(function (x) {
+      var ack = Number(x.ack) === 1;
+      return "<tr><td>" + lvTag(x.level) + "<b>" + esc(x.name) + "</b>（" + esc(x.display) + ")</td><td class=\"nw\">" + esc(x.owner || "") + "</td><td class=\"nw\">" + (x.first ? fmtWhen(Number(x.first)) : "—") + "</td><td>" + (ack ? '<span class="erp-good">✓ ' + esc(x.ackBy || "") + " 已知悉</span>" : x.level === "red" && Number(x.esc) === 1 ? '<span class="erp-bad">已升級通知老闆，尚未處理</span>' : '<span class="erp-warn">尚未處理</span>') + "</td><td>" + (ack ? "" : '<button class="dbmini" data-nack="' + esc(x.id) + '">已知悉</button>') + "</td></tr>";
+    }).join("");
+    var warn = !hb ? "自動通知排程還沒啟用（要貼上 sched-alerts.gs 並執行 installSchedAlertTrigger）" : "";
+    return '<div class="erp-sec"><div class="erp-sechead"><h3>' + ic("bell") + "待處理的警示（自動通知）</h3><button class=\"dbmini\" data-tab=\"risk\">通知設定</button></div>"
+      + (warn ? '<div class="erp-bad">' + esc(warn) + "</div>" : "")
+      + (rows ? '<div class="dbtablewrap"><table class="dbtable erp-table"><thead><tr><th>警示</th><th>負責人</th><th>開始時間</th><th>處理狀態</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div>" : '<div class="erp-muted">' + (hb ? "目前沒有待處理的警示。" : "") + "</div>") + "</div>";
+  }
+  function dashTab() {
+    if (!cur || !cur.M || !V.kri) return '<div class="erp-sec sc-empty"><h3>' + ic("bars") + "風險儀表板</h3><p>要先到「排程看板」按「開始排程」，儀表板才有東西可以看。</p></div>";
+    var items = V.kri, tr = V.trend || {}, c = K.counts(items), now = Date.now();
+    var rising = items.filter(function (x) { return tr[x.id] && tr[x.id].dir === "worse"; }), soon = items.filter(function (x) { return tr[x.id] && tr[x.id].eta; });
+    var wk = {}; S.events.forEach(function (e) { if (!e.type && e.up && now - e.ts < 7 * 86400000 && e.to !== "green") wk[e.id] = 1; });
+    var sel = items.filter(function (x) { return x.id === V.dsel; })[0] || rising[0] || items.filter(function (x) { return x.level === "red"; })[0] || items.filter(function (x) { return x.level === "yellow"; })[0] || items.filter(function (x) { return x.level !== "na"; })[0] || items[0];
+    var grp = "", tiles = "";
+    items.forEach(function (x) {
+      if (x.grp !== grp) { tiles += (grp ? "</div>" : "") + '<div class="sc-tilegrp">' + esc(x.grp) + '</div><div class="sc-tiles">'; grp = x.grp; }
+      var t = tr[x.id];
+      tiles += '<div class="sc-tile lv-' + x.level + (x.id === sel.id ? " sel" : "") + (t && t.dir === "worse" ? " worse" : "") + '" data-dsel="' + x.id + '" title="' + esc(x.hint) + '"><div class="sc-tile-h">' + lvTag(x.level) + "<b>" + esc(x.name) + '</b></div><div class="sc-tile-v">' + esc(x.display) + " " + trendText(x, t) + '</div><div class="sc-tile-s">' + (x.level === "na" ? '<span class="erp-muted">還沒有資料</span>' : svgChart(x, 150, 30, 7, false)) + "</div></div>";
+    });
+    tiles += "</div>";
+    var rank = items.filter(function (x) { return x.level !== "na" && ((tr[x.id] && tr[x.id].dir === "worse") || x.level !== "green"); }).sort(function (a, b) {
+      var ea = tr[a.id] && tr[a.id].eta ? tr[a.id].eta.days : 99, eb = tr[b.id] && tr[b.id].eta ? tr[b.id].eta.days : 99;
+      return ea - eb || K.LV[b.level] - K.LV[a.level];
+    }).slice(0, 6);
+    var rk = rank.map(function (x, k) { return '<li data-dsel="' + x.id + '"><span class="sc-rk">' + (k + 1) + "</span>" + lvTag(x.level) + "<b>" + esc(x.name) + "</b>（" + esc(x.display) + "） " + trendText(x, tr[x.id]) + "</li>"; }).join("");
+    var st = tr[sel.id], hasH = histOf(sel.id, 14).length;
+    var detail = '<div class="sc-detail lv-' + sel.level + '"><div class="sc-dh">' + lvTag(sel.level) + "<b>" + esc(sel.name) + '</b><span class="erp-muted">　' + esc(sel.risk) + "</span></div>"
+      + '<div class="sc-dgrid"><div><div class="sc-big">' + esc(sel.display) + "</div><div>" + trendText(sel, st) + "</div>"
+      + '<div class="erp-muted" style="margin-top:6px">門檻：' + esc(K.thresholdText(sel)) + "<br>負責人：" + esc(sel.owner) + "<br>" + esc(sel.hint) + "</div>"
+      + (sel.msg ? '<div class="sc-dmsg">' + esc(sel.msg) + ' <button class="dbmini" data-kact="' + sel.action + '">' + esc(sel.actionLabel) + "</button></div>" : "") + "</div>"
+      + "<div>" + (sel.level === "na" ? '<span class="erp-muted">還沒有資料</span>' : svgChart(sel, 620, 170, 14, true)) + (hasH < 2 ? "" : '<div class="erp-muted">最近 14 天；虛線是黃線、紅線。</div>') + "</div></div></div>";
+    var ev = S.events.filter(function (e) { return !e.type; }).slice(0, 8).map(function (e) { return "<li><span>" + fmtWhen(e.ts) + "</span>" + (e.up ? "▲ " : "▼ ") + lvTag(e.from === "na" ? "green" : e.from) + " → " + lvTag(e.to) + " <b>" + esc(e.name) + "</b>（" + esc(e.display) + "）</li>"; }).join("");
+    return alertsBox() + '<div class="cards sc-kpis four">'
+      + kpiCard("紅燈", "alert", c.red + " 項", "已經越線、要處理", null, c.red ? false : null)
+      + kpiCard("黃燈", "info", c.yellow + " 項", "接近風險、要注意", null)
+      + kpiCard("惡化中", "chart", rising.length + " 項", "連續往壞的方向走" + (Object.keys(wk).length ? "；本週新轉壞 " + Object.keys(wk).length + " 項" : ""), null, rising.length ? false : null)
+      + kpiCard("預計 3 天內轉壞", "clock", soon.length + " 項", soon.length ? soon.slice(0, 2).map(function (x) { return x.name; }).join("、") : "照目前速度，3 天內不會碰到下一道門檻", null, soon.length ? false : null) + "</div>"
+      + '<div class="erp-sec"><div class="erp-sechead"><h3>' + ic("bars") + "風險熱度圖（點一格看曲線）</h3><span class=\"erp-muted\">顏色＝燈號；小曲線＝最近 7 天；虛線＝黃線、紅線</span></div>" + tiles + "</div>"
+      + '<div class="erp-grid2"><div class="erp-sec"><div class="erp-sechead"><h3>' + ic("alert") + "最近惡化排行（最該先處理的在最上面）</h3></div>" + (rk ? '<ol class="sc-rank">' + rk + "</ol>" : '<div class="erp-muted">目前沒有亮燈或惡化中的指標。</div>') + "</div>"
+      + '<div class="erp-sec"><div class="erp-sechead"><h3>' + ic("list") + "最近燈號變化</h3><button class=\"dbmini\" data-tab=\"risk\">門檻與完整紀錄</button></div>" + (ev ? '<ul class="sc-log sc-evlog">' + ev + "</ul>" : '<div class="erp-muted">還沒有燈號變化。</div>') + "</div></div>"
+      + '<div class="erp-sec"><div class="erp-sechead"><h3>' + ic("bars") + "指標明細</h3></div>" + detail + "</div>"
+      + '<div class="erp-muted">歷史每 30 分鐘記一筆（燈號變化時立刻記），最多保留 600 筆；趨勢要累積至少 3 筆、跨 2 小時以上才會判斷。「預計 N 天後轉黃／紅」是用最近幾筆的速度外推，只是預警，不是保證。</div>';
+  }
+
+  function kriCtx(P, isPending) {
+    var M = P.M, cal = M.cal, tm = function (ms) { return cal.fromDate(ms); }, nowMs = Date.now(), st = stats(P);
+    var orders = M.orders.map(function (od, i) {
+      var a = S.act[od.id] || {}, pr = S.pred[od.id] || null, sids = stageIdsOf(M, od), la = a[sids[sids.length - 1]];
+      return {
+        id: od.id, planned: !!pr, predEnd: pr && pr.c != null ? tm(pr.c) : P.res.C[i],
+        actEnd: la && la.e != null ? tm(la.e) : null, actInferred: !!(la && la.inferred),
+        stages: sids.map(function (sid) {
+          var ps = pr && pr.st && pr.st[sid] ? [tm(pr.st[sid][0]), tm(pr.st[sid][1])] : stagePredOf(P, i, sid), x = a[sid];
+          return { sid: sid, pred: ps, act: x ? { s: x.s != null ? tm(x.s) : null, e: x.e != null ? tm(x.e) : null, inferred: !!x.inferred } : null };
+        })
+      };
+    });
+    var shaky = 0; if (P.risk) P.risk.forEach(function (r, i) { if (M.orders[i].due != null && r.onTimeProb < 0.7) shaky++; });
+    var sum = E.summarize(P.res);
+    return { nowMin: nowMin(cal), grace: S.grace, stageName: stageName, orders: orders,
+      plan: isPending ? { ageDays: 0, fresh: 0, cfgChanged: false } : { ageDays: (nowMs - (S.plan.at || nowMs)) / 86400000, fresh: cur.fresh.length, cfgChanged: !!cur.cfgChanged },
+      stats: { hasDue: st.hasDue, late: st.late.length, onTimeRate: sum.onTimeRate, maxLate: st.maxLate, outCost: st.outCost, shaky: P.risk ? shaky : null },
+      util: P.an && P.an.bottleneck ? P.an.bottleneck.util : null, lead: leadCtx(P) };
+  }
+  function kriTick() {                               // 重算燈號；有變化就寫「觸發紀錄」並更新快照
+    if (!cur || !cur.M || !cur.res) { V.kri = null; return []; }
+    var items = K.evaluate(kriCtx(cur, false), S.tol), ev = K.transitions(S.lastLv, items);
+    if (ev.length) {
+      var by = who();
+      ev.forEach(function (e) { S.events.unshift(Object.assign({ ts: Date.now(), by: by }, e)); });
+      S.events = S.events.slice(0, 150);
+    }
+    S.lastLv = K.levels(items); V.kri = items;
+    var pushed = histPush(items, ev.length > 0); V.trend = K.trends(S.hist, items);
+    if (ev.length || pushed) { save(); if (pushed) publishHist(); }
+    publishKri(items);
+    return ev;
+  }
+  var kriT = null, kriLast = "";
+  function publishKri(items) {
+    if (!items || !cur || !cur.M) return;
+    var M = cur.M, cal = M.cal;
+    var ob = M.orders.map(function (od, i) {
+      var pr = S.pred[od.id], a = S.act[od.id] || {}, sids = stageIdsOf(M, od), la = a[sids[sids.length - 1]], src = S.orders.filter(function (x) { return x.id === od.id; })[0] || {};
+      return { id: od.id, pe: pr && pr.c != null ? pr.c : cal.toDate(cur.res.C[i], true), ae: la && la.e != null ? la.e : null, due: od.due != null ? cal.toDate(od.due, true) : null, erp: src.erpRef || null };
+    });
+    var tr = V.trend || {}, soonL = items.filter(function (x) { return tr[x.id] && tr[x.id].eta; }).map(function (x) { return { id: x.id, name: x.name, to: tr[x.id].eta.to, days: Math.round(tr[x.id].eta.days * 10) / 10 }; });
+    var snap = K.snapshot(items, { by: who(), orders: ob, grace: S.grace, rising: items.filter(function (x) { return tr[x.id] && tr[x.id].dir === "worse"; }).length, soon: soonL });
+    lsSet("sched_kri_v1", snap);
+    var sig = JSON.stringify(snap.items) + snap.worst + JSON.stringify(ob);
+    if (sig === kriLast) return;
+    kriLast = sig;
+    if (!authed()) return;
+    clearTimeout(kriT);
+    kriT = setTimeout(function () {                  // 另存一張小表 sched_kri：首頁、選單紅點、每日早報讀這張，不必載入整份排程
+      var b = bridge(); if (!b || !b.authed()) return;
+      var rows = strRows("kri", JSON.stringify(snap)), ids = rows.map(function (r) { return r.id; }), stale = (S.kriIds || []).filter(function (id) { return ids.indexOf(id) < 0; });
+      putRows(b, rows, "sched_kri").then(function (d) { if (d && !d.error) { S.kriIds = ids; stale.forEach(function (id) { b.call("tRemove", { table: "sched_kri", id: id }); }); } });
+    }, 1500);
+  }
+  function lvTag(level) { return '<span class="sc-lv lv-' + level + '">' + K.LABEL[level] + "</span>"; }
+  function paintAlert() {
+    var el = document.getElementById("schedAlert"); if (!el) return;
+    var items = V.kri;
+    if (!items) { el.innerHTML = ""; return; }
+    var c = K.counts(items), bad = items.filter(function (x) { return x.level === "red" || x.level === "yellow"; }).sort(function (a, b) { return K.LV[b.level] - K.LV[a.level]; });
+    if (!bad.length) {
+      el.innerHTML = '<div class="sc-alert ok">' + ic("check") + "<b>風險燈號：全部正常</b><span>（" + c.green + " 項正常、" + c.na + " 項還沒有資料）</span>"
+        + '<button class="dbmini" data-tab="dash">看風險儀表板</button></div>'; return;
+    }
+    el.innerHTML = '<div class="sc-alert ' + (c.red ? "red" : "yellow") + '"><div class="sc-alert-head">' + ic("alert") + "<b>風險燈號：" + (c.red ? c.red + " 項紅燈" : "") + (c.red && c.yellow ? "、" : "") + (c.yellow ? c.yellow + " 項黃燈" : "") + "</b>"
+      + '<button class="dbmini" data-tab="dash">看風險儀表板</button></div>'
+      + bad.slice(0, 5).map(function (x) {
+        return '<div class="sc-alrow">' + lvTag(x.level) + "<span><b>" + esc(x.name) + "</b>（" + esc(x.display) + "）" + esc(x.msg) + "</span>"
+          + '<button class="dbmini" data-kact="' + x.action + '">' + esc(x.actionLabel) + "</button></div>";
+      }).join("") + (bad.length > 5 ? '<div class="erp-muted">…另外還有 ' + (bad.length - 5) + " 項，到「風險儀表板」看。</div>" : "") + "</div>";
+  }
+  function doKact(a) {                               // 警示列／監控表的「建議動作」
+    if (a === "report") { V.tab = "report"; history.replaceState(null, "", "#tab=report"); render(); }
+    else if (a === "factory") { V.tab = "factory"; history.replaceState(null, "", "#tab=factory"); render(); }
+    else if (a === "board") { V.tab = "board"; history.replaceState(null, "", "#tab=board"); render(); }
+    else if (a === "reopt") { V.tab = "board"; render(); reschedule({ desc: "重新最佳化（風險燈號建議）" }); }
+    else if (a === "fresh") { V.tab = "board"; render(); if (!confirm("從頭排程會把還沒做的全部重排（已回報完工的站不動），確定？")) return; planFresh(); }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 進度回報：每一站的實際開工／完工；ERP 工單完工自動帶入整張單完工
+  // ---------------------------------------------------------------------------
+  function msOf(x) { return x == null ? null : x; }
+  function fmtMs(cal, ms, asEnd) { return fmtDT(cal, cal.fromDate(ms), asEnd); }
+  function signedH(min) { var h = Math.abs(min) / 60; return (min >= 0 ? "+" : "−") + (h >= 10 ? h.toFixed(0) : h.toFixed(1)).replace(/\.0$/, "") + " 小時"; }
+  function reportTab() {
+    if (!cur || !cur.M) return '<div class="erp-sec sc-empty"><h3>' + ic("check") + "進度回報</h3><p>要先到「排程看板」按「開始排程」，才有「預計時間」可以和現場實際對照。</p></div>";
+    var M = cur.M, cal = M.cal, nowM = nowMin(cal), grace = S.grace, items = V.kri || [];
+    var pick = function (id) { return items.filter(function (x) { return x.id === id; })[0] || { display: "—", level: "na" }; };
+    var rows = M.orders.map(function (od, i) {
+      var sids = stageIdsOf(M, od), a = S.act[od.id] || {}, pr = S.pred[od.id];
+      var predEnd = pr && pr.c != null ? cal.fromDate(pr.c) : cur.res.C[i];
+      return { i: i, od: od, sids: sids, a: a, pr: pr, predEnd: predEnd };
+    }).sort(function (x, y) { return x.predEnd - y.predEnd; });
+    var head = M.stages.map(function (s) { return "<th>" + esc(s.name) + "</th>"; }).join("");
+    var body = rows.map(function (r) {
+      var cells = M.stages.map(function (st, s) {
+        if (r.sids.indexOf(st.id) < 0) return '<td class="erp-muted">—</td>';
+        var x = r.a[st.id], pp = r.pr && r.pr.st && r.pr.st[st.id] ? [cal.fromDate(r.pr.st[st.id][0]), cal.fromDate(r.pr.st[st.id][1])] : stagePredOf(cur, r.i, st.id);
+        var pe = pp ? pp[1] : null;
+        if (x && x.e != null) {
+          var d = pe != null ? cal.fromDate(x.e) - pe : null, cls = d == null ? "" : Math.abs(d) >= grace ? "erp-bad" : "erp-good";
+          return '<td class="sc-rc done"><div>' + (x.inferred ? '<span class="erp-st muted" title="ERP 工單完工，這一站是推定做完；請補上實際時間">~ 推定</span>' : "✓ ") + " " + esc(fmtMs(cal, x.e, true)) + "</div>"
+            + (d != null ? '<div class="' + cls + ' sc-rd">' + signedH(d) + (x.src === "erp" ? " · ERP" : "") + "</div>" : "") + "</td>";
+        }
+        if (x && x.s != null) return '<td class="sc-rc"><div>◐ 開工 ' + esc(fmtMs(cal, x.s)) + '</div><div class="erp-muted sc-rd">預計 ' + (pe != null ? esc(fmtDT(cal, pe, true)) : "—") + "</div></td>";
+        if (pe != null && pe + grace < nowM) return '<td class="sc-rc late"><div class="erp-bad">! 逾時未回報</div><div class="erp-muted sc-rd">預計 ' + esc(fmtDT(cal, pe, true)) + "</div></td>";
+        return '<td class="sc-rc"><div class="erp-muted">預計 ' + (pe != null ? esc(fmtDT(cal, pe, true)) : "—") + "</div></td>";
+      }).join("");
+      var lastA = r.a[r.sids[r.sids.length - 1]], tot = "";
+      if (lastA && lastA.e != null) {
+        var e = cal.fromDate(lastA.e) - r.predEnd; tot = '<span class="' + (Math.abs(e) >= grace ? "erp-bad" : "erp-good") + '">' + (lastA.inferred ? "ERP 完工 " : "已完工 ") + signedH(e) + "</span>";
+      } else tot = '<span class="erp-muted">未完工</span>';
+      return '<tr data-rep="' + r.i + '"><td class="nw"><span class="sc-dot" style="background:' + color(r.od.id) + '"></span><b>' + esc(r.od.id) + '</b><div class="erp-muted">' + esc(M.prodNames[r.od.product]) + "</div></td>" + cells + "<td class=\"nw\">" + tot + "</td></tr>";
+    }).join("");
+    var erpN = 0; M.orders.forEach(function (od) { var a = S.act[od.id] || {}, sids = stageIdsOf(M, od), la = a[sids[sids.length - 1]]; if (la && la.src === "erp") erpN++; });
+    return '<div class="cards sc-kpis four">'
+      + kpiCard("各站完工回報率", "check", pick("D5").display, "已到期的站有幾成回報（寬限 " + fmtDur(cal, grace) + "）", null, pick("D5").level === "red" ? false : null)
+      + kpiCard("逾時沒回報", "alert", pick("D4").display, "預計完工已過寬限時間", null, pick("D4").level === "red" ? false : null)
+      + kpiCard("最近完工的預測誤差", "clock", pick("D1").display, "實際完工 − 預計完工", null, pick("D1").level === "red" ? false : null)
+      + kpiCard("ERP 自動帶入", "factory", erpN + " 張", "ERP 工單完工 → 整張單完工", null) + "</div>"
+      + '<div class="erp-sec"><div class="erp-sechead"><h3>' + ic("check") + "進度回報（每一站）</h3><div class=\"erp-row\">"
+      + '<button class="dbbtn" data-act="erpsync">' + ic("factory") + "從 ERP 帶入完工</button></div></div>"
+      + '<div class="erp-muted">點一列回報那張單的每一站「實際開工／完工」。ERP 的工單一按完工，會自動帶入「整張單完工」；各站的時間請現場補上（ERP 推定的站不算已回報）。預計完工過了 ' + esc(fmtDur(cal, grace)) + " 還沒回報會亮燈。回報後排程會照實際進度調整，之後重排也以它為準。</div>"
+      + '<div class="dbtablewrap"><table class="dbtable erp-table sc-reptbl"><thead><tr><th>訂單</th>' + head + "<th>整張單</th></tr></thead><tbody>" + (body || '<tr><td colspan="9" class="dbempty">沒有訂單。</td></tr>') + "</tbody></table></div></div>";
+  }
+  function reportDialog(oi) {
+    var M = cur.M, cal = M.cal, od = M.orders[oi], sids = stageIdsOf(M, od), a0 = S.act[od.id] || {}, pr = S.pred[od.id];
+    var rowsH = sids.map(function (sid) {
+      var x = a0[sid], pp = pr && pr.st && pr.st[sid] ? [pr.st[sid][0], pr.st[sid][1]] : (function () { var q = stagePredOf(cur, oi, sid); return q ? [cal.toDate(q[0]), cal.toDate(q[1], true)] : null; })();
+      var tag = x && x.inferred ? ' <span class="erp-st muted">ERP 推定</span>' : x && x.src === "erp" ? ' <span class="erp-st info">ERP</span>' : "";
+      return "<tr><td class=\"nw\"><b>" + esc(stageName(sid)) + "</b>" + tag + '</td><td class="erp-muted">' + (pp ? esc(fmtMs(cal, pp[0])) + " → " + esc(fmtMs(cal, pp[1], true)) : "—") + "</td>"
+        + '<td><input type="datetime-local" name="s_' + esc(sid) + '" value="' + (x && x.s != null ? localInput(x.s) : "") + '"></td>'
+        + '<td><input type="datetime-local" name="e_' + esc(sid) + '" value="' + (x && x.e != null ? localInput(x.e) : "") + '"></td>'
+        + "<td>" + (pp ? '<button type="button" class="dbmini" data-fill="' + esc(sid) + "|" + localInput(Math.min(pp[0], Date.now())) + "|" + localInput(Math.min(pp[1], Date.now())) + '" title="預計時間；還在未來的就填現在">用預計</button>' : "") + "</td></tr>";
+    }).join("");
+    var html = '<div class="sc-rep"><table class="sc-reptbl2"><thead><tr><th>站別</th><th>預計</th><th>實際開工</th><th>實際完工</th><th></th></tr></thead><tbody>' + rowsH + "</tbody></table></div>";
+    dialog("回報進度：" + od.id + " " + M.prodNames[od.product], "填每一站的實際時間；沒開工紀錄可以只填完工（視為照預計時間開工）；留白＝還沒做。<b>前面的站要先回報，後面的站才能回報。</b>", [{ html: html }], function () {
+      var form = document.querySelector(".dbmodal form"), now = Date.now(), na = {}, prevE = null, prevS = null, missing = false, changed = [];
+      sids.forEach(function (sid) {
+        var nm = stageName(sid), sv = form.elements["s_" + sid].value, ev = form.elements["e_" + sid].value, s = parseLocal(sv), e = parseLocal(ev);
+        if ((sv && s == null) || (ev && e == null)) throw new Error(nm + "：時間格式不對");
+        if (s != null && e != null && e <= s) throw new Error(nm + "：完工時間要晚於開工時間");
+        if ((e != null && e > now + 600000) || (s != null && s > now + 600000)) throw new Error(nm + "：不能填未來的時間");
+        if (e != null && missing) throw new Error(nm + "：前面的站還沒回報完工，請先回報前面的站");
+        if (e != null && prevE != null && e < prevE) throw new Error(nm + "：完工時間不能早於前一站的完工時間");
+        if (s != null && prevS != null && s < prevS) throw new Error(nm + "：開工時間不能早於前一站的開工時間");
+        if (e == null) missing = true;
+        if (e != null) prevE = e; if (s != null) prevS = s;
+        var old = a0[sid];
+        if (s == null && e == null) return;
+        if (old && (old.e == null ? null : old.e) === e && (old.s == null ? null : old.s) === s) na[sid] = old;
+        else { na[sid] = { s: s, e: e, by: who(), src: "manual", ts: now }; changed.push(sid); }
+      });
+      if (Object.keys(na).length) S.act[od.id] = na; else delete S.act[od.id];
+      afterReport(od, sids, changed);
+    }, "儲存回報");
+  }
+  function afterReport(od, sids, changed) {
+    save(); rebuild(); render();
+    var d1 = (V.kri || []).filter(function (x) { return x.id === "D1"; })[0], lastA = (S.act[od.id] || {})[sids[sids.length - 1]];
+    if (lastA && lastA.e != null && changed.indexOf(sids[sids.length - 1]) >= 0 && d1 && d1.msg) toast("已回報。" + (d1.level === "green" ? "預測誤差在容忍度內。" : K.LABEL[d1.level] + "：" + d1.msg), d1.level === "red");
+    else toast("已回報，排程已照實際進度調整。");
+  }
+  function syncErp(silent) {                         // ERP 工單完工 → 整張單完工（只補還沒有手動回報的）
+    if (!cur || !cur.M) return;
+    var b = bridge();
+    var p = b && b.authed() ? b.call("erpLoad", {}).then(function (d) { return d && d.ok ? d.world : null; }) : Promise.resolve(lsGet("erp_world_local"));
+    p.then(function (w) {
+      if (!w) { if (!silent) toast("讀不到 ERP 資料（未登入時讀本機試用資料）。", true); return; }
+      var wo = {}, mv = {}, n = 0, M = cur.M;
+      (w.workorders || []).forEach(function (x) { wo[x.no] = x; });
+      (w.moves || []).forEach(function (m) { if (m.type === "完工入庫" && m.ref) mv[m.ref] = m; });
+      S.orders.forEach(function (o) {
+        var ref = o.erpRef || o.id, x = wo[ref], m = mv[ref]; if (!x || x.status !== "完工" || !m) return;
+        var ts = Date.parse(m.ts); if (!isFinite(ts)) return;
+        var i = -1; M.orders.forEach(function (od, k) { if (od.id === o.id) i = k; }); if (i < 0) return;
+        var sids = stageIdsOf(M, M.orders[i]), last = sids[sids.length - 1], a = S.act[o.id] || (S.act[o.id] = {}), cl = a[last];
+        if (cl && cl.e != null && (cl.src === "manual" || cl.e === ts)) return;
+        a[last] = { s: cl && cl.s != null ? cl.s : null, e: ts, by: m.by || "ERP", src: "erp", ts: Date.now() };
+        sids.slice(0, -1).forEach(function (sid) {
+          if (a[sid] && a[sid].e != null && !a[sid].inferred) return;
+          var pp = S.pred[o.id] && S.pred[o.id].st && S.pred[o.id].st[sid];
+          a[sid] = { s: null, e: Math.min(ts, pp ? pp[1] : ts), inferred: true, src: "erp", by: "ERP（推定）", ts: Date.now() };
+        });
+        n++;
+      });
+      if (n) { save(); rebuild(); render(); toast("已從 ERP 帶入 " + n + " 張工單的完工。各站的實際時間請現場補上。"); }
+      else if (!silent) toast("ERP 沒有新的完工工單可以帶入（單號要和工單號相同）。");
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 風險監控頁：風險登錄表（風險 → 指標 → 門檻 → 觸發）＋觸發紀錄
+  // ---------------------------------------------------------------------------
+  function notifyBox() {
+    var n = S.notify, nt = lsGet("sched_notice_v1") || {}, hb = nt.hb || 0;
+    var hbText = !authed() ? "登入公司帳號後，設定才會存到公司試算表、自動通知才讀得到。" : !hb ? "<b class=\"erp-bad\">自動通知排程還沒啟用</b>：要在 Apps Script 貼上 <code>sched-alerts.gs</code>，執行一次 <code>installSchedAlertTrigger</code>。" : "自動通知最近一次檢查：" + Math.round((Date.now() - hb) / 60000) + " 分鐘前（平日 08:00–18:59 每 30 分鐘）。";
+    var owners = ["生管", "班長", "業務"].map(function (r) { return '<label class="dbfield"><span>' + r + ' Email（空白＝寄給老闆）</span><input type="text" data-ntf-owner="' + r + '" value="' + esc(n.owners[r] || "") + '" placeholder="例：planner@your-company.com"></label>'; }).join("");
+    return '<div class="erp-sec sc-notify"><div class="erp-sechead"><h3>' + ic("bell") + "自動通知設定</h3></div>"
+      + '<div class="erp-muted">指標越線時，由 Apps Script 每 30 分鐘檢查並寄信，也寫進網頁右上角的「通知中心」（鈴鐺）。<b>黃燈</b>通知該指標的負責人；<b>紅燈</b>通知負責人加老闆；<b>趨勢預警</b>只放在通知中心，不寄信。同一件事 ' + S.notify.repeatHours + " 小時內不重複寄；紅燈 " + S.notify.escalateMin + " 分鐘沒有人按「已知悉」，會再通知老闆一次。</div>"
+      + '<div class="sc-nform"><label class="dbfield"><span>老闆 Email（可填多個，用逗號分開；空白＝用 Apps Script 的 NOTIFY_EMAILS 或試算表擁有者）</span><input type="text" data-ntf="boss" value="' + esc(n.boss) + '" placeholder="例：boss@your-company.com"></label>' + owners
+      + '<label class="dbfield"><span>紅燈沒人處理幾分鐘後，再通知老闆一次</span><input type="number" min="5" step="5" data-ntf="escalateMin" value="' + n.escalateMin + '"></label>'
+      + '<label class="dbfield"><span>同一件事幾小時內不重複通知</span><input type="number" min="1" step="1" data-ntf="repeatHours" value="' + n.repeatHours + '"></label>'
+      + '<label class="dbfield dbcheck"><input type="checkbox" data-ntf="enabled"' + (n.enabled ? " checked" : "") + ">啟用自動通知</label></div>"
+      + '<div class="erp-muted">' + hbText + "</div></div>";
+  }
+  function setNotify(t) {
+    var f = t.getAttribute("data-ntf"), ow = t.getAttribute("data-ntf-owner"), v = t.type === "checkbox" ? t.checked : String(t.value).trim();
+    var bad = function (txt) { return txt && txt.split(/[,;\s]+/).some(function (m) { return m && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(m); }); };
+    if ((f === "boss" || ow) && bad(v)) { toast("Email 格式不對，沒有儲存。", true); return; }
+    if (ow) S.notify.owners[ow] = v;
+    else if (f === "boss") S.notify.boss = v;
+    else if (f === "enabled") S.notify.enabled = !!v;
+    else { var x = Number(v); if (!isFinite(x) || x <= 0) return; S.notify[f] = x; }
+    S.events.unshift({ ts: Date.now(), type: "tol", id: "notify", name: "自動通知設定", by: who(), text: ow ? ow + " 的信箱改了" : f === "boss" ? "老闆信箱改了" : f === "enabled" ? (v ? "啟用" : "關閉") : f + " = " + v });
+    save(); publishNotify(); render(); toast("通知設定已儲存。");
+  }
+  function riskTab() {
+    if (!cur || !cur.M || !V.kri) return '<div class="erp-sec sc-empty"><h3>' + ic("alert") + "門檻設定</h3><p>要先到「排程看板」按「開始排程」，監控才有東西可以看。</p></div>";
+    var items = V.kri, c = K.counts(items), grp = "";
+    var rows = items.map(function (x) {
+      var g = x.grp !== grp ? '<tr class="sc-grp"><td colspan="8">' + esc(x.grp) + "</td></tr>" : ""; grp = x.grp;
+      var lo = x.dir === "lo";
+      return g + '<tr class="lv-row lv-' + x.level + '"><td><b>' + esc(x.risk) + '</b></td><td title="' + esc(x.hint) + '">' + esc(x.name) + '<div class="erp-muted">' + esc(x.hint) + "</div></td>"
+        + '<td class="nw"><b>' + esc(x.display) + "</b></td><td>" + lvTag(x.level) + '</td>'
+        + '<td class="nw">' + (lo ? "低於 " : "≥ ") + '<input class="sc-tin" type="number" step="any" data-kri="' + x.id + '" data-f="y" value="' + x.y + '"> ' + esc(x.unit === "NT$" ? "" : x.unit) + "</td>"
+        + '<td class="nw">' + (lo ? "低於 " : "≥ ") + '<input class="sc-tin" type="number" step="any" data-kri="' + x.id + '" data-f="r" value="' + (x.r == null ? "" : x.r) + '" placeholder="關閉"> ' + esc(x.unit === "NT$" ? "" : x.unit) + "</td>"
+        + '<td><input class="sc-tin wide" type="text" data-kri="' + x.id + '" data-f="owner" value="' + esc(x.owner) + '"></td>'
+        + "<td>" + (x.level === "red" || x.level === "yellow" ? esc(x.msg) + ' <button class="dbmini" data-kact="' + x.action + '">' + esc(x.actionLabel) + "</button>" : '<span class="erp-muted">不用處理</span>') + "</td></tr>";
+    }).join("");
+    var ev = S.events.slice(0, 40).map(function (e) {
+      if (e.type === "tol") return '<li><span>' + fmtWhen(e.ts) + "</span>" + ic("edit") + "<b>" + esc(e.name) + "</b> 門檻改成 " + esc(e.text) + "（" + esc(e.by || "") + "）</li>";
+      return "<li><span>" + fmtWhen(e.ts) + "</span>" + (e.up ? "▲ " : "▼ ") + lvTag(e.from === "na" ? "green" : e.from) + " → " + lvTag(e.to) + " <b>" + esc(e.name) + "</b>（" + esc(e.display) + "）" + (e.msg ? " " + esc(e.msg) : "") + "</li>";
+    }).join("");
+    return '<div class="cards sc-kpis four">'
+      + kpiCard("紅燈", "alert", c.red + " 項", "要處理；採用新排程要填原因", null, c.red ? false : null)
+      + kpiCard("黃燈", "info", c.yellow + " 項", "注意；採用新排程要確認", null)
+      + kpiCard("正常", "check", c.green + " 項", "在容忍度內", null)
+      + kpiCard("還沒有資料", "clock", c.na + " 項", "例如還沒有任何完工回報", null) + "</div>"
+      + '<div class="erp-sec sc-riskhow"><div class="erp-sechead"><h3>' + ic("shield") + "風險怎麼監控與通知</h3></div>"
+      + "<ol class=\"erp-steps\"><li><b>每個風險都連到一個監控指標（KRI）</b>：例如「排程預測和現場脫節」→「完工預測誤差」。</li>"
+      + "<li><b>每個指標有黃燈、紅燈兩道門檻</b>（下表可以改）。<b>預測漂移用「連續超標」才升級</b>：連續兩張完工誤差都超過門檻才算紅燈，避免被單次意外嚇到。</li>"
+      + "<li><b>亮燈就觸發</b>：排程頁最上方出現警示列、選單出現紅點、首頁出現燈號卡、<b>寫進觸發紀錄</b>；Apps Script 每 30 分鐘自己檢查一次，越線就<b>寄信通知負責人</b>並寫進「通知中心」（右上角鈴鐺）；平日早報信也會帶進去。</li>"
+      + "<li><b>採用新排程前再檢查一次</b>：有黃燈要勾選確認、有紅燈要寫原因並二次確認，全部連同你的名字寫進「採用紀錄」。</li>"
+      + "<li><b>監控自己也被監控</b>：「回報率」低、「燈號資料太久沒更新」都會亮燈，因為沒人回報的話，漂移指標就是空的。</li></ol>"
+      + '<label class="dbfield sc-grace"><span>回報寬限時間（分鐘）：預計完工過了這麼久還沒回報才算逾時</span><input type="number" min="0" step="10" data-grace value="' + S.grace + '"></label>'
+      + '<div class="erp-muted">燈號在排程頁開著時每 5 分鐘自動重算一次；也會在回報、採用、改設定時重算。評估時間 ' + fmtWhen(Date.now()) + "。</div></div>"
+      + '<div class="erp-sec"><div class="erp-sechead"><h3>' + ic("shield") + "風險登錄表（風險 → 指標 → 容忍度 → 觸發）</h3>"
+      + '<button class="dbbtn" data-act="tolreset">' + ic("undo") + "全部還原預設門檻</button></div>"
+      + '<div class="dbtablewrap"><table class="dbtable erp-table sc-risktbl"><thead><tr><th>風險</th><th>監控指標（KRI）</th><th>現值</th><th>燈號</th><th>黃燈門檻</th><th>紅燈門檻</th><th>負責人</th><th>亮燈後怎麼辦</th></tr></thead><tbody>' + rows + "</tbody></table></div></div>"
+      + notifyBox()
+      + '<div class="erp-sec"><div class="erp-sechead"><h3>' + ic("list") + "觸發紀錄（燈號變化）</h3></div>"
+      + (ev ? '<ul class="sc-log sc-evlog">' + ev + "</ul>" : '<div class="erp-muted">還沒有燈號變化。</div>') + "</div>";
+  }
+
+  // ---------------------------------------------------------------------------
+  // 採用紀錄與版本回復；工廠設定變更紀錄
+  // ---------------------------------------------------------------------------
+  var VER_KEY = "sched_ver_v1";
+  function pickK(k) { return k ? { meanF: k.meanF, makespan: k.makespan, tardy: k.tardy, onTimeRate: k.onTimeRate, setups: k.setups, cost: k.cost } : null; }
+  function slimPlan(p) { var q = Object.assign({}, p); delete q.history; delete q.pareto; return q; }
+  function verLocal() { return lsGet(VER_KEY) || {}; }
+  function recordVersion(info) {
+    var vid = "v" + Date.now().toString(36), snap = JSON.stringify({ plan: slimPlan(S.plan), down: S.down }), rows = strRows(vid, snap);
+    var lights = (info.items || []).filter(function (x) { return x.level === "red" || x.level === "yellow"; }).map(function (x) { return { id: x.id, name: x.name, level: x.level, display: x.display }; });
+    var meta = { id: vid, ts: Date.now(), by: who(), desc: info.desc, preset: V.preset, out: V.out, noise: V.noise, speed: V.speed, engine: E.VERSION, kri: "1", cfgSig: S.plan.cfgSig, seed: V.lastSeed,
+      before: pickK(info.before), after: pickK(info.after), lights: lights, reason: info.ack && info.ack.reason || "", second: !!(info.ack && info.ack.second), restoredFrom: info.restoredFrom || null, chunks: rows.length };
+    S.versions.unshift(meta);
+    var cut = S.versions.splice(30);                   // 只留最近 30 版的完整排程
+    var loc = verLocal(); loc[vid] = snap; cut.forEach(function (m) { delete loc[m.id]; }); lsSet(VER_KEY, loc);
+    var b = bridge();
+    if (b && b.authed()) {
+      S.verSaved = S.verSaved || {}; S.verSaved[vid] = 1;
+      putRows(b, rows, "sched_ver");
+      cut.forEach(function (m) { for (var k = 0; k < (m.chunks || 1); k++) b.call("tRemove", { table: "sched_ver", id: m.id + "." + k }); });
+    }
+    return meta;
+  }
+  function loadVerSnap(vid, cb) {
+    var loc = verLocal(); if (loc[vid]) { try { cb(JSON.parse(loc[vid])); return; } catch (e) {} }
+    var b = bridge();
+    if (!b || !b.authed()) { toast("這個版本的排程內容不在這台電腦上（登入後可從公司試算表讀取）。", true); return; }
+    b.call("tList", { table: "sched_ver" }).then(function (d) {
+      var rows = d && d.rows ? d.rows.map(function (r) { return { id: String(r.id), data: String(r.data == null ? "" : r.data).replace(/^~/, "") }; }) : [], snap = blobGet(vid, rows);
+      if (!snap) { toast("讀不到這個版本的排程內容。", true); return; }
+      loc = verLocal(); loc[vid] = JSON.stringify(snap); lsSet(VER_KEY, loc); cb(snap);
+    });
+  }
+  function restoreVersion(vid) {                     // 預覽並回復：走一般的「前後對照 → 採用前檢查 → 採用」流程
+    if (!cur || !cur.M) { toast("請先有一份排程。", true); return; }
+    if (pending) { toast("請先決定上一個重排結果要不要採用。", true); return; }
+    var meta = S.versions.filter(function (m) { return m.id === vid; })[0];
+    loadVerSnap(vid, function (snap) {
+      var M1;
+      try { M1 = E.compile(planCfg(snap.plan.start), S.orders); } catch (e) { toast(e.message, true); return; }
+      var X = xFromPlan(M1, snap.plan);
+      V.tab = "board";
+      showPending({ desc: "回復到 " + fmtWhen(meta ? meta.ts : Date.now()) + " 的排程版本" + (meta ? "（" + meta.desc + "）" : ""), restoredFrom: vid }, M1, { X: X, lockUsed: snap.plan.lock || null }, snap.plan.now0 || 0, S.orders, snap.down || S.down);
+    });
+  }
+  function cfgDiff(a, b) {
+    var out = [], i;
+    function j(x) { return JSON.stringify(x); }
+    var ca = a.calendar || {}, cb = b.calendar || {};
+    [["days", "上班日"], ["dayStart", "開工時間"], ["hours", "每天工時"], ["holidays", "休假日"]].forEach(function (f) { if (j(ca[f[0]]) !== j(cb[f[0]])) out.push("日曆「" + f[1] + "」改了"); });
+    function byId(l) { var m = {}; (l || []).forEach(function (x) { m[x.id] = x; }); return m; }
+    var sa = byId(a.stages), sb = byId(b.stages);
+    Object.keys(sb).forEach(function (id) { if (!sa[id]) out.push("新增站別「" + sb[id].name + "」"); else if (j(sa[id]) !== j(sb[id])) out.push("站別「" + sb[id].name + "」改了" + ["name", "mode", "setup", "out"].filter(function (k) { return j(sa[id][k]) !== j(sb[id][k]); }).map(function (k) { return { name: "名稱", mode: "生產方式", setup: "換線分鐘", out: "外包設定" }[k]; }).join("、")); });
+    Object.keys(sa).forEach(function (id) { if (!sb[id]) out.push("刪除站別「" + sa[id].name + "」"); });
+    var ta = byId(a.types), tb = byId(b.types);
+    Object.keys(tb).forEach(function (id) { if (!ta[id]) out.push("新增機型「" + tb[id].name + "」"); else if (j(ta[id]) !== j(tb[id])) out.push("機型「" + tb[id].name + "」" + (ta[id].count !== tb[id].count ? "台數 " + ta[id].count + " → " + tb[id].count : "設定改了")); });
+    Object.keys(ta).forEach(function (id) { if (!tb[id]) out.push("刪除機型「" + ta[id].name + "」"); });
+    var pa = byId(a.products), pb = byId(b.products);
+    Object.keys(pb).forEach(function (id) { if (!pa[id]) out.push("新增產品 " + id); else if (j(pa[id]) !== j(pb[id])) out.push("產品 " + id + (j(pa[id].route) !== j(pb[id].route) ? " 的工時（途程）改了" : " 的批量設定改了")); });
+    Object.keys(pa).forEach(function (id) { if (!pb[id]) out.push("刪除產品 " + id); });
+    void i; return out;
+  }
+  function logCfg() {                                // 工廠設定的每次修改：誰、何時、改了什麼，並留可還原的版本
+    var now = JSON.stringify(S.cfg);
+    if (S.cfgPrev == null) { S.cfgPrev = now; return; }
+    if (S.cfgPrev === now) return;
+    var t = Date.now(), by = who(), last = S.cfgLog[0], base = S.cfgPrev;
+    if (last && last.by === by && t - last.ts < 90000 && last.base) base = last.base;       // 90 秒內連續修改併成一筆
+    var text = cfgDiff(JSON.parse(base), S.cfg).join("；") || "設定調整";
+    var rec = { ts: t, by: by, text: text, base: base, snap: now };
+    if (base !== S.cfgPrev) S.cfgLog[0] = rec; else S.cfgLog.unshift(rec);
+    S.cfgLog = S.cfgLog.slice(0, 40);
+    S.cfgLog.forEach(function (x, k) { if (k >= 8) { x.base = null; x.snap = null; } });
+    S.cfgPrev = now;
+  }
+  function auditTab() {
+    var cal = cur && cur.M ? cur.M.cal : E.calendar(planCfg().calendar);
+    var vrows = S.versions.map(function (m, k) {
+      var a = m.after, b = m.before;
+      var kp = a ? "週期 " + fmtDur(cal, a.meanF) + (b ? "（原 " + fmtDur(cal, b.meanF) + "）" : "") + " · 延遲 " + a.tardy + " 張" + (b ? "（原 " + b.tardy + "）" : "") + (a.cost ? " · 外包費 " + money(a.cost) : "") : "—";
+      var lights = m.lights && m.lights.length ? m.lights.map(function (x) { return lvTag(x.level) + esc(x.name); }).join("<br>") : '<span class="erp-good">全綠</span>';
+      return "<tr><td class=\"nw\">" + esc(fmtWhen(m.ts)) + (k === 0 ? ' <span class="erp-st ok">目前採用</span>' : "") + '</td><td class="nw">' + esc(m.by || "") + "</td><td>" + esc(m.desc || "") + (m.restoredFrom ? ' <span class="erp-st info">回復</span>' : "") + '<div class="erp-muted">' + esc((PRESET[m.preset] || PRESET.bal).label) + " · " + esc((OUTS[m.out] || OUTS.need).label) + (m.noise ? " · 含加工誤差" : "") + " · 引擎 " + esc(m.engine || "") + (m.seed ? " · 種子 " + m.seed : "") + "</div></td>"
+        + "<td>" + kp + "</td><td>" + lights + "</td><td>" + (m.reason ? esc(m.reason) + (m.second ? ' <span class="erp-st warn">已二次確認</span>' : "") : '<span class="erp-muted">—</span>') + "</td>"
+        + "<td class=\"nw\">" + (k === 0 ? "" : '<button class="dbmini" data-ver="' + m.id + '">' + ic("undo") + "預覽並回復</button>") + "</td></tr>";
+    }).join("");
+    var crows = S.cfgLog.map(function (c) {
+      return "<tr><td class=\"nw\">" + esc(fmtWhen(c.ts)) + '</td><td class="nw">' + esc(c.by || "") + "</td><td>" + esc(c.text) + "</td><td class=\"nw\">" + (c.base ? '<button class="dbmini" data-cfgrest="' + c.ts + '">' + ic("undo") + "還原到改動前</button>" : '<span class="erp-muted">版本已過期</span>') + "</td></tr>";
+    }).join("");
+    return '<div class="erp-sec"><div class="erp-sechead"><h3>' + ic("list") + "排程採用紀錄（最近 " + S.versions.length + " 版）</h3></div>"
+      + '<div class="erp-muted">每次「採用」都留一筆：誰、何時、為什麼、用什麼設定算的、前後差多少、採用當下有哪些燈號、風險確認的原因。可以預覽任何一版並回復（回復也會走一次風險檢查，並多一筆紀錄，歷史不會被刪）。回復只換回當時的排法，已回報的實際進度仍然有效。</div>'
+      + '<div class="dbtablewrap"><table class="dbtable erp-table sc-audtbl"><thead><tr><th>時間</th><th>誰</th><th>事由與設定</th><th>前後成績</th><th>採用當下的燈號</th><th>風險確認原因</th><th></th></tr></thead><tbody>'
+      + (vrows || '<tr><td colspan="7" class="dbempty">還沒有紀錄；第一次排程之後就會有。</td></tr>') + "</tbody></table></div></div>"
+      + '<div class="erp-sec"><div class="erp-sechead"><h3>' + ic("factory") + "工廠設定變更紀錄</h3></div>"
+      + '<div class="erp-muted">工時、機台數、站別這些是排程的「參數」，改一個數字就會改變結果，所以每次修改都留紀錄，並保留最近 8 次可還原的版本。</div>'
+      + '<div class="dbtablewrap"><table class="dbtable erp-table"><thead><tr><th>時間</th><th>誰</th><th>改了什麼</th><th></th></tr></thead><tbody>'
+      + (crows || '<tr><td colspan="4" class="dbempty">還沒有修改紀錄。</td></tr>') + "</tbody></table></div></div>";
+  }
+
+  // ---------------------------------------------------------------------------
+  // 採用前的風險檢查：全綠直接採用；黃燈要勾選確認；紅燈要填原因＋二次確認
+  // ---------------------------------------------------------------------------
+  function gateList(g) {
+    return g.red.concat(g.yellow).map(function (x) {
+      return '<div class="sc-gl lv-' + x.level + '">' + lvTag(x.level) + "<b>" + esc(x.name) + "</b>：" + esc(x.display)
+        + '<div class="erp-muted">' + esc(x.msg || x.risk) + "（" + esc(K.thresholdText(x)) + "；負責人：" + esc(x.owner) + "）</div></div>";
+    }).join("");
+  }
+  function adoptGate() {
+    if (!pending) return;
+    var items = K.evaluate(kriCtx(pending, true), S.tol), g = K.gate(items);
+    if (g.clear) { doAdopt(null, items); return; }
+    var html = '<div class="sc-gate">' + gateList(g)
+      + '<label class="dbfield"><span>' + (g.needReason ? "有紅燈：請寫下為什麼還是要採用（至少 6 個字）" : "備註（選填）") + '</span><textarea name="reason" rows="3" placeholder="例：客戶指定這週一定要出，先硬排，下週補產能"></textarea></label>'
+      + '<label class="dbfield dbcheck"><input type="checkbox" name="ack">我已經看過上面的風險，仍然要採用</label></div>';
+    dialog("採用前風險確認：" + (g.red.length ? g.red.length + " 項紅燈" : "") + (g.red.length && g.yellow.length ? "、" : "") + (g.yellow.length ? g.yellow.length + " 項黃燈" : ""),
+      g.needReason ? "有紅燈：要寫原因，並在下一步再確認一次。這筆會連同你的名字寫進「採用紀錄」。" : "有黃燈：看過、勾選確認後才能採用。", [{ html: html }], function () {
+        var form = document.querySelector(".dbmodal form"), reason = form.elements.reason.value.trim();
+        if (!form.elements.ack.checked) throw new Error("請勾選「我已經看過上面的風險，仍然要採用」。");
+        if (g.needReason && reason.length < 6) throw new Error("紅燈一定要寫原因（至少 6 個字）。");
+        if (g.needReason) { setTimeout(function () { adoptConfirm2(g, items, reason); }, 0); return true; }
+        doAdopt({ reason: reason, by: who(), ts: Date.now() }, items); return true;
+      }, g.needReason ? "下一步：二次確認" : "確認採用");
+  }
+  function adoptConfirm2(g, items, reason) {
+    if (!pending) return;
+    dialog("二次確認：採用含紅燈的排程", "你即將採用一份有 <b>" + g.red.length + " 項紅燈、" + g.yellow.length + " 項黃燈</b> 的排程。<br>原因：「" + esc(reason) + "」<br>這筆會連同你的名字、時間和上面的風險寫進「採用紀錄」，之後可以稽核。", [], function () {
+      doAdopt({ reason: reason, second: true, by: who(), ts: Date.now() }, items); return true;
+    }, "確定採用（含紅燈）");
+  }
+  function updatePred(M, res) {                      // 記下「這次採用時的預測」；已回報的站不再更新（才量得出誤差）
+    var cal = M.cal;
+    M.orders.forEach(function (od, i) {
+      var a = S.act[od.id] || {}, sids = stageIdsOf(M, od), pr = S.pred[od.id] || (S.pred[od.id] = { st: {} });
+      pr.st = pr.st || {};
+      sids.forEach(function (sid) {
+        if (a[sid] && a[sid].e != null) return;
+        var s = -1; M.stages.forEach(function (x, k) { if (x.id === sid) s = k; });
+        var ops = res.ops.filter(function (op) { return op.o === i && op.s === s; }); if (!ops.length) return;
+        pr.st[sid] = [cal.toDate(Math.min.apply(null, ops.map(function (o) { return o.start; }))), cal.toDate(Math.max.apply(null, ops.map(function (o) { return o.end; })), true)];
+      });
+      var la = a[sids[sids.length - 1]];
+      if (!(la && la.e != null)) pr.c = cal.toDate(res.C[i], true);
+      pr.at = Date.now();
+    });
+    var ids = {}; M.orders.forEach(function (od) { ids[od.id] = 1; });
+    Object.keys(S.pred).forEach(function (id) { if (!ids[id] && !S.act[id]) delete S.pred[id]; });
+  }
+  function doAdopt(ack, items) {
+    if (!pending) return;
+    var p = pending, old = cur && cur.plan, before = cur && cur.res ? E.summarize(cur.res) : null, after = E.summarize(p.res);
+    S.orders = p.orders; S.down = p.down;
+    S.plan = planRecord(p.M, p.X, p.out.heur ? p.out : null, { now0: p.now, start: p.M.cal.start });
+    S.plan.lock = p.out.lockUsed || null;
+    if (!p.out.heur && old) {                         // 取捨圖上換一個點、或回復舊版：沿用原本的比較資料
+      S.plan.heur = old.heur; S.plan.baseF = old.baseF; S.plan.history = old.history; S.plan.stats = old.stats;
+      S.plan.pareto = (old.pareto || []).map(function (q, k) { return Object.assign({}, q, { best: k === p.ch.paretoIdx }); });
+    } else V.lastOut = p.out;
+    V.lastOutPlan = S.plan;
+    updatePred(p.M, p.res);
+    recordVersion({ desc: p.ch.desc, before: before, after: after, items: items, ack: ack, restoredFrom: p.ch.restoredFrom });
+    logAdd(p.ch.desc + (ack && ack.reason ? "（風險確認：" + ack.reason + "）" : ""));
+    pending = null; S.demo = false; save(); rebuild(); render(); syncErp(true);
+    toast("已採用新排程，並寫進採用紀錄。");
+  }
+  function gateSummaryHtml() {                       // 對照框裡先預告：按「採用」時會被檢查到什麼
+    if (!pending) return "";
+    var g = K.gate(K.evaluate(kriCtx(pending, true), S.tol));
+    if (g.clear) return '<div class="sc-gatehint ok">' + ic("check") + "採用前風險檢查：全部在容忍度內，可以直接採用。</div>";
+    return '<div class="sc-gatehint ' + (g.red.length ? "red" : "yellow") + '">' + ic("alert") + "<b>採用前風險檢查：" + (g.red.length ? g.red.length + " 項紅燈" : "") + (g.red.length && g.yellow.length ? "、" : "") + (g.yellow.length ? g.yellow.length + " 項黃燈" : "") + "</b>（按「採用」時需要"
+      + (g.red.length ? "填原因並二次確認" : "勾選確認") + "）<div>" + g.red.concat(g.yellow).map(function (x) { return lvTag(x.level) + esc(x.name) + "：" + esc(x.display); }).join("　") + "</div></div>";
+  }
+
+  function restoreCfg(ts) {
+    var c = S.cfgLog.filter(function (x) { return x.ts === ts; })[0];
+    if (!c || !c.base) { toast("這個版本已過期，無法還原。", true); return; }
+    if (!confirm("把工廠設定還原到「" + c.text + "」之前的樣子？（這次還原也會留一筆紀錄）")) return;
+    S.cfg = JSON.parse(c.base); cfgChanged(); render(); toast("已還原工廠設定；建議按「從頭排程」。");
+  }
+  function setTol(id, f, raw) {                      // 改容忍度門檻：記一筆、立刻重算燈號
+    var def = K.DEFS.filter(function (d) { return d.id === id; })[0]; if (!def) return;
+    var o = S.tol[id] = S.tol[id] || {};
+    if (f === "owner") o.owner = String(raw).trim();
+    else if (raw === "") { if (f === "r") o.r = null; else return; }
+    else { var n = Number(raw); if (!isFinite(n)) return; o[f] = n; }
+    var t = K.tolOf(def, S.tol);
+    S.events.unshift({ ts: Date.now(), type: "tol", id: id, name: def.name, by: who(), text: K.thresholdText({ dir: def.dir, y: t.y, r: t.r, unit: def.unit }) + "；負責人 " + t.owner });
+    save(); kriTick(); render();
+  }
   var toastT = null;
   function toast(msg, bad) {
     var el = document.getElementById("schedToast");
@@ -1229,9 +1878,11 @@
     clearTimeout(toastT); toastT = setTimeout(function () { el.className = "sc-toast"; }, bad ? 6000 : 3500);
   }
   mount.addEventListener("click", function (e) {
-    var t = e.target.closest("button, .dbtab, [data-o]"); if (!t || !mount.contains(t)) return;
+    var t = e.target.closest("button, .dbtab, [data-o], [data-rep], [data-dsel]"); if (!t || !mount.contains(t)) return;
     var a;
-    if ((a = t.getAttribute("data-tab"))) { V.tab = a; V.hl = null; history.replaceState(null, "", "#tab=" + a); render(); return; }
+    if ((a = t.getAttribute("data-dsel")) && t.tagName !== "BUTTON") { V.dsel = a; render(); return; }
+    if ((a = t.getAttribute("data-nack"))) { if (window.__noticeAck) window.__noticeAck(null, a, function () { render(); }); return; }
+    if ((a = t.getAttribute("data-tab"))) { V.tab = a; V.hl = null; history.replaceState(null, "", "#tab=" + a); render(); if (a === "report") syncErp(true); return; }
     var seg = t.parentNode && t.parentNode.getAttribute && t.parentNode.getAttribute("data-seg");
     if (seg) {
       var v = t.getAttribute("data-v");
@@ -1241,15 +1892,21 @@
       render(); return;
     }
     if ((a = t.getAttribute("data-act"))) {
-      if (a === "fresh") { if (cur && cur.M && !confirm("從頭排程會忽略目前的生產進度（已開工的也會重排），確定？")) return; planFresh(); }
+      if (a === "fresh") { if (cur && cur.M && !confirm("從頭排程會把還沒做的全部重排（已回報完工的站不動），結果會先給你對照，確定？")) return; planFresh(); }
       else if (a === "reopt") reschedule({ desc: "重新最佳化（" + PRESET[V.preset].label + "）" });
       else if (a === "stop") stopRun();
       else if (a === "adopt") adopt();
       else if (a === "discard") discard();
       else if (a === "unhl") { V.hl = null; drawGantt(); paintHl(cur); }
       else if (a === "verify") verify();
+      else if (a === "erpsync") syncErp(false);
+      else if (a === "tolreset") { if (confirm("全部門檻還原成預設值？（會留一筆紀錄）")) { S.tol = {}; S.events.unshift({ ts: Date.now(), type: "tol", id: "*", name: "全部指標", by: who(), text: "還原預設" }); save(); kriTick(); render(); } }
       return;
     }
+    if ((a = t.getAttribute("data-kact"))) { doKact(a); return; }
+    if ((a = t.getAttribute("data-ver"))) { restoreVersion(a); return; }
+    if ((a = t.getAttribute("data-cfgrest"))) { restoreCfg(+a); return; }
+    if ((a = t.getAttribute("data-rep")) != null && V.tab === "report") { reportDialog(+a); return; }
     if ((a = t.getAttribute("data-wi"))) { whatIf(a); return; }
     if ((a = t.getAttribute("data-oact"))) { whatIf(a, t.getAttribute("data-id")); return; }
     if ((a = t.getAttribute("data-ord"))) {
@@ -1308,6 +1965,9 @@
   });
   mount.addEventListener("change", function (e) {
     var t = e.target, a;
+    if (t.hasAttribute("data-ntf") || t.hasAttribute("data-ntf-owner")) { setNotify(t); return; }
+    if (t.hasAttribute("data-kri")) { setTol(t.getAttribute("data-kri"), t.getAttribute("data-f"), t.value); return; }
+    if (t.hasAttribute("data-grace")) { S.grace = Math.max(0, num(t.value, 120)); save(); kriTick(); render(); return; }
     if (t.getAttribute("data-act") === "noise") { V.noise = t.checked; save(false); return; }
     if ((a = t.getAttribute("data-cal"))) {
       var cl = S.cfg.calendar = S.cfg.calendar || {};
@@ -1340,5 +2000,10 @@
   window.addEventListener("resize", function () { clearTimeout(rz); rz = setTimeout(function () { if (V.tab === "board") afterBoard(); }, 200); });
   new MutationObserver(function () { if (V.tab === "board") afterBoard(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
-  rebuild(); render();
+  rebuild(); render(); syncErp(true);
+  setInterval(function () {                          // 頁面開著時，每 5 分鐘重算一次燈號（逾時沒回報會隨時間變化）
+    if (document.hidden || !cur || !cur.M || pending || V.busy) return;
+    var ev = kriTick(); paintAlert();
+    if (ev.length && V.tab === "risk") render();
+  }, 300000);
 })();

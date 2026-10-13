@@ -125,7 +125,20 @@ def _hcard(href: str, emoji: str, title: str, lines: str, cta: str) -> str:
     )
 
 
-def render_home(history: dict, sup_total, sup_near, cust_total=None) -> str:
+def _health_box(health) -> str:
+    """首頁「原料資料來源」燈號：有黃／紅才顯示；另外前端會自己檢查頁面是不是太久沒更新。"""
+    upd = (health or {}).get("updated") or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    lis = ""
+    if health and health.get("level") != "green":
+        bad = [i for i in health["items"] if i["level"] != "green"]
+        lis = "".join(
+            f'<li><b class="dh-{i["level"]}">{"紅燈" if i["level"] == "red" else "黃燈"}</b> {i["name"]}：{i["display"]}'
+            f'<span>{i["msg"]}</span></li>' for i in bad)
+        lis = f'<div class="dh-t dh-{health["level"]}">原料資料來源有{health["red"] and "紅燈" or "黃燈"}，報價先別直接照用</div><ul>{lis}</ul>'
+    return f'<div id="dhBox" class="dhbox" data-upd="{upd}"{"" if lis else " hidden"}>{lis}</div>'
+
+
+def render_home(history: dict, sup_total, sup_near, cust_total=None, health=None) -> str:
     # 大焦點：最常用的兩張主卡（訂單、每日早報）
     def _feat(href, icon, title, note, cta, ext=False, cid=""):
         idattr = f' id="{cid}"' if cid else ""
@@ -186,6 +199,8 @@ def render_home(history: dict, sup_total, sup_near, cust_total=None) -> str:
     </div>
     <div class="stats-hint" id="stHint">登入後這裡會帶入你的即時數字（待出貨、逾期、本月訂單數）</div>
     <div id="pinBox"></div>
+    {_health_box(health)}
+    <div id="kriBox"></div>
     <div class="hfeat">{feat}</div>
     <div class="hqlabel">快速前往</div>
     <div class="hquick">{quick}</div>
@@ -279,6 +294,9 @@ def render_erp_html() -> str:
   <script src="assets/erp-admin.js?v={_VER}"></script>
   <script src="assets/erp.js?v={_VER}"></script>
   <script src="assets/erp-crm.js?v={_VER}"></script>
+  <script src="assets/sched-kri.js?v={_VER}"></script>
+  <script src="assets/biz-kri.js?v={_VER}"></script>
+  <script src="assets/erp-risk-ui.js?v={_VER}"></script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
@@ -310,8 +328,13 @@ def render_admin_html() -> str:
   </div>
   <script src="assets/erp-engine.js?v={_VER}"></script>
   <script src="assets/erp-admin.js?v={_VER}"></script>
+  <script src="assets/erp-roles.js?v={_VER}"></script>
   <script src="assets/erp.js?v={_VER}"></script>
   <script src="assets/erp-admin-ui.js?v={_VER}"></script>
+  <script src="assets/erp-access-ui.js?v={_VER}"></script>
+  <script src="assets/sched-kri.js?v={_VER}"></script>
+  <script src="assets/biz-kri.js?v={_VER}"></script>
+  <script src="assets/erp-risk-ui.js?v={_VER}"></script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
@@ -345,6 +368,7 @@ def render_schedule_html() -> str:
   </div>
   <script src="assets/sched-engine.js?v={_VER}"></script>
   <script src="assets/sched-data.js?v={_VER}"></script>
+  <script src="assets/sched-kri.js?v={_VER}"></script>
   <script src="assets/sched.js?v={_VER}"></script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
@@ -592,6 +616,8 @@ def render_help_html() -> str:
           <p><b>它怎麼想（白話）：</b>電腦先把整間工廠「模擬」一遍，算出每個方案的結果；再用「演化」的方式從數千種排法裡挑——好的排法留下、互相混合、隨機改一點，一代代變好。同一張單在同一站只用一種機型；每站依性質分三種做法：<b>整批流動</b>（一台做完，做好一批就先送下一站）、<b>拆批平行</b>（拆成子批給多台同時做）、<b>併批</b>（湊成一批一起做，如電鍍、陽極）。開始前會先試「現場經驗做法」（先到先做）、交期優先 EDD、加權急迫度 ATC，作為起點與比較基準，所以最後的綜合成績不會比現場做法差。</p>
           <p><b>方法與出處：</b>核心是陳建銘（2015，清華大學博士論文；Lin &amp; Chen, 2015, <i>Simulation Modelling Practice and Theory</i>）的「模擬＋基因演算法＋OCBA」，加上迭代貪婪（Ruiz &amp; Stützle, 2007, <i>EJOR</i>）、NEH 插入、ATC 派工、多目標（效率×準時）與插單／機台故障的事件驅動重排程。「方法說明」分頁可以看到本系統算出的結果與論文逐項<b>對答案</b>。</p>
           <p><b>要注意：</b>系統假設現場<b>照排程在做</b>（時間一到就視為已開工、不再更動）；現場進度和排程不一樣時，請在對話框的「發生時間」調整。工廠設定改過後，請按「從頭排程」。資料登入後存公司試算表的「sched」分頁；同時有人改時，以最後存的為準。</p>
+          <p><b>風險監控（內建警示）：</b>排程頁有幾個分頁負責「別讓排程悄悄失準」。<b>進度回報</b>：現場每一站回報實際開工／完工（ERP 工單一按完工，會自動帶入整張單完工；各站時間由現場補），預計完工過了 2 小時還沒回報就亮燈。<b>風險儀表板</b>（管理層看這頁）：17 個指標排成熱度圖，每格有燈號、最近 7 天的小曲線、「▲ 惡化中」箭頭，以及「預計 N 天後轉黃／紅」的預警；右邊「最近惡化排行」告訴你先處理誰。指標分成預測漂移、計畫新舊、<b>領先指標</b>（未來 5 個工作日的工時需求÷產能、交期寬裕、平均準時機率、外包佔比，比準時率更早反映風險）、交期、產能與成本。<b>門檻設定</b>：每個指標的黃燈、紅燈門檻與負責人都能改，並設定老闆的 Email。<b>採用紀錄</b>：每次採用都記誰、何時、為什麼、前後差多少、當下的燈號，可以預覽並回復舊版，工廠設定的每次修改也留紀錄。<b>採用新排程前會再檢查一次</b>：有黃燈要勾選確認，有紅燈要寫原因並二次確認。設計參考 COSO 2026《GenAI 內部控制指引》的內控觀念（KRI、容忍度、可追溯、變更控制），但這裡監控的是排程的預測，不是 AI。</p>
+          <p><b>自動通知（不用有人盯報表）：</b>要在 Apps Script 貼上 <code>sched-alerts.gs</code> 並執行一次 <code>installSchedAlertTrigger</code>（只貼檔案、不用重新部署網頁）。之後平日 08:00–18:59 每 30 分鐘自動檢查：<b>黃燈</b>通知該指標的負責人，<b>紅燈</b>通知負責人加老闆；<b>趨勢預警只顯示在網頁右上角的通知中心（鈴鐺），不寄信</b>。同一次檢查有好幾項亮燈，每個收件人只收一封；同一件事 24 小時內不重複寄；紅燈 30 分鐘沒人按「已知悉」會再通知老闆一次。在通知中心按「已知悉」之後就不再催，除非變得更糟。平日早報信也會帶「排程風險」（要貼新版 <code>email-notify.gs</code>）。</p>
           <a class="gobtn" href="schedule.html">前往 生產排程 →</a>
         </div>
       </details>

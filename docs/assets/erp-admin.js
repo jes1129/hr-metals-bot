@@ -22,7 +22,7 @@
     shifts: { sheet: "ERP_班表", cols: ["id", "staff_id", "date", "start", "end", "break_min", "status", "note", "created"], num: ["break_min"] },
     attendance: { sheet: "ERP_出勤", cols: ["id", "staff_id", "date", "clock_in", "clock_out", "break_min", "status", "void_reason", "note", "by", "created"], num: ["break_min"] },
     requests: { sheet: "ERP_申請", cols: ["id", "no", "staff_id", "kind", "leave_type", "start_date", "start_time", "end_date", "end_time", "hours", "reason", "status", "created_by", "reviewer", "review_note", "history", "created"], num: ["hours"], json: ["history"] },
-    equipment: { sheet: "ERP_設備", cols: ["id", "code", "name", "location", "active", "note", "created"], bool: ["active"] },
+    equipment: { sheet: "ERP_設備", cols: ["id", "code", "name", "location", "active", "note", "created", "maint_days", "last_maint"], bool: ["active"], num: ["maint_days"] },
     reservations: { sheet: "ERP_設備預約", cols: ["id", "equipment_id", "staff_id", "date", "start", "end", "purpose", "status", "by", "created"] },
     notices: { sheet: "ERP_公告", cols: ["id", "title", "body", "pinned", "status", "by", "created", "updated"], bool: ["pinned"] }
   };
@@ -202,8 +202,19 @@
     var e = p.id ? find(w, "equipment", p.id, "設備") : { id: ctx.newId("G"), active: true, created: today(ctx) };
     e.name = name; e.code = code; e.location = str(p.location, 60); e.note = str(p.note, 300);
     if (p.active !== undefined) e.active = !!p.active;
+    // 保養週期（天；0 或空＝不追蹤）與上次保養日：風險儀表板「設備保養逾期」用
+    if (p.maint_days !== undefined && p.maint_days !== "") { var md = Number(p.maint_days); need(isFinite(md) && md >= 0 && md <= 3650, "保養週期要是 0–3650 天"); e.maint_days = Math.round(md); }
+    else if (e.maint_days === undefined || p.maint_days === "") e.maint_days = 0;
+    if (p.last_maint !== undefined) { need(p.last_maint === "" || isDate(p.last_maint), "上次保養日格式要是 YYYY-MM-DD"); e.last_maint = p.last_maint; }
+    else if (e.last_maint === undefined) e.last_maint = "";
     if (!p.id) w.equipment.push(e);
     touch(ctx, "equipment", e);
+    return e.id;
+  };
+  A["equipment.maintained"] = function (w, p, ctx) {                       // 按一下＝今天（或指定日）已完成保養
+    var e = find(w, "equipment", p.id, "設備");
+    var d = p.date ? needDate(p.date, "保養日期") : today(ctx);
+    e.last_maint = d; touch(ctx, "equipment", e);
     return e.id;
   };
   A["reservation.save"] = function (w, p, ctx) {
@@ -280,7 +291,11 @@
     refs: { staff: { unit_id: "units" }, shifts: { staff_id: "staff" }, attendance: { staff_id: "staff" },
       requests: { staff_id: "staff" }, reservations: { equipment_id: "equipment" } }
   });
-  E.admin = { UNIT_KINDS: UNIT_KINDS, REQ_KINDS: REQ_KINDS, LEAVE_TYPES: LEAVE_TYPES, REQ_STATUS: REQ_STATUS,
+  function nextMaint(e) {                                  // 下次該保養的日期；沒追蹤或從未保養回傳 ""（從未保養＝現在就該做）
+    if (!(e.maint_days > 0) || !isDate(e.last_maint)) return "";
+    var d = new Date(e.last_maint + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + e.maint_days); return d.toISOString().slice(0, 10);
+  }
+  E.admin = { nextMaint: nextMaint, UNIT_KINDS: UNIT_KINDS, REQ_KINDS: REQ_KINDS, LEAVE_TYPES: LEAVE_TYPES, REQ_STATUS: REQ_STATUS,
     diff: diff, workHours: workHours, weekday: weekday, span: span };
   if (typeof module !== "undefined" && module.exports) module.exports = E;
 })(typeof window !== "undefined" ? window : this);

@@ -24,6 +24,9 @@ function doPost(e) {
     var body = JSON.parse(e.postData.contents || "{}");
     var email = verify_(body.token);          // 驗證登入身分，不合法會丟錯
     var p = body.payload || {};
+    // 職能分工（選用）：貼了 google-apps-script-erp.gs 並啟用權限後，依職務擋下不該做的操作；沒貼或沒啟用 = 不影響
+    var gate = (typeof accessGate_ === "function") ? accessGate_(body.action, p, email) : null;
+    if (gate) return json_(gate);
     var out;
     switch (body.action) {
       case "load":     out = loadAll_(); break;

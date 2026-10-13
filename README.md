@@ -126,7 +126,8 @@ ERP（料號庫存 FIFO、進貨、報價、銷售訂單、BOM／工單、客戶
 - **計算都在瀏覽器**（`sched-worker.js` 背景執行緒），訂單不會送到外部服務。
 - **方法**：陳建銘（2015，清大博士論文）／Lin & Chen（2015, SIMPAT 51:100–114）的「離散事件模擬＋基因演算法＋OCBA」為核心，融合迭代貪婪（Ruiz & Stützle 2007）、NEH 插入、ATC 派工（Vepsalainen & Morton 1987）、多目標（平均週期×加權延遲）與事件驅動重排程（Peng et al. 2019；Uhlmann et al. 2022）。完整文獻在頁面「方法說明」，同一頁也會把系統算的結果和論文範例（50,000／44,000／48,000／42,000）逐項對答案。
 - **檔案**：`docs/assets/sched-engine.js`（引擎，瀏覽器與 Node 測試共用）、`sched-worker.js`、`sched.js`＋`sched.css`（畫面）、`sched-data.js`（預設工廠與範例訂單）。測試：`node --test tests/sched-engine.test.mjs`。
-- **限制**：假設現場照排程進行（沒有「回報實際進度」功能；現場和排程不同時，在對話框改「發生時間」）；不含物料齊套檢查、人員技能排班、各機台各自的上下班時間。
+- **風險監控與自動通知**（`docs/assets/sched-kri.js`、`sched-alerts.gs`；測試 `tests/sched-risk.test.mjs`、`sched-brief.test.mjs`、`sched-alerts.test.mjs`）：風險 → 17 個監控指標（KRI，含領先指標：未來 5 個工作日負荷、交期寬裕、平均準時機率、外包佔比）→ 黃／紅門檻 → 觸發。「風險儀表板」有熱度圖、小曲線、惡化箭頭、預計幾天後轉壞的預警、最近惡化排行（歷史每 30 分鐘記一筆，存小表 `sched_hist`）；「進度回報」每一站回報實際時間，ERP 工單完工自動帶入整張單完工；採用新排程前依燈號檢查（黃燈勾選、紅燈填原因＋二次確認）；每次採用、每次工廠設定修改都留紀錄可預覽回復（`sched_ver`）。**自動通知**：把 `sched-alerts.gs` 貼進 Apps Script 並執行 `installSchedAlertTrigger`，平日 08:00–18:59 每 30 分鐘檢查，黃燈通知負責人、紅燈加老闆、同一次檢查合併成每人一封、24 小時不重複、紅燈 30 分鐘沒人「已知悉」升級老闆；趨勢預警只放在網頁右上角通知中心（`sched_notice`、`sched_alert`、`sched_cfg`、`sched_kri` 幾張小表）。早報信要貼新版 `email-notify.gs`。設計參考 COSO 2026《GenAI 內部控制指引》的內控觀念。
+- **限制**：不含物料齊套檢查、人員技能排班、各機台各自的上下班時間；燈號在有人開排程頁時才計算（早報信會在寄信當下補算「逾時沒回報」與「資料太久沒更新」）。
 
 ### 交接給客戶時
 
@@ -139,3 +140,15 @@ ERP（料號庫存 FIFO、進貨、報價、銷售訂單、BOM／工單、客戶
 ### NotebookLM 串接（選填）
 
 `notebooklm-export.gs`（貼進同一個 Apps Script 專案）會把 ERP 現況每天寫成一份固定 Google 文件「九上科技 ERP 每日簡報」；把它加進 NotebookLM 當來源即可問答、生語音摘要。筆記本網址填進 `docs/config.js` 的 `NOTEBOOK_URL`，首頁「🧠 NotebookLM」卡片就會直達。NotebookLM 無寫入 API，第一次來源需手動加、之後按「同步」。
+
+## 內控與治理（五項）
+
+| 項目 | 做什麼 | 要貼／要做的事 |
+|---|---|---|
+| 原料資料來源監控 | `datahealth.py`：新鮮度、連續抓不到、單日異常、兩來源價差、價格凍結、匯率；首頁燈號、早報警示、Actions 紅色註解 | 貼新版 `email-notify.gs` |
+| 變更控制 | 程式有改先跑全部測試（`.github/workflows/metals.yml` 的 test job，失敗不部署；其他分支與 PR 由 `tests.yml` 跑）；頁尾顯示網頁版本與後端版本，對不上警告 | 貼新版 `google-apps-script-erp.gs` |
+| 備份與復原 | `backup.gs`：每天 03:00 複製整份試算表到雲端硬碟（留 30 份）、列數大減警示、每月還原演練、`restoreSheet` 單張救回 | 貼 `backup.gs` → 執行 `installBackupTrigger` |
+| 權限與職能分工 | 七種職務（老闆、主管、業務、生管倉管、會計、行政、唯讀），伺服器端把關並遮掉成本；高風險操作通知老闆；每季帳號盤點；停用或離職立刻失效 | 貼新版 ERP 檔 → 執行 `accessSetup` →（選用）主檔 doPost 加 `accessGate_` 那一行 → `installAccessTrigger` |
+| 營運風險儀表板 | `biz-kri.js`：14 個指標（負毛利、逾期應收、客戶集中度、缺料、盤點差異、工單成本超支、簽核卡關、設備保養、加班上限…），與排程風險同一套燈號／趨勢／通知 | 貼新版 `sched-alerts.gs`（已裝過的要重貼） |
+
+主檔 `google-apps-script.gs` 在 `var p = body.payload || {};` 下面多了三行（`accessGate_`）。你自己的主檔有填 CLIENT_ID／ALLOWED_EMAILS，**不要整份覆蓋**，只把那三行貼進去。
