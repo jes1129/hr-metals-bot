@@ -75,7 +75,7 @@
   function accountForm(r) {
     var editing = !!r; r = r || {};
     U.form({ title: editing ? "修改帳號" : "新增帳號", fields: [
-      editing ? { type: "html", html: '<div class="dbnote">帳號 <b>' + esc(r.id) + "</b></div>" } : { k: "id", l: "Google 帳號 Email", req: 1, ph: "例：amy@gmail.com" },
+      editing ? { type: "html", html: '<div class="dbnote">帳號 <b>' + esc(r.id) + "</b></div>" } : { k: "id", l: "Google 帳號 Email", req: 1, ph: "例：user@example.com" },
       { k: "name", l: "姓名", value: r.name },
       { k: "role", l: "職務", type: "select", opts: roleOpts(), value: r.role || "sales", req: 1 },
       { k: "active", l: "狀態", type: "check", text: "啟用（取消勾選＝停用，這個人立刻無法使用）", value: editing ? r.active : true }],

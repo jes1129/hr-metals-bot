@@ -1624,10 +1624,10 @@
   function notifyBox() {
     var n = S.notify, nt = lsGet("sched_notice_v1") || {}, hb = nt.hb || 0;
     var hbText = !authed() ? "登入公司帳號後，設定才會存到公司試算表、自動通知才讀得到。" : !hb ? "<b class=\"erp-bad\">自動通知排程還沒啟用</b>：要在 Apps Script 貼上 <code>sched-alerts.gs</code>，執行一次 <code>installSchedAlertTrigger</code>。" : "自動通知最近一次檢查：" + Math.round((Date.now() - hb) / 60000) + " 分鐘前（平日 08:00–18:59 每 30 分鐘）。";
-    var owners = ["生管", "班長", "業務"].map(function (r) { return '<label class="dbfield"><span>' + r + ' Email（空白＝寄給老闆）</span><input type="text" data-ntf-owner="' + r + '" value="' + esc(n.owners[r] || "") + '" placeholder="例：planner@your-company.com"></label>'; }).join("");
+    var owners = ["生管", "班長", "業務"].map(function (r) { return '<label class="dbfield"><span>' + r + ' Email（空白＝寄給老闆）</span><input type="text" data-ntf-owner="' + r + '" value="' + esc(n.owners[r] || "") + '" placeholder="例：user@example.com"></label>'; }).join("");
     return '<div class="erp-sec sc-notify"><div class="erp-sechead"><h3>' + ic("bell") + "自動通知設定</h3></div>"
       + '<div class="erp-muted">指標越線時，由 Apps Script 每 30 分鐘檢查並寄信，也寫進網頁右上角的「通知中心」（鈴鐺）。<b>黃燈</b>通知該指標的負責人；<b>紅燈</b>通知負責人加老闆；<b>趨勢預警</b>只放在通知中心，不寄信。同一件事 ' + S.notify.repeatHours + " 小時內不重複寄；紅燈 " + S.notify.escalateMin + " 分鐘沒有人按「已知悉」，會再通知老闆一次。</div>"
-      + '<div class="sc-nform"><label class="dbfield"><span>老闆 Email（可填多個，用逗號分開；空白＝用 Apps Script 的 NOTIFY_EMAILS 或試算表擁有者）</span><input type="text" data-ntf="boss" value="' + esc(n.boss) + '" placeholder="例：boss@your-company.com"></label>' + owners
+      + '<div class="sc-nform"><label class="dbfield"><span>老闆 Email（可填多個，用逗號分開；空白＝用 Apps Script 的 NOTIFY_EMAILS 或試算表擁有者）</span><input type="text" data-ntf="boss" value="' + esc(n.boss) + '" placeholder="例：admin@example.com"></label>' + owners
       + '<label class="dbfield"><span>紅燈沒人處理幾分鐘後，再通知老闆一次</span><input type="number" min="5" step="5" data-ntf="escalateMin" value="' + n.escalateMin + '"></label>'
       + '<label class="dbfield"><span>同一件事幾小時內不重複通知</span><input type="number" min="1" step="1" data-ntf="repeatHours" value="' + n.repeatHours + '"></label>'
       + '<label class="dbfield dbcheck"><input type="checkbox" data-ntf="enabled"' + (n.enabled ? " checked" : "") + ">啟用自動通知</label></div>"

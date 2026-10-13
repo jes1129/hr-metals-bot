@@ -48,9 +48,9 @@ test("網頁需要的後端版本（app.js 的 NEED）不能高於程式碼裡�
 
 test("沒有 ERP_EMAILS 權限的人也能看版本（版本不含資料），其他 ERP 動作仍受限", () => {
   const ctx = load(["google-apps-script-erp.gs"]);
-  ctx.PropertiesService = { getScriptProperties: () => ({ getProperty: (k) => (k === "ERP_EMAILS" ? "boss@x.com" : null) }) };
-  assert.equal(ctx.erpDispatch_("appVersion", {}, "staff@x.com").ok, true);
-  assert.match(ctx.erpDispatch_("erpLoad", {}, "staff@x.com").error, /沒有 ERP 權限/);
+  ctx.PropertiesService = { getScriptProperties: () => ({ getProperty: (k) => (k === "ERP_EMAILS" ? "boss@example.com" : null) }) };
+  assert.equal(ctx.erpDispatch_("appVersion", {}, "user@example.com").ok, true);
+  assert.match(ctx.erpDispatch_("erpLoad", {}, "user@example.com").error, /沒有 ERP 權限/);
 });
 
 test("CI 流程：部署前先跑測試，失敗就不部署", () => {
