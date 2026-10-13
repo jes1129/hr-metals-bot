@@ -35,6 +35,14 @@
       hint: "訂單清單有、但排程裡沒有的單，目前只是用現場做法暫排。" },
     { id: "P3", grp: "計畫新舊", risk: "設定被改動", name: "工廠設定改過、排程還沒重排", unit: "項", dir: "hi", y: 1, r: null, owner: "生管", action: "fresh", actionLabel: "從頭排程",
       hint: "站別、機台數、工時改過之後，原本的排程是依舊設定算的。" },
+    { id: "L1", grp: "領先指標（早期預警）", risk: "產能不夠接單（需求超過產能）", name: "未來 5 個工作日要交的單：工時需求 ÷ 產能", unit: "%", dir: "hi", y: 85, r: 100, owner: "生管", action: "board", actionLabel: "看各站忙碌、考慮外包",
+      hint: "最早的警訊：還沒延遲，但需求已經逼近產能。取各站裡最緊的一站；超過 100% 代表來不及。" },
+    { id: "L2", grp: "領先指標（早期預警）", risk: "交期緩衝被吃光", name: "未完工訂單的平均交期寬裕", unit: "小時", dir: "lo", y: 12, r: 4, owner: "業務", action: "board", actionLabel: "看延遲風險的單",
+      hint: "每張未完工的單，預計完工離交期還剩多少緩衝，取平均。緩衝一路縮小，就是延遲的前兆。" },
+    { id: "L3", grp: "領先指標（早期預警）", risk: "交期不穩", name: "未完工訂單的平均準時機率", unit: "%", dir: "lo", y: 90, r: 75, owner: "業務", action: "board", actionLabel: "看準時機率",
+      hint: "考慮加工時間誤差後，未完工的單平均有多大機會準時。比「準時率」更早反應。" },
+    { id: "L4", grp: "領先指標（早期預警）", risk: "外包依賴升高", name: "外包佔比（未完工訂單）", unit: "%", dir: "hi", y: 5, r: 15, owner: "老闆", action: "board", actionLabel: "看外包的單",
+      hint: "未完工的單裡，外包的件數佔幾成。越來越高，代表自家產能撐不住。" },
     { id: "S1", grp: "交期", risk: "交期落空", name: "準時率", unit: "%", dir: "lo", y: 95, r: 85, owner: "業務", action: "board", actionLabel: "看延遲的單",
       hint: "預計能準時完工的單 ÷ 有交期的單。" },
     { id: "S2", grp: "交期", risk: "交期落空", name: "預計最大延遲", unit: "小時", dir: "hi", y: 2, r: 8, owner: "業務", action: "board", actionLabel: "看延遲的單",
@@ -96,7 +104,7 @@
         due++; if (st.act && st.act.e != null && !st.act.inferred) rep++;
       });
     });
-    var st = ctx.stats || {}, pl = ctx.plan || {};
+    var st = ctx.stats || {}, pl = ctx.plan || {}, ld = ctx.lead || {};
     var V = {
       D1: d1 == null ? null : d1,
       D2: errs.length ? run : null,
@@ -109,6 +117,10 @@
       S1: st.hasDue ? st.onTimeRate * 100 : null,
       S2: st.hasDue ? Math.max(0, st.maxLate || 0) / 60 : null,
       S3: st.shaky == null ? null : st.shaky,
+      L1: ld.load == null ? null : ld.load * 100,
+      L2: ld.slack == null ? null : ld.slack / 60,
+      L3: ld.prob == null ? null : ld.prob * 100,
+      L4: ld.outPct == null ? null : ld.outPct * 100,
       C1: ctx.util == null ? null : ctx.util * 100,
       C2: st.outCost == null ? null : st.outCost
     };
@@ -128,6 +140,10 @@
         else if (def.id === "S1") msg = "預計只有 " + pct0(v) + " 準時（" + ((st.hasDue || 0) - (st.late || 0)) + "／" + st.hasDue + " 張）。";
         else if (def.id === "S2") msg = "最晚的一張預計晚 " + disp + "。";
         else if (def.id === "S3") msg = v + " 張的準時機率低於 70%，加工稍慢就會延遲。";
+        else if (def.id === "L1") msg = "未來 5 個工作日要交的單，工時需求已達產能的 " + disp + (ld.loadName ? "（最緊的是「" + ld.loadName + "」）" : "") + "，再插單就會延遲。";
+        else if (def.id === "L2") msg = v < 0 ? "未完工訂單預計平均已經比交期晚 " + (Math.abs(v) >= 10 ? Math.abs(v).toFixed(0) : Math.abs(v).toFixed(1)).replace(/\.0$/, "") + " 小時。" : "未完工訂單平均只剩 " + disp + " 的交期緩衝。";
+        else if (def.id === "L3") msg = "未完工訂單平均準時機率只剩 " + disp + "。";
+        else if (def.id === "L4") msg = "未完工訂單有 " + disp + " 靠外包。";
         else if (def.id === "C1") msg = "瓶頸站忙碌 " + disp + "，幾乎沒有彈性。";
         else if (def.id === "C2") msg = "外包費合計 " + disp + "。";
       }
@@ -165,12 +181,45 @@
 
   // 給首頁、選單紅點、每日早報用的精簡快照（orders：單號＋預計完工與實際完工的絕對時間 ms，早報在 Apps Script 端再算「逾時沒回報」）
   function snapshot(items, extra) {
-    var c = counts(items);
-    return Object.assign({ v: 1, ts: Date.now(), worst: worst(items), red: c.red, yellow: c.yellow, green: c.green,
+    var c = counts(items), tol = {};
+    items.forEach(function (x) { tol[x.id] = { y: x.y, r: x.r, owner: x.owner, name: x.name, dir: x.dir, unit: x.unit }; });
+    return Object.assign({ v: 1, ts: Date.now(), worst: worst(items), red: c.red, yellow: c.yellow, green: c.green, tol: tol,
       items: items.filter(function (x) { return x.level === "red" || x.level === "yellow"; }).map(function (x) { return { id: x.id, name: x.name, level: x.level, display: x.display, msg: x.msg, owner: x.owner, actionLabel: x.actionLabel }; }) }, extra || {});
   }
 
-  var api = { DEFS: DEFS, LABEL: LABEL, LV: LV, evaluate: evaluate, worst: worst, counts: counts, gate: gate, transitions: transitions, levels: levels, snapshot: snapshot, tolOf: tolOf, thresholdText: thresholdText };
+  // 趨勢（領先）：用歷史值判斷「正在惡化／改善」，並預估多久會碰到下一道門檻
+  //   hist：[{t(ms), v:{id: 數字}}]（舊→新）；items：evaluate 的結果；回傳 {id: {n, dir: none|flat|worse|better, eta:{to,days}|null, slopeDay}}
+  var DAY = 86400000;
+  function trends(hist, items) {
+    var out = {};
+    items.forEach(function (x) {
+      var pts = (hist || []).filter(function (p) { return p.v && p.v[x.id] != null; }).slice(-8).map(function (p) { return [p.t, p.v[x.id]]; });
+      var r = { n: pts.length, dir: "none", eta: null, slopeDay: 0 };
+      out[x.id] = r;
+      if (pts.length < 3 || x.value == null) return;
+      var span = pts[pts.length - 1][0] - pts[0][0];
+      if (span < 2 * 3600000) return;
+      var n = pts.length, t0 = pts[0][0], sx = 0, sy = 0, sxx = 0, sxy = 0;
+      pts.forEach(function (q) { var tx = (q[0] - t0) / DAY; sx += tx; sy += q[1]; sxx += tx * tx; sxy += tx * q[1]; });
+      var den = n * sxx - sx * sx, slope = den > 1e-12 ? (n * sxy - sx * sy) / den : 0;
+      r.slopeDay = slope;
+      var hi = x.dir === "hi", scale = Math.max(Math.abs(x.y), 1e-9), l3 = pts.slice(-3);
+      var worse = hi ? (l3[0][1] < l3[1][1] && l3[1][1] < l3[2][1]) : (l3[0][1] > l3[1][1] && l3[1][1] > l3[2][1]);
+      var better = hi ? (l3[0][1] > l3[1][1] && l3[1][1] > l3[2][1]) : (l3[0][1] < l3[1][1] && l3[1][1] < l3[2][1]);
+      var chg = Math.abs(l3[2][1] - l3[0][1]) / scale;
+      r.dir = worse && chg >= 0.03 ? "worse" : better && chg >= 0.03 ? "better" : "flat";
+      if (r.dir === "worse" && span >= 6 * 3600000 && Math.abs(slope) > 1e-9 && (hi ? slope > 0 : slope < 0)) {
+        var target = x.level === "green" ? x.y : (x.level === "yellow" && x.r != null ? x.r : null);
+        if (target != null) {
+          var dist = hi ? target - x.value : x.value - target, d = dist / Math.abs(slope);
+          if (dist > 0 && d <= 3) r.eta = { to: x.level === "green" ? "yellow" : "red", days: d };
+        }
+      }
+    });
+    return out;
+  }
+
+  var api = { trends: trends, DEFS: DEFS, LABEL: LABEL, LV: LV, evaluate: evaluate, worst: worst, counts: counts, gate: gate, transitions: transitions, levels: levels, snapshot: snapshot, tolOf: tolOf, thresholdText: thresholdText };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.SchedKri = api;
 })(typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : this);

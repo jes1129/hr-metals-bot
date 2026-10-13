@@ -178,3 +178,61 @@ test("回報後重排：已回報的站固定不動，機型與拆批鎖住", ()
   assert.equal(o1.X.asg[2 * M.S + 0], o0.X.asg[2 * M.S + 0], "第一站機型沒被改");
   void cfg; void cal; void orders;
 });
+
+// ---------- 領先指標與趨勢 ----------
+test("領先指標：工時需求÷產能、交期寬裕、平均準時機率、外包佔比", () => {
+  const mk = (lead) => K.evaluate(Object.assign(ctx([]), { lead }));
+  assert.equal(get(mk({ load: 0.8 }), "L1").level, "green");
+  assert.equal(get(mk({ load: 0.9, loadName: "CNC 加工" }), "L1").level, "yellow");
+  const l1 = get(mk({ load: 1.05, loadName: "CNC 加工" }), "L1");
+  assert.equal(l1.level, "red"); assert.match(l1.msg, /CNC 加工/);
+  assert.equal(get(mk({ slack: 20 * H }), "L2").level, "green");
+  assert.equal(get(mk({ slack: 8 * H }), "L2").level, "yellow");
+  assert.equal(get(mk({ slack: 2 * H }), "L2").level, "red");
+  assert.equal(get(mk({ prob: 0.95 }), "L3").level, "green");
+  assert.equal(get(mk({ prob: 0.8 }), "L3").level, "yellow");
+  assert.equal(get(mk({ prob: 0.6 }), "L3").level, "red");
+  assert.equal(get(mk({ outPct: 0.03 }), "L4").level, "green");
+  assert.equal(get(mk({ outPct: 0.1 }), "L4").level, "yellow");
+  assert.equal(get(mk({ outPct: 0.2 }), "L4").level, "red");
+  assert.equal(get(mk({}), "L1").level, "na");
+});
+
+function series(id, vals, stepH = 4) {                    // 每 stepH 小時一筆，最後一筆是現在
+  const now = Date.now();
+  return vals.map((v, k) => ({ t: now - (vals.length - 1 - k) * stepH * 3600000, v: { [id]: v } }));
+}
+function item(id, value, o = {}) { return Object.assign({ id, value, dir: "hi", y: 85, r: 100, level: value >= 100 ? "red" : value >= 85 ? "yellow" : "green" }, o); }
+
+test("趨勢：連續往壞的方向走＝惡化中；往好的方向＝改善中；其餘持平", () => {
+  const w = K.trends(series("L1", [60, 66, 72, 78]), [item("L1", 78)]).L1;
+  assert.equal(w.dir, "worse");
+  const b = K.trends(series("L1", [90, 84, 78, 70]), [item("L1", 70)]).L1;
+  assert.equal(b.dir, "better");
+  const f = K.trends(series("L1", [70, 75, 70, 75]), [item("L1", 75)]).L1;
+  assert.equal(f.dir, "flat");
+  const lo = K.trends(series("L3", [95, 92, 88, 84]), [item("L3", 84, { dir: "lo", y: 90, r: 75, level: "yellow" })]).L3;
+  assert.equal(lo.dir, "worse");                           // 準時機率越來越低＝惡化
+});
+
+test("趨勢：照目前速度 3 天內會碰到下一道門檻，就給預計天數；太慢或已改善就不給", () => {
+  const e = K.trends(series("L1", [60, 66, 72, 78], 12), [item("L1", 78)]).L1;      // 每 12 小時 +6 → 每天 +12；離 85 還差 7 → 約 0.6 天
+  assert.equal(e.dir, "worse"); assert.equal(e.eta.to, "yellow"); assert.ok(e.eta.days > 0.3 && e.eta.days < 1.2);
+  const y = K.trends(series("L1", [86, 90, 94, 97], 12), [item("L1", 97)]).L1;       // 黃燈中，往紅線 100 走
+  assert.equal(y.eta.to, "red");
+  const slow = K.trends(series("L1", [50, 50.5, 51, 51.5], 24), [item("L1", 51.5)]).L1;
+  assert.equal(slow.eta, null);                            // 每天 +0.5，離 85 要 60 多天
+  assert.equal(K.trends(series("L1", [90, 84, 78, 70], 12), [item("L1", 70)]).L1.eta, null);
+});
+
+test("趨勢：資料太少或時間太短不亂判斷", () => {
+  assert.equal(K.trends(series("L1", [60, 70]), [item("L1", 70)]).L1.dir, "none");
+  assert.equal(K.trends(series("L1", [60, 66, 72, 78], 0.2), [item("L1", 78)]).L1.dir, "none");   // 全部擠在 1 小時內
+  assert.equal(K.trends([], [item("L1", 70)]).L1.n, 0);
+  assert.equal(K.trends(series("L1", [60, 66, 72, 78]), [item("L1", null)]).L1.dir, "none");
+});
+
+test("快照帶門檻與負責人（早報／自動通知的伺服器端要用）", () => {
+  const s = K.snapshot(K.evaluate(ctx([], { util: 0.99 })), {});
+  assert.equal(s.tol.C1.y, 90); assert.equal(s.tol.C1.owner, "生管"); assert.equal(s.tol.D4.r, 3);
+});

@@ -82,10 +82,78 @@
     var box = document.getElementById("kriBox"); if (!box) return;
     if (!s) { box.innerHTML = ""; return; }
     var top = (s.items || []).slice(0, 3).map(function (x) { return "<li><b>" + escAttr(x.name) + "</b>（" + escAttr(x.display) + "）" + escAttr(x.msg || "") + "</li>"; }).join("");
-    box.innerHTML = '<a class="kri-card ' + lvl + '" href="schedule.html#tab=risk"><div class="kri-h">' + ic("alert") + "<b>排程風險燈號</b>"
-      + '<span class="kri-n">' + (s.red ? s.red + " 紅燈" : "") + (s.red && s.yellow ? "・" : "") + (s.yellow ? s.yellow + " 黃燈" : "") + (!s.red && !s.yellow ? "全部正常" : "") + "</span></div>"
-      + (top ? "<ul>" + top + "</ul>" : "") + (stale ? '<div class="kri-stale">燈號資料已 ' + Math.floor(age) + " 小時沒有更新（最近一次有人打開排程頁是 " + new Date(s.ts).toLocaleString("zh-TW", { hour12: false }) + "）。沒人更新，燈號就不準。</div>" : "") + "</a>";
+    box.innerHTML = '<a class="kri-card ' + lvl + '" href="schedule.html#tab=dash"><div class="kri-h">' + ic("alert") + "<b>排程風險燈號</b>"
+      + '<span class="kri-n">' + (s.red ? s.red + " 紅燈" : "") + (s.red && s.yellow ? "・" : "") + (s.yellow ? s.yellow + " 黃燈" : "") + (!s.red && !s.yellow ? "全部正常" : "") + (s.rising ? "・" + s.rising + " 項惡化中" : "") + "</span></div>"
+      + (top ? "<ul>" + top + "</ul>" : "") + ((s.soon || []).length ? '<div class="kri-soon">預警：' + s.soon.slice(0, 3).map(function (x) { return escAttr(x.name) + "預計 " + (x.days < 1 ? "不到 1" : x.days) + " 天後轉" + (x.to === "red" ? "紅燈" : "黃燈"); }).join("；") + "</div>" : "") + (stale ? '<div class="kri-stale">燈號資料已 ' + Math.floor(age) + " 小時沒有更新（最近一次有人打開排程頁是 " + new Date(s.ts).toLocaleString("zh-TW", { hour12: false }) + "）。沒人更新，燈號就不準。</div>" : "") + "</a>";
   }
+  // ---------- 通知中心（鈴鐺）：sched-alerts.gs 每 30 分鐘檢查，結果寫進 sched_notice／sched_alert ----------
+  var NT_KEY = "sched_notice_v1";
+  var NOTICE_HDR = ["id", "t", "kind", "key", "level", "name", "display", "msg", "owner", "to", "read"];
+  var ALERT_HDR = ["id", "level", "active", "first", "lastN", "nlevel", "ack", "ackBy", "ackAt", "esc", "name", "display", "msg", "owner", "t"];
+  function ntGet() { try { return JSON.parse(localStorage.getItem(NT_KEY)) || {}; } catch (e) { return {}; } }
+  function ntSet(o) { try { localStorage.setItem(NT_KEY, JSON.stringify(o)); } catch (e) {} }
+  function ntWindow() { var d = new Date(Date.now() + 8 * 3600000), dow = d.getUTCDay(); return dow >= 1 && dow <= 5 && d.getUTCHours() >= 8 && d.getUTCHours() < 19; }
+  function ntAgo(ms) { var m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 60 ? m + " 分鐘前" : m < 1440 ? Math.floor(m / 60) + " 小時前" : Math.floor(m / 1440) + " 天前"; }
+  function ntUnread() { var st = ntGet(), k = kriSnap(); return (st.notices || []).filter(function (n) { return Number(n.read) !== 1 && n.kind !== "ok"; }).length + (k && k.soon ? k.soon.length : 0); }
+  function ntBell() {
+    var box = document.querySelector(".toplinks"); if (!box) return null;
+    var b = document.getElementById("noticeBtn");
+    if (!b) {
+      b = document.createElement("button"); b.type = "button"; b.id = "noticeBtn"; b.className = "tsearch np-btn"; b.setAttribute("aria-label", "通知中心");
+      b.innerHTML = ic("bell") + '<span class="np-badge" hidden></span>';
+      var after = document.getElementById("paletteBtn"); box.insertBefore(b, after ? after.nextSibling : box.firstChild);
+      b.addEventListener("click", function (e) { e.stopPropagation(); var p = document.getElementById("noticePanel"); if (p && p.style.display !== "none") { p.style.display = "none"; return; } ntPanel(true); noticePull(); });
+      document.addEventListener("click", function (e) { var p = document.getElementById("noticePanel"); if (p && p.style.display !== "none" && !p.contains(e.target)) p.style.display = "none"; });
+    }
+    return b;
+  }
+  function ntPaint() {
+    var b = ntBell(); if (!b) return;
+    b.hidden = !idToken;
+    var n = ntUnread(), bd = b.querySelector(".np-badge"); bd.hidden = !n; bd.textContent = n > 9 ? "9+" : n;
+    var st = ntGet(), red = (st.notices || []).some(function (x) { return Number(x.read) !== 1 && x.level === "red"; });
+    b.classList.toggle("red", red && n > 0);
+    var p = document.getElementById("noticePanel"); if (p && p.style.display !== "none") ntPanel(false);
+  }
+  function ntPanel(open) {
+    var p = document.getElementById("noticePanel");
+    if (!p) { p = document.createElement("div"); p.id = "noticePanel"; p.className = "np"; document.body.appendChild(p); p.addEventListener("click", function (e) {
+      var t = e.target.closest("[data-np]"); if (!t) return; var a = t.getAttribute("data-np");
+      if (a === "refresh") noticePull(); else if (a === "ack") { var q = t.getAttribute("data-v").split("|"); noticeAck(q[0], q[1]); }
+    }); }
+    var st = ntGet(), k = kriSnap(), hb = st.hb || 0, h = '<div class="np-h"><b>' + ic("bell") + "通知中心</b><button type=\"button\" class=\"np-b\" data-np=\"refresh\">重新整理</button></div>";
+    h += '<div class="np-hb ' + (!hb ? "bad" : (ntWindow() && Date.now() - hb > 100 * 60000 ? "bad" : "ok")) + '">'
+      + (!hb ? "自動通知排程還沒啟用（Apps Script 要貼上 sched-alerts.gs 並執行 installSchedAlertTrigger）。" : ntWindow() && Date.now() - hb > 100 * 60000 ? "自動通知已經 " + ntAgo(hb).replace("前", "") + "沒有執行，請確認 Apps Script 的觸發條件。" : "自動通知最近一次檢查：" + ntAgo(hb) + "（平日 08:00–18:59，每 30 分鐘）") + "</div>";
+    var soon = (k && k.soon) || [];
+    if (soon.length) h += '<div class="np-s">預警（趨勢，只在這裡提醒）</div>' + soon.map(function (x) { return '<div class="np-i soon"><b>' + escAttr(x.name) + "</b> 照目前速度，預計 " + (x.days < 1 ? "不到 1" : x.days) + " 天後轉" + (x.to === "red" ? "紅燈" : "黃燈") + "</div>"; }).join("");
+    var ns = (st.notices || []).slice(0, 20);
+    h += '<div class="np-s">通知</div>' + (ns.length ? ns.map(function (n) {
+      var unread = Number(n.read) !== 1 && n.kind !== "ok";
+      return '<div class="np-i ' + (n.level || "") + (unread ? " unread" : "") + '"><div class="np-t"><span class="np-lv ' + (n.level || "") + '">' + (n.kind === "ok" ? "恢復" : n.kind === "esc" ? "升級" : n.level === "red" ? "紅燈" : "黃燈") + "</span>" + escAttr(n.name) + (n.display ? "（" + escAttr(n.display) + "）" : "") + '<em>' + ntAgo(Number(n.t)) + "</em></div>"
+        + (n.msg ? '<div class="np-m">' + escAttr(n.msg) + "</div>" : "") + (n.to ? '<div class="np-m">已通知：' + escAttr(n.to) + "</div>" : "")
+        + (unread ? '<button type="button" class="np-b" data-np="ack" data-v="' + escAttr(n.id) + "|" + escAttr(n.key) + '">已知悉</button>' : "") + "</div>";
+    }).join("") : '<div class="np-m">還沒有通知。</div>') + '<a class="np-a" href="schedule.html#tab=dash">打開風險儀表板 →</a>';
+    p.innerHTML = h; if (open) p.style.display = "block";
+  }
+  function noticePull(cb) {
+    if (!API || !idToken) { ntPaint(); return; }
+    Promise.all([dbCall("tList", { table: "sched_notice" }), dbCall("tList", { table: "sched_alert" })]).then(function (r) {
+      var n = (r[0] && r[0].rows) || [], a = (r[1] && r[1].rows) || [], hb = 0, alerts = {};
+      a.forEach(function (x) { if (x.id === "_hb") hb = Number(x.t) || 0; else alerts[x.id] = x; });
+      n.sort(function (x, y) { return Number(y.t) - Number(x.t); });
+      ntSet({ ts: Date.now(), notices: n.slice(0, 40), alerts: alerts, hb: hb });
+      ntPaint(); if (cb) cb();
+    });
+  }
+  function noticeAck(id, key, cb) {                      // 已知悉：通知標已讀、這個警示標已處理（之後不再催，變更糟才再通知）
+    var st = ntGet(), now = Date.now(), who = gUser ? gUser.email : "";
+    (st.notices || []).forEach(function (n) {
+      if ((id && n.id === id) || (key && n.key === key)) { if (Number(n.read) !== 1) dbCall("tUpsert", { table: "sched_notice", row: { id: n.id, read: 1 }, header: NOTICE_HDR }); n.read = 1; }
+    });
+    if (key) { dbCall("tUpsert", { table: "sched_alert", row: { id: key, ack: 1, ackBy: who, ackAt: now }, header: ALERT_HDR }); if (st.alerts && st.alerts[key]) { st.alerts[key].ack = 1; st.alerts[key].ackBy = who; st.alerts[key].ackAt = now; } }
+    ntSet(st); ntPaint(); if (cb) cb();
+  }
+  window.__noticePull = noticePull; window.__noticeAck = noticeAck;
   function kriPull() {                                   // 登入後從公司試算表讀最新快照（小表，不必載入整份排程）
     if (!API || !idToken) return;
     dbCall("tList", { table: "sched_kri" }).then(function (d) {
@@ -158,7 +226,7 @@
     if (window.__refreshHome) window.__refreshHome();
     if (window.__refreshErp) window.__refreshErp();
     if (window.__refreshSched) window.__refreshSched();
-    kriBadges(); if (gUser) kriPull();
+    kriBadges(); if (gUser) { kriPull(); noticePull(); } else ntPaint();
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
@@ -1087,7 +1155,8 @@
     if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
     if (document.getElementById("ordersView")) initOrders();     // 訂單 + 老闆儀表板
     if (document.getElementById("stShip")) initHome();            // 首頁今日數字看板
-    kriBadges();
+    kriBadges(); ntPaint();
+    setInterval(function () { if (!document.hidden && idToken) noticePull(); }, 300000);     // 通知中心每 5 分鐘更新
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
     // 情報下拉：點空白處收起（原生 details 負責開關）
     document.addEventListener("click", function (e) {

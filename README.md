@@ -126,7 +126,7 @@ ERP（料號庫存 FIFO、進貨、報價、銷售訂單、BOM／工單、客戶
 - **計算都在瀏覽器**（`sched-worker.js` 背景執行緒），訂單不會送到外部服務。
 - **方法**：陳建銘（2015，清大博士論文）／Lin & Chen（2015, SIMPAT 51:100–114）的「離散事件模擬＋基因演算法＋OCBA」為核心，融合迭代貪婪（Ruiz & Stützle 2007）、NEH 插入、ATC 派工（Vepsalainen & Morton 1987）、多目標（平均週期×加權延遲）與事件驅動重排程（Peng et al. 2019；Uhlmann et al. 2022）。完整文獻在頁面「方法說明」，同一頁也會把系統算的結果和論文範例（50,000／44,000／48,000／42,000）逐項對答案。
 - **檔案**：`docs/assets/sched-engine.js`（引擎，瀏覽器與 Node 測試共用）、`sched-worker.js`、`sched.js`＋`sched.css`（畫面）、`sched-data.js`（預設工廠與範例訂單）。測試：`node --test tests/sched-engine.test.mjs`。
-- **風險監控**（`docs/assets/sched-kri.js`，測試 `tests/sched-risk.test.mjs`、`tests/sched-brief.test.mjs`）：風險 → 監控指標（KRI）→ 黃／紅門檻 → 觸發（排程頁警示列、選單紅點、首頁燈號卡、觸發紀錄、早報信）。「進度回報」分頁每一站回報實際時間，ERP 工單完工自動帶入整張單完工；採用新排程前依燈號檢查（黃燈勾選確認、紅燈填原因＋二次確認）；每次採用、每次工廠設定修改都留紀錄，可預覽並回復。額外會多出兩張小表：`sched_kri`（燈號快照）、`sched_ver`（各版排程內容）。早報信要把新版 `email-notify.gs` 貼進 Apps Script（只需貼檔案，不用重新部署網頁）。設計參考 COSO 2026《GenAI 內部控制指引》的內控觀念。
+- **風險監控與自動通知**（`docs/assets/sched-kri.js`、`sched-alerts.gs`；測試 `tests/sched-risk.test.mjs`、`sched-brief.test.mjs`、`sched-alerts.test.mjs`）：風險 → 17 個監控指標（KRI，含領先指標：未來 5 個工作日負荷、交期寬裕、平均準時機率、外包佔比）→ 黃／紅門檻 → 觸發。「風險儀表板」有熱度圖、小曲線、惡化箭頭、預計幾天後轉壞的預警、最近惡化排行（歷史每 30 分鐘記一筆，存小表 `sched_hist`）；「進度回報」每一站回報實際時間，ERP 工單完工自動帶入整張單完工；採用新排程前依燈號檢查（黃燈勾選、紅燈填原因＋二次確認）；每次採用、每次工廠設定修改都留紀錄可預覽回復（`sched_ver`）。**自動通知**：把 `sched-alerts.gs` 貼進 Apps Script 並執行 `installSchedAlertTrigger`，平日 08:00–18:59 每 30 分鐘檢查，黃燈通知負責人、紅燈加老闆、同一次檢查合併成每人一封、24 小時不重複、紅燈 30 分鐘沒人「已知悉」升級老闆；趨勢預警只放在網頁右上角通知中心（`sched_notice`、`sched_alert`、`sched_cfg`、`sched_kri` 幾張小表）。早報信要貼新版 `email-notify.gs`。設計參考 COSO 2026《GenAI 內部控制指引》的內控觀念。
 - **限制**：不含物料齊套檢查、人員技能排班、各機台各自的上下班時間；燈號在有人開排程頁時才計算（早報信會在寄信當下補算「逾時沒回報」與「資料太久沒更新」）。
 
 ### 交接給客戶時
