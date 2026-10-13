@@ -1,7 +1,7 @@
 /**
  * 九上科技儀表板 — ERP 後端（Google Apps Script 第二個檔案）
  *
- * ⚠️ 自動產生，請勿手改：來源是 docs/assets/erp-engine.js + erp-admin.js + gas/erp-adapter.gs，
+ * ⚠️ 自動產生，請勿手改：來源是 docs/assets/erp-engine.js + erp-admin.js + erp-roles.js + gas/erp-adapter.gs，
  *    修改後執行 python scripts/build_erp_gas.py 重新產生。
  *
  * 安裝：在同一個 Apps Script 專案按「＋ → 指令碼」新增檔案（名稱例：erp），把本檔全部貼進去；
@@ -1197,6 +1197,100 @@
   if (typeof module !== "undefined" && module.exports) module.exports = E;
 })(typeof window !== "undefined" ? window : this);
 
+/*
+ * erp-roles.js — 職能分工規則（純計算，沒有畫面也沒有儲存）
+ *
+ * 同一份程式在三個地方執行：瀏覽器（隱藏看不到的欄位）、Apps Script（真正擋下不該做的操作、
+ * 把看不到的欄位在伺服器端就拿掉）、Node（tests/roles.test.mjs 驗算）。
+ * 真正的把關在伺服器端；瀏覽器只是不顯示。
+ *
+ * 職務：老闆／主管／業務／生管倉管／會計／行政／唯讀。
+ * 原則：業務看不到成本與毛利；人事資料只有老闆、主管、行政、會計看得到；會計只管收付款；
+ *       匯入備份、帳號設定只有老闆與主管能做；還沒設定任何帳號時維持原狀（所有登入者權限相同），避免把自己鎖在門外。
+ */
+(function (root) {
+  "use strict";
+
+  var ROLES = {
+    boss:    { name: "老闆",     all: true,  seeCost: true,  seePersonnel: true,  manage: true,  rank: 7 },
+    manager: { name: "主管",     all: true,  seeCost: true,  seePersonnel: true,  manage: false, rank: 6 },
+    sales:   { name: "業務",     seeCost: false, seePersonnel: false, rank: 3,
+      can: ["customer.", "deal.", "quote.", "contact.", "case.", "task.", "milestone.", "reservation.", "request.save", "request.submit", "request.withdraw", "request.delete",
+            "order.create", "order.update", "order.ship", "order.cancel",
+            "service.save", "service.confirm", "service.deliver", "service.accept", "service.request_changes"] },
+    ops:     { name: "生管／倉管", seeCost: false, seePersonnel: false, rank: 3,
+      can: ["item.", "stock.", "bom.", "wo.", "task.", "milestone.", "reservation.", "equipment.save", "request.save", "request.submit", "request.withdraw", "request.delete",
+            "order.ship", "order.return"] },
+    finance: { name: "會計",     seeCost: true,  seePersonnel: true,  rank: 4,
+      can: ["order.pay", "order.refund", "service.pay", "reservation.", "request.save", "request.submit", "request.withdraw", "request.delete"] },
+    admin:   { name: "行政",     seeCost: false, seePersonnel: true,  rank: 4,
+      can: ["unit.", "staff.", "shift.", "attendance.", "request.", "equipment.", "reservation.", "notice.", "task.", "milestone."] },
+    viewer:  { name: "唯讀",     seeCost: false, seePersonnel: false, rank: 1, can: [] }
+  };
+  var ORDER = ["boss", "manager", "sales", "ops", "finance", "admin", "viewer"];
+
+  // 看得到成本才算得出來的欄位／整張表
+  var COST_FIELDS = { items: ["std_cost"], lots: ["unit_cost"], moves: ["value"], workorders: ["extra_cost", "actual_cost"] };
+  var COST_TABLES = ["receipts"];                                   // 進貨單全是進價
+  var PERSONNEL_TABLES = ["staff", "shifts", "attendance", "requests"];
+
+  function role(r) { return ROLES[r] || null; }
+  function name(r) { return ROLES[r] ? ROLES[r].name : String(r || ""); }
+
+  /** 這個職務能不能執行這個 ERP 動作（action 例：order.pay） */
+  function can(r, action) {
+    var d = ROLES[r]; if (!d) return false;
+    if (d.all) return true;
+    var list = d.can || [];
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i];
+      if (p.charAt(p.length - 1) === "." ? String(action).indexOf(p) === 0 : action === p) return true;
+    }
+    return false;
+  }
+
+  /** 只有老闆、主管能匯入備份（整份取代）；只有老闆能管帳號 */
+  function canImport(r) { return !!(ROLES[r] && ROLES[r].all); }
+  function canManage(r) { return !!(ROLES[r] && ROLES[r].manage); }
+
+  /** 一般資料表（非 ERP_ 分頁）的存取：write=是否為寫入 */
+  function canTable(r, table, write) {
+    var d = ROLES[r]; if (!d) return false;
+    var t = String(table || "");
+    if (t === "acl") return d.manage === true;                                 // 帳號表只有老闆能讀寫
+    if (t === "高風險操作") return !write && d.all === true;                     // 高風險紀錄由伺服器寫入，老闆、主管可讀
+    if (/^ERP_/.test(t) || t === "backup_log") return d.all === true;          // ERP 分頁只透過 ERP 動作存取；直接讀寫限老闆／主管
+    if (!write) return true;
+    if (r === "viewer") return false;
+    if (/^sched_(notice|alert)$/.test(t)) return true;                        // 通知中心「已知悉」
+    if (/^sched/.test(t)) return d.all === true || r === "ops";                // 排程設定與資料：老闆、主管、生管
+    return true;
+  }
+
+  /** 伺服器端把這個職務看不到的欄位拿掉（回傳新物件，不改原本的）。world.meta.access 讓畫面知道要顯示「—」 */
+  function redact(world, r) {
+    var d = ROLES[r] || ROLES.viewer, w = JSON.parse(JSON.stringify(world));
+    w.meta = w.meta || {};
+    w.meta.access = { role: r, name: d.name, seeCost: !!d.seeCost, seePersonnel: !!d.seePersonnel };
+    if (!d.seeCost) {
+      Object.keys(COST_FIELDS).forEach(function (t) {
+        (w[t] || []).forEach(function (row) { COST_FIELDS[t].forEach(function (f) { if (f in row) row[f] = null; }); });
+      });
+      COST_TABLES.forEach(function (t) { if (w[t]) w[t] = []; });
+      (w.items || []).forEach(function (it) { it.cost_hidden = true; });
+      (w.workorders || []).forEach(function (row) { (row.consumed || []).forEach(function (c) { delete c.value; }); });
+      (w.orders || []).forEach(function (o) { (o.lines || []).forEach(function (l) { delete l.cost_layers; delete l.cost; delete l.unit_cost; }); });
+    }
+    if (!d.seePersonnel) PERSONNEL_TABLES.forEach(function (t) { if (w[t]) w[t] = []; });
+    return w;
+  }
+
+  var api = { ROLES: ROLES, ORDER: ORDER, role: role, name: name, can: can, canImport: canImport, canManage: canManage, canTable: canTable, redact: redact,
+    COST_FIELDS: COST_FIELDS, PERSONNEL_TABLES: PERSONNEL_TABLES };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.ErpRoles = api;
+})(typeof window !== "undefined" ? window : this);
+
 // ===========================================================================
 // ERP 後端（Apps Script 端）：把 ErpEngine 的資料放進試算表的 ERP_* 分頁
 //
@@ -1220,17 +1314,21 @@ function erpBackup_() {                                // 備份狀態讀不到�
   try { return typeof backupStatus_ === "function" ? backupStatus_() : null; } catch (e) { return null; }
 }
 
-function erpVersion_() {
+function erpAccess_(email) {                            // 網頁用：我是誰、什麼職務、權限控管有沒有啟用
+  try { var a = aclRole_(email); return { configured: a.configured, role: a.role, name: a.role ? ErpRoles.name(a.role) : "", why: a.why }; } catch (e) { return null; }
+}
+
+function erpVersion_(email) {
   return { ok: true, build: GAS_BUILD, api: {
     erp: GAS_API,
     alerts: typeof SA_API !== "undefined" ? SA_API : null,       // 沒貼 sched-alerts.gs → null（網頁會提示尚未安裝）
     digest: typeof EMAIL_API !== "undefined" ? EMAIL_API : null,
     backup: typeof BK_API !== "undefined" ? BK_API : null
-  }, backup: erpBackup_() };
+  }, backup: erpBackup_(), access: erpAccess_(email) };
 }
 
 function erpDispatch_(action, p, email) {
-  if (action === "appVersion") return erpVersion_();                  // 任何通過登入的人都能看版本（不含資料）
+  if (action === "appVersion") return erpVersion_(email);                  // 任何通過登入的人都能看版本（不含資料）
   if (action !== "erpLoad" && action !== "erpAct" && action !== "erpImport") return null;   // 不是 ERP 的 action → 交回原本的 unknown action
   // ERP 含售價、成本、毛利：可在「專案設定 → 指令碼屬性」加 ERP_EMAILS（逗號分隔）限定誰能用；
   // 沒設 = 所有通過主檔白名單的人都能用。其他功能（訂單看板、資料庫…）不受影響。
@@ -1238,9 +1336,21 @@ function erpDispatch_(action, p, email) {
   if (only && only.split(/\s*,\s*/).map(function (x) { return x.toLowerCase(); }).indexOf(String(email).toLowerCase()) < 0) {
     return { error: "此帳號沒有 ERP 權限（請管理者把你加入 ERP_EMAILS）：" + email };
   }
-  if (action === "erpLoad") return { ok: true, world: erpLoad_() };
-  if (action === "erpImport") return erpImport_(p || {}, email);
-  return erpAct_(p || {}, email);
+  // 職能分工：沒設定任何帳號（acl 空）= 維持原狀；設定後依職務把關，看不到的欄位在這裡就拿掉
+  var acc = aclRole_(email), role = acc.role;
+  if (acc.configured && !role) return { error: acc.why };
+  var cut = function (out) { if (acc.configured && out && out.world) out.world = ErpRoles.redact(out.world, role); return out; };
+  if (action === "erpLoad") return cut({ ok: true, world: erpLoad_() });
+  if (action === "erpImport") {
+    if (acc.configured && !ErpRoles.canImport(role)) return { error: "你的職務（" + ErpRoles.name(role) + "）不能匯入備份" };
+    var imp = erpImport_(p || {}, email);
+    if (imp && !imp.error) aclRisk_("匯入備份（整份取代 ERP 資料）", email, role, "匯入 " + Object.keys((p && p.world) || {}).length + " 個資料表");
+    return imp;
+  }
+  if (acc.configured && !ErpRoles.can(role, String((p && p.action) || ""))) return { error: "你的職務（" + ErpRoles.name(role) + "）不能執行：" + String((p && p.action) || "") };
+  var out = erpAct_(p || {}, email);
+  if (out && out.ok && /\.delete$/.test(String((p && p.action) || "")) && aclCount_(email, 1) >= ACL_DEL_LIMIT) aclRisk_("短時間大量刪除", email, role, "10 分鐘內已刪 " + ACL_DEL_LIMIT + " 筆以上（最近：" + p.action + "）");
+  return cut(out);
 }
 
 // 匯入備份（整份取代 ERP_ 分頁）：先完整檢查，不通過就什麼都不寫；寫入前在操作紀錄留一筆
@@ -1403,4 +1513,154 @@ function erpFindKey_(log, key) {
   var vals = log.getRange(from, 4, last - from + 1, 2).getDisplayValues();
   for (var i = vals.length - 1; i >= 0; i--) if (vals[i][0] === key) return vals[i][1];
   return null;
+}
+
+// ===========================================================================
+// 權限與職能分工（規則在 erp-roles.js；這裡負責讀「acl」分頁、把關、通知老闆）
+//
+//  - 「acl」分頁一列一個人：id（Email 小寫）、role（boss/manager/sales/ops/finance/admin/viewer）、active（1/0）、name。
+//  - acl 完全沒有任何啟用的帳號 = 還沒啟用權限控管，維持原狀（所有登入者權限相同），避免把自己鎖在門外。
+//    啟用方式：在 Apps Script 執行一次 accessSetup（把你自己設成老闆），之後在行政工作台「帳號權限」分頁加人。
+//  - 停用帳號（active=0）、或「ERP_員工」裡同 Email 的員工被標為離職，立刻無法使用，不必等人去改白名單。
+//  - 高風險操作（匯入備份、大量匯入、短時間大量刪除、帳號權限變更）會寫進「高風險操作」分頁並寄信給老闆。
+// ===========================================================================
+var ACL_SHEET = "acl";
+var ACL_HDR = ["id", "role", "active", "name", "ts", "by"];
+var RISK_SHEET = "高風險操作";
+var RISK_HDR = ["ts", "who", "role", "kind", "detail"];
+var ACL_BULK_ROWS = 20;                       // 一次匯入超過幾列算高風險
+var ACL_DEL_LIMIT = 5;                        // 10 分鐘內刪幾筆算「大量刪除」
+
+function aclTrue_(v) { return v === true || v === 1 || /^(1|true|yes|是|y)$/i.test(String(v).trim()); }
+function aclRows_() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ACL_SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var v = sh.getRange(1, 1, sh.getLastRow(), Math.max(sh.getLastColumn(), 1)).getValues(), hdr = v[0], out = [];
+  for (var i = 1; i < v.length; i++) {
+    var o = {}; for (var c = 0; c < hdr.length; c++) o[hdr[c]] = v[i][c];
+    if (!o.id) continue;
+    o.id = String(o.id).trim().toLowerCase(); o.active = aclTrue_(o.active); out.push(o);
+  }
+  return out;
+}
+function aclStaffInactive_(email) {           // 員工資料裡同 Email 的人被標為離職 → 視同停用
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("ERP_員工");
+    if (!sh || sh.getLastRow() < 2) return false;
+    var v = sh.getDataRange().getValues(), hdr = v[0], ei = hdr.indexOf("email"), ai = hdr.indexOf("active"), hit = false, anyActive = false;
+    if (ei < 0 || ai < 0) return false;
+    for (var i = 1; i < v.length; i++) if (String(v[i][ei]).trim().toLowerCase() === email) { hit = true; if (aclTrue_(v[i][ai])) anyActive = true; }
+    return hit && !anyActive;
+  } catch (e) { return false; }
+}
+/** → {configured, role, why}；role 為 null = 不准使用 */
+function aclRole_(email) {
+  var rows = aclRows_(), em = String(email || "").trim().toLowerCase();
+  if (!rows.some(function (r) { return r.active; })) return { configured: false, role: "boss", why: "" };
+  var me = rows.filter(function (r) { return r.id === em; })[0];
+  if (!me) return { configured: true, role: null, why: "此帳號還沒有被指派職務：" + email + "（請老闆在「帳號權限」加入）" };
+  if (!me.active) return { configured: true, role: null, why: "此帳號已停用：" + email };
+  if (aclStaffInactive_(em)) return { configured: true, role: null, why: "此帳號對應的員工已離職：" + email };
+  if (!ErpRoles.role(String(me.role))) return { configured: true, role: null, why: "職務設定不正確（" + me.role + "）：" + email };
+  return { configured: true, role: String(me.role), why: "" };
+}
+function aclBosses_() {
+  var l = aclRows_().filter(function (r) { return r.active && r.role === "boss"; }).map(function (r) { return r.id; });
+  if (l.length) return l;
+  var v = PropertiesService.getScriptProperties().getProperty("NOTIFY_EMAILS");
+  return [(v && v.trim()) ? v.trim() : Session.getActiveUser().getEmail()];
+}
+/** 高風險操作：寫紀錄＋寄信給老闆（同一人同一類 10 分鐘內只寄一次，避免洗版） */
+function aclRisk_(kind, email, role, detail) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    erpAppend_(erpSheet_(ss, RISK_SHEET, RISK_HDR), [[new Date().toISOString(), email, role || "", kind, String(detail || "").slice(0, 500)]]);
+    var cache = CacheService.getScriptCache(), ck = "risk:" + kind + ":" + email;
+    if (cache.get(ck)) return;
+    cache.put(ck, "1", 600);
+    GmailApp.sendEmail(aclBosses_().join(","), "【高風險操作】" + kind + "（" + email + "）",
+      "操作人：" + email + "（" + (role ? ErpRoles.name(role) : "未設定") + "）\n操作：" + kind + "\n內容：" + detail +
+      "\n時間：" + Utilities.formatDate(new Date(), "Asia/Taipei", "yyyy-MM-dd HH:mm") + "\n\n如果這不是你預期的操作，請立刻到「帳號權限」停用該帳號，並檢查「高風險操作」分頁。");
+  } catch (e) { console.log("高風險通知失敗：" + e); }
+}
+function aclCount_(email, n) {                // 10 分鐘內累計刪除筆數
+  var cache = CacheService.getScriptCache(), k = "del:" + email, v = (Number(cache.get(k)) || 0) + n;
+  cache.put(k, String(v), 600); return v;
+}
+function aclDeny_(role, what) { return { error: "你的職務（" + ErpRoles.name(role) + "）不能" + what }; }
+
+/**
+ * 主檔 doPost 驗證完 email 之後呼叫（見 README「權限」的一行設定）。回傳 null = 放行；回傳物件 = 直接當回應擋下。
+ * 沒貼這個檔、或沒設定任何帳號時完全不影響原本行為。
+ */
+function accessGate_(action, p, email) {
+  var a = aclRole_(email);
+  if (!a.configured) return null;
+  if (!a.role) return { error: a.why };
+  var role = a.role;
+  p = p || {};
+  switch (action) {
+    case "tList":
+      return ErpRoles.canTable(role, p.table, false) ? null : aclDeny_(role, "讀取資料表「" + p.table + "」");
+    case "tUpsert": case "tRemove": case "tImport":
+      if (!ErpRoles.canTable(role, p.table, true)) return aclDeny_(role, "修改資料表「" + p.table + "」");
+      if (p.table === ACL_SHEET) {
+        var chk = aclChange_(action, p); if (chk) return chk;
+        aclRisk_("帳號權限變更", email, role, action + " " + (p.row ? JSON.stringify(p.row) : (p.id || "")));
+      } else if (action === "tImport" && (p.rows || []).length > ACL_BULK_ROWS) aclRisk_("大量匯入", email, role, p.table + " 匯入 " + p.rows.length + " 列");
+      else if (action === "tRemove" && aclCount_(email, 1) >= ACL_DEL_LIMIT) aclRisk_("短時間大量刪除", email, role, "10 分鐘內已刪 " + ACL_DEL_LIMIT + " 筆以上（最近：" + p.table + "）");
+      return null;
+    case "markSet": case "quoteAdd": case "quoteDel": case "driveSave":
+      return role === "viewer" ? aclDeny_(role, "修改資料") : null;
+    default:
+      return null;                              // erpLoad / erpAct / erpImport 由 erpDispatch_ 依職務處理
+  }
+}
+/** 改 acl 本身的防呆：不能把最後一位老闆停用或降級（會沒人能管帳號） */
+function aclChange_(action, p) {
+  var rows = aclRows_(), bosses = rows.filter(function (r) { return r.active && r.role === "boss"; });
+  var target = String((p.row && p.row.id) || p.id || "").trim().toLowerCase();
+  var isBoss = bosses.some(function (r) { return r.id === target; });
+  if (!isBoss || bosses.length > 1) return null;
+  var stays = action === "tUpsert" && p.row && (p.row.role === undefined || p.row.role === "boss") && (p.row.active === undefined || aclTrue_(p.row.active));
+  return stays ? null : { error: "不能停用、刪除或降級最後一位老闆，否則沒有人能管理帳號。請先指定另一位老闆。" };
+}
+
+// 一次性設定：在 Apps Script 編輯器執行，把「你自己」設為第一位老闆，啟用權限控管
+function accessSetup() {
+  var me = String(Session.getActiveUser().getEmail()).toLowerCase();
+  if (aclRows_().some(function (r) { return r.active; })) return "已經設定過了（acl 分頁已有啟用的帳號）。";
+  var sh = erpSheet_(SpreadsheetApp.getActiveSpreadsheet(), ACL_SHEET, ACL_HDR);
+  erpAppend_(sh, [[me, "boss", 1, "老闆", new Date().toISOString(), "accessSetup"]]);
+  return "已啟用權限控管：" + me + " 是老闆。請到行政工作台「帳號權限」加入其他人；沒加入的人將無法使用。";
+}
+
+// 每季帳號盤點：列出所有帳號與最後使用時間、久未使用的、白名單與職務對不上的
+// 手動執行 = 立刻寄；由每月 1 號的觸發器呼叫時，只在 1、4、7、10 月寄
+function accessReview(e) {
+  if (e && [0, 3, 6, 9].indexOf(new Date().getMonth()) < 0) return "非季初，略過";
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), rows = aclRows_(), last = {}, lines = [], flags = [];
+  var log = ss.getSheetByName(ERP_LOG_SHEET);
+  if (log && log.getLastRow() >= 2) {
+    log.getRange(2, 1, log.getLastRow() - 1, 2).getValues().forEach(function (r) { var em = String(r[1]).toLowerCase(), t = new Date(r[0]).getTime(); if (t && (!last[em] || t > last[em])) last[em] = t; });
+  }
+  var now = Date.now(), allow = typeof ALLOWED_EMAILS !== "undefined" ? ALLOWED_EMAILS.map(function (x) { return String(x).toLowerCase(); }) : null;
+  rows.forEach(function (r) {
+    var idle = last[r.id] ? Math.floor((now - last[r.id]) / 86400000) : null;
+    lines.push((r.active ? "● " : "○ ") + r.id + "　" + ErpRoles.name(r.role) + (r.active ? "" : "（已停用）") + "　最後操作：" + (idle === null ? "沒有紀錄" : idle + " 天前"));
+    if (r.active && (idle === null || idle > 90)) flags.push("🟡 " + r.id + " 已 " + (idle === null ? "從未" : idle + " 天沒") + "使用，確認還需要這個帳號嗎？");
+    if (r.active && allow && allow.indexOf(r.id) < 0) flags.push("🔴 " + r.id + " 在 acl 是啟用的，但不在 ALLOWED_EMAILS 白名單，實際上無法登入。");
+    if (r.active && aclStaffInactive_(r.id)) flags.push("🔴 " + r.id + " 對應的員工已離職，但帳號還是啟用的（已被系統擋下，請在「帳號權限」停用）。");
+  });
+  if (allow) allow.forEach(function (em) { if (!rows.some(function (r) { return r.id === em; })) flags.push("🟡 " + em + " 在 ALLOWED_EMAILS 白名單，但 acl 沒有這個人（啟用權限控管後他無法使用）。若這個人已離職，請從白名單移除。"); });
+  var body = "【每季帳號盤點】\n\n" + (lines.join("\n") || "（acl 還沒有帳號，權限控管尚未啟用）") + "\n\n" + (flags.length ? "需要處理：\n" + flags.join("\n") : "沒有發現需要處理的項目。") +
+    "\n\n請老闆逐一確認：每個人的職務是否仍適合？離職或調動的人是否已停用？";
+  GmailApp.sendEmail(aclBosses_().join(","), "【每季帳號盤點】" + (flags.length ? flags.length + " 項待處理" : "無異常"), body);
+  erpAppend_(erpSheet_(ss, RISK_SHEET, RISK_HDR), [[new Date().toISOString(), "system", "", "每季帳號盤點", flags.length + " 項待處理"]]);
+  return body;
+}
+function installAccessTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === "accessReview") ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger("accessReview").timeBased().onMonthDay(1).atHour(9).inTimezone("Asia/Taipei").create();   // 每月 1 號觸發；實際只在 1、4、7、10 月寄出盤點信
+  return "已安裝：每季（1、4、7、10 月 1 號 09:00）寄帳號盤點信。";
 }

@@ -325,8 +325,10 @@ def render_admin_html() -> str:
   </div>
   <script src="assets/erp-engine.js?v={_VER}"></script>
   <script src="assets/erp-admin.js?v={_VER}"></script>
+  <script src="assets/erp-roles.js?v={_VER}"></script>
   <script src="assets/erp.js?v={_VER}"></script>
   <script src="assets/erp-admin-ui.js?v={_VER}"></script>
+  <script src="assets/erp-access-ui.js?v={_VER}"></script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""

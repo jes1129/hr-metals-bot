@@ -75,9 +75,9 @@
     if (rl === "all") return head + oldHome(w) + crmSections(r);
     if (rl === "boss") return head + '<div class="okpis erp-kpis">'
       + kpi(ic("cash") + "本月銷售", nt(r.sales_month), "", "依出貨認列")
-      + kpi(ic("chart") + "本月毛利", nt(r.gp_month), r.gp_month < 0 ? "warn" : "", r.gm_month == null ? "—" : "毛利率 " + r.gm_month + "%")
+      + kpi(ic("chart") + "本月毛利", U.ct(r.gp_month), U.seeCost() && r.gp_month < 0 ? "warn" : "", !U.seeCost() || r.gm_month == null ? "—" : "毛利率 " + r.gm_month + "%")
       + kpi(ic("file") + "應收帳款", nt(r.receivable + (r.services_unpaid || 0)), "", "含服務未收 " + nt(r.services_unpaid || 0))
-      + kpi(ic("box") + "庫存價值", nt(r.inventory_value), "", "FIFO 成本")
+      + kpi(ic("box") + "庫存價值", U.ct(r.inventory_value), "", "FIFO 成本")
       + kpi(ic("truck") + "未出貨訂單", r.open_orders + " 張", r.overdue_orders.length ? "warn" : "", r.overdue_orders.length ? "逾期 " + r.overdue_orders.length + " 張" : "無逾期")
       + kpi(ic("chat") + "未結案件", r.cases_open.length + " 件", r.cases_open.some(function (c) { return c.late; }) ? "warn" : "", "")
       + kpi(ic("clipboard") + "待簽核申請", (r.requests_pending || []).length + " 件", (r.requests_pending || []).length ? "warn" : "", "行政工作台")

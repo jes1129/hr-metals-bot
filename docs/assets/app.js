@@ -100,11 +100,16 @@
         else if (bk.backupDays >= 2) note.push("備份已 " + bk.backupDays + " 天沒更新");
         if (bk.drillDays == null || bk.drillDays > 90) note.push("還原演練" + (bk.drillDays == null ? "從未做過" : "已 " + bk.drillDays + " 天沒做") + "（執行 restoreDrill）");
       }
+      var ac = r && r.ok ? r.access : null, acTxt = "";
+      if (ac) {
+        if (!ac.configured) note.push("權限控管尚未啟用（所有登入者權限相同，見行政工作台「帳號權限」）");
+        else acTxt = " · 你的職務：" + (ac.name || "—");
+      }
       var foot = document.querySelector(".foot"), line = document.getElementById("verLine");
       if (!line && foot) { line = document.createElement("div"); line.id = "verLine"; line.className = "verline"; foot.parentNode.insertBefore(line, foot.nextSibling); }
       if (line) {
         line.className = "verline" + (bad.length ? " bad" : note.length ? " note" : "");
-        line.textContent = "網頁版本 " + UI_VERSION + (verBuild() ? "（建置 " + verBuild() + "）" : "") + " · 後端版本 " + (r && r.ok ? r.build : "舊版") + bkTxt +
+        line.textContent = "網頁版本 " + UI_VERSION + (verBuild() ? "（建置 " + verBuild() + "）" : "") + " · 後端版本 " + (r && r.ok ? r.build : "舊版") + bkTxt + acTxt +
           (bad.length ? " ｜ ⚠ " + bad.join("；") : note.length ? " ｜ " + note.join("；") : " ｜ 版本一致");
       }
       var bar = document.getElementById("verBar");
