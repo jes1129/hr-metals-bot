@@ -1885,8 +1885,8 @@
     lines.push("");
     lines.push("一、風險燈號（排程＋營運）");
     lines.push("　目前紅燈 " + (k.red || 0) + " 項、黃燈 " + (k.yellow || 0) + " 項" + (k.green != null ? "、正常 " + k.green + " 項" : "") + (k.na ? "、資料不足 " + k.na + " 項" : ""));
-    (k.red_names || []).slice(0, 8).forEach(function (n) { lines.push("　🔴 " + n); });
-    (k.yellow_names || []).slice(0, 8).forEach(function (n) { lines.push("　🟡 " + n); });
+    (k.red_names || []).slice(0, 8).forEach(function (n) { lines.push("　【紅】" + n); });
+    (k.yellow_names || []).slice(0, 8).forEach(function (n) { lines.push("　【黃】" + n); });
     if ((k.red || 0) > 0) todo.push("有紅燈未解除，請負責人處理並在通知中心按「已知悉」");
     lines.push("");
     lines.push("二、備份與還原");
@@ -1903,7 +1903,7 @@
     lines.push("");
     lines.push("四、定期治理紀錄");
     due.forEach(function (d) {
-      var tag = d.state === "ok" ? "✅" : d.state === "due" ? "🟡 逾期" : "🟡 從未記錄";
+      var tag = d.state === "ok" ? "【正常】" : d.state === "due" ? "【逾期】" : "【從未記錄】";
       lines.push("　" + tag + " " + d.label + (d.days != null ? "（" + d.days + " 天前，應每 " + d.every + " 天一次）" : ""));
       if (d.state !== "ok") todo.push(d.label + (d.state === "never" ? "：還沒有任何紀錄" : "：已逾期 " + (d.days - d.every) + " 天"));
     });
