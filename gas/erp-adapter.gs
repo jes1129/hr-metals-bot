@@ -15,7 +15,7 @@ var ERP_LOG_COLS = ["ts", "by", "action", "key", "result", "payload"];
 // 版本：網頁（docs/assets/app.js 的 NEED）會用 appVersion 問後端「你是第幾版」，對不上就警告。
 // 改了後端的對外行為、而網頁需要新行為時，把 GAS_API 加 1，並同步改 app.js 的 NEED.erp。
 var GAS_BUILD = "2026.10.14";
-var GAS_API = 1;
+var GAS_API = 2;                                // 2：內控治理（gov_ 資料表只有老闆、主管能寫；每月內控月報）
 
 function erpBackup_() {                                // 備份狀態讀不到也不能讓版本查詢失敗
   try { return typeof backupStatus_ === "function" ? backupStatus_() : null; } catch (e) { return null; }
@@ -408,4 +408,47 @@ function bizHist_(items, now) {                 // 距離上一筆至少 25 分�
   var v = {}; items.forEach(function (x) { if (x.value != null) v[x.id] = Math.round(x.value * 100) / 100; });
   tUpsert_(BIZ_HIST, { id: "h" + now, t: now, v: JSON.stringify(v) }, BIZ_HIST_HDR, "營運風險");
   rows.sort(function (a, b) { return Number(b.t) - Number(a.t); }).slice(BIZ_HIST_KEEP - 1).forEach(function (r) { tRemove_(BIZ_HIST, r.id); });
+}
+
+
+// ===========================================================================
+// 內控月報（規則在 governance.js）：每月 1 號 08:00 寄給老闆。
+// 內容：目前紅黃燈（排程＋營運）、備份與還原演練、近 30 天高風險操作、定期治理紀錄（gov_log）有沒有逾期、待辦清單。
+// 安裝：Apps Script 函式選單選 installGovTrigger → 執行（只做一次）；想先看看內容，執行 govMonthlyReport。
+// ===========================================================================
+var GOV_LOG = "gov_log";
+
+function govActiveKri_() {                          // 目前還亮著的燈：sched_alert 分頁（排程與營運風險共用，checkSchedAlerts 每 30 分鐘維護）
+  var rows = [];
+  try { rows = tList_("sched_alert").rows || []; } catch (e) {}
+  var out = { red: 0, yellow: 0, red_names: [], yellow_names: [] };
+  rows.forEach(function (r) {
+    if (!aclTrue_(r.active)) return;
+    if (r.level === "red") { out.red++; out.red_names.push(String(r.name || r.id) + (r.display ? "（" + r.display + "）" : "")); }
+    else if (r.level === "yellow") { out.yellow++; out.yellow_names.push(String(r.name || r.id) + (r.display ? "（" + r.display + "）" : "")); }
+  });
+  return out;
+}
+function govRiskOps_(now) {                         // 近 30 天高風險操作筆數（每季帳號盤點那一行不算）
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RISK_SHEET);
+    if (!sh || sh.getLastRow() < 2) return 0;
+    var since = now - 30 * 86400000;
+    return sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues().filter(function (r) { var t = new Date(r[0]).getTime(); return t && t >= since && r[3] !== "每季帳號盤點"; }).length;
+  } catch (e) { return 0; }
+}
+function govReport_(now) {
+  var records = [];
+  try { records = tList_(GOV_LOG).rows || []; } catch (e) {}
+  return ErpGov.monthlyReport({ now: now, kri: govActiveKri_(), backup: erpBackup_(), riskOps: govRiskOps_(now), records: records });
+}
+function govMonthlyReport(e) {
+  var r = govReport_(Date.now());
+  GmailApp.sendEmail(aclBosses_().join(","), r.subject, r.body);
+  return r.body;
+}
+function installGovTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === "govMonthlyReport") ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger("govMonthlyReport").timeBased().onMonthDay(1).atHour(8).inTimezone("Asia/Taipei").create();
+  return "已安裝：每月 1 號 08:00 寄內控月報給老闆。";
 }

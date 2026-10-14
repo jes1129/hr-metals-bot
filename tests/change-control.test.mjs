@@ -33,9 +33,9 @@ test("appVersion：回報 ERP 版本；沒貼的檔案回 null", () => {
   const only = load(["google-apps-script-erp.gs"]);
   const r = only.erpDispatch_("appVersion", {}, "a@b.c");
   assert.equal(r.ok, true);
-  assert.deepEqual({ ...r.api }, { erp: 1, alerts: null, digest: null, backup: null });
+  assert.deepEqual({ ...r.api }, { erp: 2, alerts: null, digest: null, backup: null });
   const all = load(["google-apps-script-erp.gs", "sched-alerts.gs", "email-notify.gs", "backup.gs"]);
-  assert.deepEqual({ ...all.erpDispatch_("appVersion", {}, "a@b.c").api }, { erp: 1, alerts: 1, digest: 1, backup: 1 });
+  assert.deepEqual({ ...all.erpDispatch_("appVersion", {}, "a@b.c").api }, { erp: 2, alerts: 1, digest: 1, backup: 1 });
 });
 
 test("網頁需要的後端版本（app.js 的 NEED）不能高於程式碼裡的實際版本", () => {

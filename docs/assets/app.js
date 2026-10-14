@@ -78,7 +78,7 @@
 
   // ---------- 變更控制：網頁版本 vs Apps Script 版本 ----------
   // UI_VERSION 每次發佈改一次；NEED 是「網頁需要後端至少第幾版」。後端對不上就在頁尾與頂端警告，避免新網頁配舊後端悄悄出錯。
-  var UI_VERSION = "2026.10.14", NEED = { erp: 1, alerts: 1, digest: 1, backup: 1 };
+  var UI_VERSION = "2026.10.14", NEED = { erp: 2, alerts: 1, digest: 1, backup: 1 };
   var NEED_NAME = { erp: ["ERP 後端", "google-apps-script-erp.gs"], alerts: ["排程自動通知", "sched-alerts.gs"], digest: ["每日早報", "email-notify.gs"], backup: ["每日備份", "backup.gs"] };
   function verBuild() { var l = document.querySelector('link[href*="style.css?v="]'); var m = l && /v=(\d+)/.exec(l.getAttribute("href")); return m ? m[1] : ""; }
   function verCheck() {

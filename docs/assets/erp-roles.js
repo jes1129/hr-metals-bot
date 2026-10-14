@@ -63,6 +63,7 @@
     if (/^ERP_/.test(t) || t === "backup_log") return d.all === true;          // ERP 分頁只透過 ERP 動作存取；直接讀寫限老闆／主管
     if (!write) return true;
     if (r === "viewer") return false;
+    if (/^gov_/.test(t)) return d.all === true;                                  // 內控治理紀錄：只有老闆、主管能寫
     if (/^sched_(notice|alert)$/.test(t)) return true;                        // 通知中心「已知悉」
     if (/^sched/.test(t)) return d.all === true || r === "ops";                // 排程設定與資料：老闆、主管、生管
     return true;
