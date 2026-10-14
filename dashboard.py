@@ -335,6 +335,8 @@ def render_admin_html() -> str:
   <script src="assets/sched-kri.js?v={_VER}"></script>
   <script src="assets/biz-kri.js?v={_VER}"></script>
   <script src="assets/erp-risk-ui.js?v={_VER}"></script>
+  <script src="assets/governance.js?v={_VER}"></script>
+  <script src="assets/gov-ui.js?v={_VER}"></script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""

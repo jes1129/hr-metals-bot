@@ -133,6 +133,9 @@ test("後端內嵌的治理規則與 docs/assets/governance.js 同一份（改�
 test("內控治理頁已掛進行政工作台，且 governance.js 先於 gov-ui.js 載入", () => {
   const h = read("docs/admin.html");
   assert.ok(h.indexOf("assets/governance.js") > 0 && h.indexOf("assets/governance.js") < h.indexOf("assets/gov-ui.js"));
+  // admin.html 是 dashboard.py 每次更新報價時重新產生的：產生器裡也要有，否則手改的會被蓋掉
+  const d = read("dashboard.py"), at = d.indexOf("erp-access-ui.js");
+  assert.ok(at > 0 && d.indexOf("assets/governance.js", at) > 0 && d.indexOf("assets/gov-ui.js", at) > d.indexOf("assets/governance.js", at));
 });
 
 test("內控治理頁：每個子頁都能畫出來、紀錄寫入後待辦消失、沒有核准人就不記變更", () => {
