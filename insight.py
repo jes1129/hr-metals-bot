@@ -100,8 +100,8 @@ def _driver(attr):
     return f"國際價 {_sg(u)}、匯率 {_sg(f)} 各占一部分"
 
 
-def rule_summary(stats, news_tagged=None):
-    """規則式白話解讀（AI 不可用時使用）。"""
+def rule_facts(stats):
+    """行情數字句：全部由程式計算（不經 AI），不會寫錯。"""
     parts = []
     for st in stats.values():
         if st.get("price_twd") is None:
@@ -112,65 +112,78 @@ def rule_summary(stats, news_tagged=None):
         if a and a.get("total") is not None and d:
             line += f"；依日線收盤（{_mmdd(a.get('from'))}→{_mmdd(a.get('to'))}）變動 {_sg(a['total'])}，{d}"
         parts.append(line + "。")
+    return "".join(parts)
+
+
+def news_sentence(news_tagged):
     tags = [n.get("tag") for n in (news_tagged or [])]
-    if tags:
-        up, dn = tags.count("偏多"), tags.count("偏空")
-        parts.append(f"最近 {len(tags)} 則相關新聞：偏多 {up} 則、偏空 {dn} 則、中性 {len(tags) - up - dn} 則。")
-    return "".join(parts) or "目前沒有足夠的行情資料可以整理。"
+    if not tags:
+        return ""
+    up, dn = tags.count("偏多"), tags.count("偏空")
+    return f"最近 {len(tags)} 則相關新聞：偏多 {up} 則、偏空 {dn} 則、中性 {len(tags) - up - dn} 則。"
 
 
-def _allowed_numbers(stats, news):
-    nums = set()
-    blob = repr(stats) + repr(news)
-    for m in re.findall(r"\d[\d,]*\.?\d*", blob):
-        nums.add(m.replace(",", ""))
-    return nums
+def rule_summary(stats, news_tagged=None):
+    """規則式白話解讀（AI 不可用時使用）。"""
+    return (rule_facts(stats) + news_sentence(news_tagged)) or "目前沒有足夠的行情資料可以整理。"
 
 
-def _numbers_ok(text, allowed):
-    """AI 解讀裡凡是帶小數或 ≥100 的數字，都必須出現在我們提供的資料裡；否則視為亂編。"""
-    for m in re.findall(r"\d[\d,]*\.?\d*", text):
-        raw = m.replace(",", "").rstrip(".")
-        if not raw:
-            continue
-        is_big = ("." in raw) or (float(raw) >= 100)
-        if not is_big:
-            continue
-        if raw in allowed:
-            continue
-        # 允許四捨五入的差異（AI 常把 0.64 寫成 0.6、1.32 寫成 1.3）
-        if any(abs(float(raw) - float(a)) <= 0.051 for a in allowed if re.fullmatch(r"-?\d+\.?\d*", a) and float(a) < 100):
-            continue
+def _qual(v, thr=0.3):
+    """把數字轉成方向詞給 AI 看——AI 完全看不到任何行情數字，所以不可能把數字讀錯或寫錯。"""
+    if v is None:
+        return "不明"
+    return "上漲" if v >= thr else "下跌" if v <= -thr else "持平"
+
+
+def _ai_ok(text):
+    """AI 說明文字的驗收：長度合理、有中文、**完全不能有數字**（數字只由程式負責）、不能是買賣建議。"""
+    if not (20 <= len(text) <= 260):
+        return False
+    if not re.search(r"[\u4e00-\u9fff]", text):
+        return False
+    if re.search(r"\d", text):
+        return False
+    if re.search(r"建議(買|賣|進場|出場|加碼|減碼|做多|做空)|應該(買|賣)|值得(買|賣)|買進|賣出", text):
         return False
     return True
 
 
 def daily_summary(stats, news_tagged=None, use_ai=True):
-    """回傳 {text, source}，source 為 'ai' 或 'rule'。"""
-    fallback = {"text": rule_summary(stats, news_tagged), "source": "rule"}
-    if not use_ai:
+    """回傳 {text, source, facts, note}。
+
+    text  = 行情數字句（程式算的）＋ 新聞面說明。source 為 'ai'（說明句由 AI 寫）或 'rule'（全規則）。
+    設計理由（2026-11-05 雲端實測學到的）：讓 AI 寫含數字的解讀，它會把不同來源的數字混在一起、
+    把「國際銅價下跌」誤讀成「美元走弱」，而且這些數字都在我們給它的資料裡，所以『數字有出現在資料裡』
+    的檢查擋不住。所以數字一律不給 AI、也不准它寫，AI 只負責新聞面的氣氛說明。
+    """
+    facts = rule_facts(stats)
+    fallback = {"text": rule_summary(stats, news_tagged), "source": "rule", "facts": facts, "note": ""}
+    if not use_ai or not news_tagged:
         return fallback
     try:
         import ai_json
         if not ai_json.available():
             return fallback
-        slim = {k: {"名稱": v["name"], "現價_台幣每噸": v.get("price_twd"), "最新價相對前次更新漲跌%": v.get("day_pct"), "近7天%": v.get("d7"),
-                    "近30天%": v.get("d30"), "近一年區間位置%": v.get("pos"),
-                    "最近一個交易日拆解_收盤對收盤": (v.get("attr") or {}).get("day"), "近7天拆解": (v.get("attr") or {}).get("week")}
-                for k, v in stats.items()}
-        news = [{"標題": n.get("title", ""), "判斷": n.get("tag")} for n in (news_tagged or [])[:6]]
-        system = ("你是公司內部的原料行情助理，對象是不懂金融的製造業主管。請用繁體中文（台灣用語）、白話，寫 80 到 140 字的『今日行情解讀』。"
-                  "只能使用我提供的資料與數字，不得編造任何數字或事件；不得提供買賣、投資或報價建議；不確定的原因要說『可能』。"
-                  "要涵蓋：銅與鋁今天的變化、變動主要來自國際價還是匯率、新聞面的大致氣氛。"
-                  "只輸出 JSON：{\"summary\":\"...\"}")
-        res, _layer = ai_json.call(system, {"行情": slim, "新聞": news}, temperature=0.3, max_tokens=2000)
-        text = str((res or {}).get("summary", "")).strip() if isinstance(res, dict) else ""
-        if not (30 <= len(text) <= 400) or not re.search(r"[一-鿿]", text):
+        view = {}
+        for k, v in stats.items():
+            a = (v.get("attr") or {}).get("day") or {}
+            view[v["name"]] = {"近一週": _qual(v.get("d7"), 1.0), "最近一個交易日": _qual(a.get("total")),
+                               "近一年區間位置": "偏高" if (v.get("pos") or 0) >= 70 else "偏低" if (v.get("pos") or 100) <= 30 else "中間"}
+        news = [{"標題": n.get("title", ""), "判斷": n.get("tag")} for n in news_tagged[:6]]
+        system = ("你是公司內部的原料行情助理，對象是不懂金融的製造業主管。請用繁體中文（台灣用語）、白話，"
+                  "寫 1 到 2 句（40 到 100 字）『新聞面與市場氣氛』說明。"
+                  "規則：一、**絕對不可以出現任何阿拉伯數字或百分比**（數字由別的程式負責）；"
+                  "二、只根據我提供的新聞標題與方向描述，不得編造事件；原因不確定要用『可能』；"
+                  "三、不得提供買賣、投資或報價建議；四、不要重述價格數字。"
+                  "只輸出 JSON：{\"note\":\"...\"}")
+        res, _layer = ai_json.call(system, {"行情方向": view, "新聞": news}, temperature=0.3, max_tokens=1200)
+        note = str((res or {}).get("note", "")).strip() if isinstance(res, dict) else ""
+        if not _ai_ok(note):
+            if note:
+                print("[insight] AI 說明未通過驗收（含數字、建議字眼或長度不符），退回規則式。")
             return fallback
-        if not _numbers_ok(text, _allowed_numbers(slim, news)):
-            print("[insight] AI 解讀含有未提供的數字，退回規則式。")
-            return fallback
-        return {"text": text, "source": "ai"}
+        text = (facts + " " + note).strip() if facts else note
+        return {"text": text, "source": "ai", "facts": facts, "note": note}
     except Exception as e:  # noqa: BLE001
         print("[insight] AI 解讀失敗，使用規則式：", e)
         return fallback

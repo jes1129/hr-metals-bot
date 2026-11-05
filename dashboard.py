@@ -213,7 +213,7 @@ def _insight_html(ins) -> str:
         return ""
     is_ai = ins.get("source") == "ai"
     label = "AI 行情解讀" if is_ai else "今日行情整理"
-    foot = ("由 AI 依今天的行情與新聞產生，只說明行情，不是買賣建議；數字以上方卡片為準。" if is_ai
+    foot = ("行情數字由程式計算；新聞面的說明由 AI 依新聞標題寫成，只說明行情，不是買賣建議。" if is_ai
             else "依規則自動整理（AI 目前未啟用或暫時不可用）。")
     return (f'<section class="insight"><div class="adv-k">{_ic("book")}{label}'
             f'<span class="ins-badge {"ai" if is_ai else ""}">{"AI" if is_ai else "自動"}</span></div>'

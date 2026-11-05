@@ -42,6 +42,14 @@ class NewsTest(unittest.TestCase):
 
 
 class SummaryTest(unittest.TestCase):
+    TAGGED = [{"title": "LME期銅下跌 全球庫存回升", "tag": "偏空"}, {"title": "金屬需求轉好", "tag": "偏多"}]
+    GOOD = "新聞面偏向庫存回升與需求回溫並存，市場氣氛可能偏謹慎，後續仍要觀察需求是否持續轉好。"
+
+    def _run(self, result, call=None, news=None):
+        ai = _fake_ai(result, call=call)
+        with mock.patch.dict(sys.modules, {"ai_json": ai}):
+            return insight.daily_summary(STATS, self.TAGGED if news is None else news), ai
+
     def test_rule_summary_has_numbers_and_driver(self):
         t = insight.rule_summary(STATS, [{"tag": "偏多"}, {"tag": "偏空"}, {"tag": "中性"}])
         self.assertIn("NT$467,440", t)
@@ -49,31 +57,54 @@ class SummaryTest(unittest.TestCase):
         self.assertIn("匯率", t)
         self.assertIn("偏多 1 則", t)
 
-    def _with_ai(self, summary):
-        with mock.patch.dict(sys.modules, {"ai_json": _fake_ai({"summary": summary})}):
-            return insight.daily_summary(STATS, [])
-
-    def test_ai_used_when_numbers_are_real(self):
-        r = self._with_ai("銅目前約 467,440 元每噸，近 7 天下跌 1.3%，最近一個交易日的小幅上漲主要來自匯率變動，國際價其實略為走低。")
+    def test_ai_note_is_appended_to_rule_facts(self):
+        r, _ = self._run({"note": self.GOOD})
         self.assertEqual(r["source"], "ai")
+        self.assertIn("NT$467,440", r["text"])          # 數字句仍是程式算的
+        self.assertTrue(r["text"].endswith(self.GOOD))
+        self.assertEqual(r["note"], self.GOOD)
 
-    def test_ai_rejected_when_it_invents_numbers(self):
-        r = self._with_ai("銅目前約 512,300 元每噸，近 7 天大漲 8.8%，預期還會再漲，國際價與匯率都在推升價格表現相當強勁。")
+    def test_ai_never_sees_market_numbers(self):
+        seen = {}
+
+        def call(system, payload, **k):
+            seen["payload"] = payload
+            return {"note": self.GOOD}, "free"
+        self._run(None, call=call)
+        import json
+        view = json.dumps(seen["payload"]["行情方向"], ensure_ascii=False)
+        self.assertNotRegex(view, r"\d")                 # 價格、漲跌幅、區間位置都不能出現在給 AI 的資料裡
+        self.assertIn("下跌", view)                       # 只給方向詞
+
+    def test_ai_rejected_if_it_writes_any_digit(self):
+        r, _ = self._run({"note": "銅價今天上漲0.64%，主要受匯率帶動，新聞面偏向庫存回升與需求疲軟，後續仍待觀察。"})
+        self.assertEqual(r["source"], "rule")
+        self.assertNotIn("0.64", r["text"])
+
+    def test_ai_rejected_if_it_gives_advice(self):
+        r, _ = self._run({"note": "新聞面庫存回升與需求疲軟並存，市場氣氛偏弱，我建議買進等待反彈，後續仍待觀察。"})
         self.assertEqual(r["source"], "rule")
 
     def test_ai_rejected_when_too_short_or_not_chinese(self):
-        self.assertEqual(self._with_ai("ok")["source"], "rule")
+        self.assertEqual(self._run({"note": "ok"})[0]["source"], "rule")
+        self.assertEqual(self._run({"note": "x" * 60})[0]["source"], "rule")
+
+    def test_no_news_means_no_ai_call(self):
+        calls = []
+        r, _ = self._run(None, call=lambda *a, **k: calls.append(1) or ({"note": self.GOOD}, "free"), news=[])
+        self.assertEqual(r["source"], "rule")
+        self.assertFalse(calls)
 
     def test_no_ai_key_falls_back(self):
         ai = mock.Mock(available=lambda: False)
         with mock.patch.dict(sys.modules, {"ai_json": ai}):
-            self.assertEqual(insight.daily_summary(STATS, [])["source"], "rule")
+            self.assertEqual(insight.daily_summary(STATS, self.TAGGED)["source"], "rule")
 
     def test_ai_exception_falls_back(self):
         def boom(*a, **k):
             raise RuntimeError("x")
-        with mock.patch.dict(sys.modules, {"ai_json": _fake_ai(None, call=boom)}):
-            self.assertEqual(insight.daily_summary(STATS, [])["source"], "rule")
+        r, _ = self._run(None, call=boom)
+        self.assertEqual(r["source"], "rule")
 
 
 if __name__ == "__main__":
