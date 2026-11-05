@@ -103,21 +103,7 @@ _SIMPLE = (
 
 
 def _system() -> str:
-    """--real-prompt 時改用正式流程的提示詞。
-
-    這件事必須測：正式提示詞比上面的簡化版長得多、要求的欄位也多，
-    而 Gemini 3.x 把**思考 tokens 也算進 maxOutputTokens**。用簡化提示詞
-    測過就上線，很可能在正式跑時被截斷——而截斷的症狀是「回應無內容」，
-    看起來像解析失敗，會把除錯帶往錯的方向。
-    """
-    if "--real-prompt" not in sys.argv:
-        return _SIMPLE
-    import config
-    import prompts
-    print("  （使用正式提示詞 prompts.radar_rank_system）")
-    return prompts.radar_rank_system(config.SUPPLIER_PROFILE,
-                                     config.RADARS["suppliers"],
-                                     config.DASHBOARD_TOP)
+    return _SIMPLE
 
 
 SYSTEM = _system()
