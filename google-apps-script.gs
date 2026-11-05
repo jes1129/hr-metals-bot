@@ -40,8 +40,8 @@ function doPost(e) {
       case "tRemove":  out = tRemove_(p.table, p.id); break;
       case "tImport":  out = tImport_(p.table, p.rows, p.header, email); break;
       case "ai":       out = ai_(p.question, p.context); break;
-      // ERP（erpLoad/erpAct）在另一個檔 google-apps-script-erp.gs；沒加那個檔時行為與原本相同
-      default:         out = (typeof erpDispatch_ === "function" && erpDispatch_(body.action, p, email)) || { error: "unknown action" };
+      // 擴充動作（詢價解析 parseInquiry、報價狀態 quoteStatus）在另一個檔 inquiry.gs；沒加那個檔時行為與原本相同
+      default:         out = (typeof extDispatch_ === "function" && extDispatch_(body.action, p, email)) || { error: "unknown action" };
     }
     return json_(out);
   } catch (err) {
@@ -91,11 +91,11 @@ function loadAll_() {
     if (!mk[i][0]) continue;
     marks[mk[i][0]] = { status: mk[i][1] || "", note: mk[i][2] || "", fav: mk[i][3] === true || mk[i][3] === "TRUE" || mk[i][3] === "true" };
   }
-  var qz = sheet_("quotes", ["ts", "material", "weight", "price", "proc", "margin", "quote", "by", "note"]).getDataRange().getValues();
+  var qz = sheet_("quotes", ["ts", "material", "weight", "price", "proc", "margin", "quote", "by", "note", "status"]).getDataRange().getValues();
   var quotes = [];
   for (var j = 1; j < qz.length; j++) {
     if (!qz[j][0]) continue;
-    quotes.push({ ts: Number(qz[j][0]), material: qz[j][1], weight: qz[j][2], price: qz[j][3], proc: qz[j][4], margin: qz[j][5], quote: qz[j][6], by: qz[j][7] || "", note: qz[j][8] || "" });
+    quotes.push({ ts: Number(qz[j][0]), material: qz[j][1], weight: qz[j][2], price: qz[j][3], proc: qz[j][4], margin: qz[j][5], quote: qz[j][6], by: qz[j][7] || "", note: qz[j][8] || "", status: qz[j][9] || "等待中" });
   }
   quotes.sort(function (a, b) { return b.ts - a.ts; });
   return { marks: marks, quotes: quotes };
@@ -112,12 +112,13 @@ function markSet_(id, v, by) {
 }
 function quoteAdd_(v, by) {
   if (!v) return;
-  var sh = sheet_("quotes", ["ts", "material", "weight", "price", "proc", "margin", "quote", "by", "note"]);
-  if (sh.getLastRow() >= 1 && !sh.getRange(1, 9).getValue()) sh.getRange(1, 9).setValue("note");   // 舊表補上「客戶／備註」欄
-  sh.appendRow([v.ts, v.material, v.weight, v.price, v.proc, v.margin, v.quote, by, String(v.note || "").slice(0, 60)]);
+  var sh = sheet_("quotes", ["ts", "material", "weight", "price", "proc", "margin", "quote", "by", "note", "status"]);
+  if (sh.getLastRow() >= 1 && !sh.getRange(1, 9).getValue()) sh.getRange(1, 9).setValue("note");     // 舊表補上「客戶／備註」欄
+  if (sh.getLastRow() >= 1 && !sh.getRange(1, 10).getValue()) sh.getRange(1, 10).setValue("status"); // 舊表補上「狀態」欄
+  sh.appendRow([v.ts, v.material, v.weight, v.price, v.proc, v.margin, v.quote, by, String(v.note || "").slice(0, 60), String(v.status || "等待中")]);
 }
 function quoteDel_(ts) {
-  var sh = sheet_("quotes", ["ts", "material", "weight", "price", "proc", "margin", "quote", "by", "note"]);
+  var sh = sheet_("quotes", ["ts", "material", "weight", "price", "proc", "margin", "quote", "by", "note", "status"]);
   var vals = sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), 1).getValues();
   for (var i = vals.length - 1; i >= 1; i--) if (Number(vals[i][0]) === Number(ts)) sh.deleteRow(i + 1);
 }

@@ -785,3 +785,37 @@ h1 .ic { color: var(--accent); width: .95em; height: .95em; margin-right: .35em;
   .adv-attn .adv-k .ic, .adv-red .adv-k .ic, .adv-yellow .adv-k .ic { animation: breathe 2s ease-in-out infinite; }
   .pc-bar i { animation: breathe 2.4s ease-in-out infinite; }
 }
+
+/* ---------- 貼上詢價、報價勝率分析、朗讀 ---------- */
+.qinq { background: var(--bg); border: 1px dashed var(--line); padding: 8px 14px; margin: 0 0 14px; }
+.qinq summary { cursor: pointer; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.qinq summary .ic { color: var(--accent); margin: 0; }
+.qinq[open] summary { margin-bottom: 8px; }
+.qinq textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; resize: vertical; }
+.inq-act { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+#inqState { font-size: 13px; color: var(--muted); }
+#inqRes { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); padding: 10px 14px; margin: 6px 0 8px; font-size: 14px; }
+.inq-h { font-size: 12px; color: var(--muted); font-weight: 700; }
+.inq-d { font-size: 16px; font-weight: 700; margin: 2px 0 4px; }
+.inq-w em { font-style: normal; color: var(--muted); font-size: 12.5px; }
+.inq-w.bad { color: var(--up); font-weight: 700; }
+.inq-warn { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); line-height: 1.7; }
+.inq-b { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.inq-n { font-size: 12px; color: var(--muted); }
+.rstats { background: var(--card); border: 1px solid var(--line); padding: 14px 18px; margin: 0 0 12px; }
+.rs-chips { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0 4px; font-size: 14px; }
+.rs-chips b { font-size: 18px; } .rs-chips b.g { color: var(--down); } .rs-chips b.r { color: var(--up); }
+.rs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 24px; margin-top: 10px; }
+.rs-t { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+.rs-row { display: grid; grid-template-columns: 8.5em 1fr auto; align-items: center; gap: 8px; font-size: 13px; padding: 2px 0; }
+.rs-bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; } .rs-bar i { display: block; height: 100%; background: var(--accent); }
+.rs-v { font-variant-numeric: tabular-nums; white-space: nowrap; } .rs-v em { font-style: normal; color: var(--muted); font-size: 12px; }
+.rs-notes { margin: 10px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.8; }
+.rstat { padding: 3px 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 13px; }
+.rstat.st-1 { color: var(--down); font-weight: 700; } .rstat.st-2 { color: var(--up); font-weight: 700; }
+.speak { margin-left: auto; padding: 2px 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 12.5px; cursor: pointer; }
+.speak:hover { border-color: var(--accent); color: var(--accent); }
+.insight .adv-k { align-items: center; }
+
+/* 讓 hidden 屬性永遠生效（否則 .qf 之類的 display 設定會把應該隱藏的元素露出來） */
+[hidden] { display: none !important; }

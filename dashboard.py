@@ -216,9 +216,10 @@ def _insight_html(ins) -> str:
     foot = ("行情數字由程式計算；新聞面的說明由 AI 依新聞標題寫成，只說明行情，不是買賣建議。" if is_ai
             else "依規則自動整理（AI 目前未啟用或暫時不可用）。")
     return (f'<section class="insight"><div class="adv-k">{_ic("book")}{label}'
-            f'<span class="ins-badge {"ai" if is_ai else ""}">{"AI" if is_ai else "自動"}</span></div>'
+            f'<span class="ins-badge {"ai" if is_ai else ""}">{"AI" if is_ai else "自動"}</span>'
+            '<button type="button" class="speak" id="speakBtn" title="用瀏覽器內建語音唸出今日行情">▶ 朗讀行情</button></div>'
             f'<p>{html.escape(ins["text"])}</p>'
-            f'<div class="adv-f">{foot}{" 更新於 " + html.escape(ins.get("updated", "")) if ins.get("updated") else ""}</div></section>')
+            f'<div class="adv-f"><span id="speakNote"></span>{foot}{" 更新於 " + html.escape(ins.get("updated", "")) if ins.get("updated") else ""}</div></section>')
 
 
 def _news_tag(n) -> str:
@@ -318,10 +319,10 @@ def render_help_html() -> str:
     <div class="panel">
       <h2>有哪些頁面</h2>
       <ul>
-        <li><b>今日總覽：</b>今天該做什麼、AI 行情解讀、銅鋁價格卡、<b>為什麼漲跌</b>（拆成國際價與匯率）、<b>報價盯盤</b>、本週摘要。</li>
+        <li><b>今日總覽：</b>今天該做什麼、AI 行情解讀（可按「朗讀行情」聽）、銅鋁價格卡、<b>為什麼漲跌</b>（拆成國際價與匯率）、<b>報價盯盤</b>、本週摘要。</li>
         <li><b>原料行情：</b>走勢圖、相關新聞（標示偏多／偏空／中性），以及<b>我的提醒</b>：選金屬與條件、填數字，價格到線就寄 Email。</li>
-        <li><b>報價試算：</b>左邊填資料、右邊即時看報價與毛利。可輸入其他材料（會記住）；<b>情境模擬</b>滑桿可以看「料價漲 10%、匯率貶 2%」時毛利剩多少。</li>
-        <li><b>報價紀錄：</b>存過的報價都在這裡，可搜尋客戶、篩選材質與時間、刪除單筆、<b>清除舊資料</b>、匯出 CSV。</li>
+        <li><b>報價試算：</b>左邊填資料、右邊即時看報價與毛利。可輸入其他材料（會記住）；<b>貼上客戶詢價</b>可自動讀出材質、尺寸、數量並算好重量（先給你核對再套用）；<b>情境模擬</b>滑桿可以看「料價漲 10%、匯率貶 2%」時毛利剩多少。</li>
+        <li><b>報價紀錄：</b>存過的報價都在這裡，可搜尋客戶、篩選材質與時間、刪除單筆、<b>清除舊資料</b>、匯出 CSV。每筆可標記「等待中／成交／流失」，上方的<b>報價勝率分析</b>會統計哪種利潤、材質、金額的報價比較容易成交（標記不到 10 筆時只供參考）。</li>
       </ul>
     </div>
     <div class="panel">
@@ -555,6 +556,13 @@ def render_quote_html(history: dict, daily: dict = None) -> str:
 
     <div class="qgrid">
       <div class="panel qformp">
+        <details class="qinq" id="qInq">
+          <summary>{_ic('clipboard')}貼上客戶詢價，自動填好報價表</summary>
+          <textarea id="inqText" rows="4" placeholder="例如：要 20 支 Φ30x200 黃銅棒，下週要&#10;或：紫銅板 100*200*5mm 10片"></textarea>
+          <div class="inq-act"><button type="button" class="dbbtn primary" id="inqRun">讀取</button><button type="button" class="dbbtn" id="inqClear">清除</button><span id="inqState"></span></div>
+          <div id="inqRes" hidden></div>
+          <div class="al-note">登入後會把詢價文字送到 Groq（外部 AI 服務）解析，讀得更準；沒登入或 AI 不可用時，改用本機規則解析。含機密的內容請先刪掉再貼。AI 只負責讀欄位，重量由程式用公式計算，不會幫你報價。</div>
+        </details>
         <div class="qform">
           <label class="qf"><span>客戶／備註（選填，之後可以用它查找）</span>
             <input id="qNote" type="text" maxlength="60" placeholder="例如：○○公司 銅軸套"></label>
@@ -612,6 +620,7 @@ def render_quote_html(history: dict, daily: dict = None) -> str:
     <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。報價存在你的瀏覽器；登入 Google 後會同步到公司試算表（團隊共用）。</div>
   </div>
 {data_script}
+  <script src="assets/inquiry.js?v={_VER}"></script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
@@ -638,12 +647,13 @@ def render_records_html(history: dict) -> str:
     <div class="topbar">{_nav("records")}{_THEME_BTN}</div>
     <div class="eyebrow">QUOTE · 報價資料庫</div>
     <h1>{_ic('clipboard')}報價紀錄</h1>
-    <div class="sub">在「報價試算」按「存這筆報價」的資料都在這裡 · 可搜尋、篩選、刪除，也能一次清掉舊資料</div>
+    <div class="sub">在「報價試算」按「存這筆報價」的資料都在這裡 · 每筆可標記「等待中／成交／流失」，系統會統計哪種報價比較容易成交 · 可搜尋、篩選、刪除，也能一次清掉舊資料</div>
     <div class="qlogin" id="rLogin" hidden></div>
 
     <div class="rbar">
       <input id="rSearch" type="search" placeholder="搜尋客戶、備註、材質…">
       <select id="rMat"><option value="">全部材質</option></select>
+      <select id="rStatus"><option value="">全部狀態</option><option>等待中</option><option>成交</option><option>流失</option></select>
       <select id="rDays"><option value="0">全部時間</option><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="90">近 90 天</option></select>
       <button id="rCsv" class="dbbtn" type="button">{_ic('save')}匯出 CSV</button>
       <button id="rPurgeBtn" class="dbbtn" type="button">{_ic('alert')}清除舊資料…</button>
@@ -655,16 +665,18 @@ def render_records_html(history: dict) -> str:
       <button id="rPurgeCancel" class="dbbtn" type="button">取消</button>
       <div class="rpurge-n">刪除後無法復原。如果已登入，公司試算表裡的紀錄也會一起刪除。建議先按「匯出 CSV」留一份。</div>
     </div>
+    <section class="rstats" id="rStats"></section>
     <div class="rcount" id="rCount"></div>
     <div class="rwrap">
       <table class="rtable">
-        <thead><tr><th>日期</th><th>客戶／備註</th><th>材質</th><th>重量</th><th>料價</th><th>加工費</th><th>利潤</th><th>報價</th><th>和現在比</th><th></th></tr></thead>
+        <thead><tr><th>日期</th><th>客戶／備註</th><th>材質</th><th>重量</th><th>料價</th><th>加工費</th><th>利潤</th><th>報價</th><th>和現在比</th><th>狀態</th><th></th></tr></thead>
         <tbody id="rBody"></tbody>
       </table>
     </div>
     <div class="foot">紀錄存在這個瀏覽器；登入 Google 後同步到公司試算表「報價紀錄」分頁（團隊共用）。「和現在比」是用今天的料價重算成本，看當時報價現在是賺還是賠。</div>
   </div>
 {data_script}
+  <script src="assets/quote-stats.js?v={_VER}"></script>
   <script src="assets/app.js?v={_VER}"></script>
 </body>
 </html>"""
