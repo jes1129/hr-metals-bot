@@ -86,6 +86,10 @@
   function markGet(id) { return Marks[id] || { status: "", note: "", fav: false }; }
   function markSet(id, m) { Marks[id] = m; lsSet("marks", Marks); dbCall("markSet", { id: id, value: m }); }
   function quoteAdd(q) { Quotes.unshift(q); lsSet("quotes", Quotes); dbCall("quoteAdd", { value: q }); }
+  function quoteSetStatus(ts, status) {
+    Quotes.forEach(function (q) { if (q.ts === ts) q.status = status; });
+    lsSet("quotes", Quotes); dbCall("quoteStatus", { ts: ts, status: status });
+  }
   function quoteDel(ts) { Quotes = Quotes.filter(function (x) { return x.ts !== ts; }); lsSet("quotes", Quotes); dbCall("quoteDel", { ts: ts }); }
 
   // ---------- Google 登入（Identity Services；只用身分，不要敏感權限） ----------
@@ -625,7 +629,7 @@
       if (!(w && p)) { alert("請先填重量與料價"); return; }
       var proc = parseFloat(procEl.value) || 0, mg = parseFloat(mgEl.value) || 0;
       var mat = cur(); if (mat.isNew && !(oName.value || "").trim()) { alert("請先填材料名稱"); oName.focus(); return; }
-      quoteAdd({ ts: Date.now(), material: mat.name, weight: w, price: p, proc: proc, margin: mg, note: custEl ? custEl.value.trim() : "", quote: Math.round((w * p + proc) * (1 + mg / 100)) });
+      quoteAdd({ ts: Date.now(), material: mat.name, weight: w, price: p, proc: proc, margin: mg, note: custEl ? custEl.value.trim() : "", status: "等待中", quote: Math.round((w * p + proc) * (1 + mg / 100)) });
       renderHist(); remember(mat, p);
       if (savedEl) { savedEl.hidden = false; savedEl.innerHTML = "已存好 ✓　" + (idToken ? "已同步到公司試算表。" : "目前只存在這個瀏覽器。") + ' <a href="records.html">到「報價紀錄」查看 →</a>'; }
     });
@@ -641,12 +645,63 @@
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () { window.prompt("複製下面的文字：", txt); });
       else window.prompt("複製下面的文字：", txt);
     });
+
+    // ---------- 貼上客戶詢價 → 自動填好報價表 ----------
+    // AI（登入後，經 Apps Script）或規則負責「讀成欄位」；重量由 inquiry.js 用公式算；讀完先給你核對，按「套用」才會填進表單。
+    (function initInquiry() {
+      var Inq = window.Inquiry, ta = document.getElementById("inqText"); if (!Inq || !ta) return;
+      var runBtn = document.getElementById("inqRun"), clrBtn = document.getElementById("inqClear"), stEl = document.getElementById("inqState"), resEl = document.getElementById("inqRes");
+      var last = null;
+      function render(parsed, how) {
+        var c = Inq.compute(parsed); last = { parsed: parsed, c: c };
+        var h = '<div class="inq-h">我讀到的是（' + escAttr(how) + '）：</div><div class="inq-d">' + escAttr(Inq.describe(parsed)) + (c.customer ? "　客戶：" + escAttr(c.customer) : "") + "</div>";
+        h += c.ok ? '<div class="inq-w">單件 ' + c.unitKg + " kg × " + c.qty + " = <b>總重 " + c.totalKg + " kg</b>　<em>" + escAttr(c.weightSource || "") + "</em></div>" : '<div class="inq-w bad">算不出重量，請手動輸入。</div>';
+        if (c.warnings.length) h += '<ul class="inq-warn">' + c.warnings.map(function (w) { return "<li>" + escAttr(w) + "</li>"; }).join("") + "</ul>";
+        h += '<div class="inq-b"><button type="button" class="dbbtn primary" id="inqApply">套用到報價表</button><span class="inq-n">套用後請再核對一次材質、重量與料價；這裡不會自動報價。</span></div>';
+        resEl.hidden = false; resEl.innerHTML = h;
+        document.getElementById("inqApply").addEventListener("click", apply);
+        stEl.textContent = "";
+      }
+      function apply() {
+        if (!last) return; var c = last.c, p = last.parsed;
+        custEl.value = [c.customer, Inq.describe(p)].filter(Boolean).join("　").slice(0, 60);
+        if (c.material) {
+          var idx = -1; LIST.forEach(function (m, i) { if (idx < 0 && (c.material.live ? (!m.custom && m.name === c.material.live) : m.name === c.material.name)) idx = i; });
+          if (idx >= 0) matEl.value = idx;
+          else { matEl.value = "new"; oName.value = c.material.name; oDen.value = c.material.density; }
+          onMat();
+        }
+        if (c.totalKg) { wEl.value = c.totalKg; }
+        calc();
+        stEl.textContent = "已填入表單" + (pEl.value ? "" : "，請再填每公斤料價") + "。";
+        if (!pEl.value) pEl.focus();
+      }
+      function run() {
+        var text = ta.value.trim(); if (text.length < 4) { stEl.textContent = "請先貼上詢價文字。"; return; }
+        var rule = Inq.ruleParse(text);
+        function finish(ai, why) {
+          var useAi = ai && Inq.compute(ai).ok, useRule = Inq.compute(rule).ok;
+          if (ai && (useAi || !useRule)) render(ai, "AI 讀取");
+          else render(rule, "規則讀取" + (ai ? "，AI 沒讀出尺寸" : (why ? "，" + why : "")));
+        }
+        if (API && idToken) {
+          stEl.textContent = "AI 讀取中…"; runBtn.disabled = true;
+          dbCall("parseInquiry", { text: text }).then(function (d) {
+            runBtn.disabled = false;
+            if (d && d.ok && d.data) { d.data.source = "ai"; finish(Inq.sanitize(d.data)); }
+            else finish(null, (d && d.error) || "AI 暫時不可用");
+          });
+        } else finish(null, needLogin() ? "登入 Google 後會改用 AI，讀得更準" : "");
+      }
+      runBtn.addEventListener("click", run);
+      clrBtn.addEventListener("click", function () { ta.value = ""; resEl.hidden = true; stEl.textContent = ""; last = null; });
+    })();
     onMat(); renderHist(); authHint(document.getElementById("qLogin"));
   }
 
   // ============================================================ 報價紀錄頁（搜尋／篩選／刪除／清除舊資料／匯出）
   function initRecords(MATS) {
-    var body = document.getElementById("rBody"), qEl = document.getElementById("rSearch"), mEl = document.getElementById("rMat"), dEl = document.getElementById("rDays");
+    var body = document.getElementById("rBody"), qEl = document.getElementById("rSearch"), mEl = document.getElementById("rMat"), dEl = document.getElementById("rDays"), sEl = document.getElementById("rStatus");
     var cntEl = document.getElementById("rCount"), purge = document.getElementById("rPurge"), pDays = document.getElementById("rPurgeDays"), pInfo = document.getElementById("rPurgeInfo");
     var DAY = 86400000;
     function fillMats() {
@@ -656,29 +711,57 @@
       mEl.value = keep;
     }
     function filtered() {
-      var kw = qEl.value.trim().toLowerCase(), mat = mEl.value, days = parseInt(dEl.value, 10) || 0, now = Date.now();
+      var kw = qEl.value.trim().toLowerCase(), sv = sEl ? sEl.value : "", mat = mEl.value, days = parseInt(dEl.value, 10) || 0, now = Date.now();
       return Quotes.filter(function (q) {
         if (mat && q.material !== mat) return false;
+        if (sv && (q.status || "等待中") !== sv) return false;
         if (days && now - q.ts > days * DAY) return false;
         if (kw && (String(q.note || "") + " " + q.material).toLowerCase().indexOf(kw) < 0) return false;
         return true;
       }).sort(function (a, b) { return b.ts - a.ts; });
     }
     function fmtDate(ts) { var d = new Date(ts); return d.getFullYear() + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + ("0" + d.getDate()).slice(-2) + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+    var STATUSES = ["等待中", "成交", "流失"];
+    function statSel(q) {
+      var cur = STATUSES.indexOf(q.status) >= 0 ? q.status : "等待中";
+      return '<select class="rstat st-' + STATUSES.indexOf(cur) + '" data-ts="' + q.ts + '">' + STATUSES.map(function (x) { return '<option' + (x === cur ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select>";
+    }
+    // 勝率分析（統計邏輯在 quote-stats.js，可單獨測試）
+    function renderStats() {
+      var box = document.getElementById("rStats"); if (!box || !window.QuoteStats) return;
+      var st = window.QuoteStats.winStats(Quotes);
+      var bars = function (list) {
+        return list.map(function (g) {
+          return '<div class="rs-row"><span class="rs-l">' + escAttr(g.label) + '</span><span class="rs-bar"><i style="width:' + (g.rate || 0) + '%"></i></span><span class="rs-v">' + (g.rate == null ? "—" : g.rate + "%") +
+            ' <em>' + g.won + "／" + g.n + (g.enough ? "" : "（樣本太少）") + "</em></span></div>";
+        }).join("");
+      };
+      var h = '<div class="adv-k">' + ic("bars") + '報價勝率分析</div><div class="rs-chips"><span>等待中 <b>' + st.counts["等待中"] + '</b></span><span>成交 <b class="g">' + st.counts["成交"] + '</b></span><span>流失 <b class="r">' + st.counts["流失"] + "</b></span>" +
+        (st.rate == null ? "" : '<span class="rs-all">整體成交率 <b>' + st.rate + "%</b>（已結案 " + st.decided + " 筆）</span>") + "</div>";
+      if (st.decided) {
+        h += '<div class="rs-grid"><div><div class="rs-t">依利潤</div>' + bars(st.byMargin) + '</div><div><div class="rs-t">依材質</div>' + bars(st.byMaterial) + '</div><div><div class="rs-t">依報價金額</div>' + bars(st.byAmount) + "</div></div>";
+      }
+      h += (st.notes.length ? '<ul class="rs-notes">' + st.notes.map(function (n) { return "<li>" + escAttr(n) + "</li>"; }).join("") + "</ul>" : "");
+      box.innerHTML = h;
+    }
     function render() {
-      fillMats();
+      fillMats(); renderStats();
       var rows = filtered();
       cntEl.textContent = "共 " + Quotes.length + " 筆" + (rows.length !== Quotes.length ? "，符合條件 " + rows.length + " 筆" : "");
       body.innerHTML = rows.length ? rows.map(function (q) {
         var nw = quoteNow(q, MATS), nowTxt = nw ? '<span class="qnow ' + nw.cls + '">' + (nw.dp >= 0 ? "+" : "") + nw.dp.toFixed(1) + "%　" + (Math.abs(nw.dc) < 1 ? "成本沒變" : (nw.dc > 0 ? "成本多 " : "成本少 ") + ntdFmt(Math.abs(nw.dc))) + "</span>" : "—";
         return "<tr><td>" + fmtDate(q.ts) + "</td><td>" + (escAttr(q.note) || '<span class="rdim">—</span>') + "</td><td>" + escAttr(q.material) + "</td><td>" + q.weight + " kg</td><td>" + q.price + "</td><td>" +
-          (q.proc || 0) + "</td><td>" + q.margin + "%</td><td><b>" + ntdFmt(q.quote) + "</b></td><td>" + nowTxt + '</td><td><button class="qdel" data-ts="' + q.ts + '">刪除</button></td></tr>';
-      }).join("") : '<tr><td colspan="10" class="rempty">' + (Quotes.length ? "沒有符合條件的紀錄" : "還沒有報價紀錄。到「報價試算」算好後按「存這筆報價」就會出現在這裡。") + "</td></tr>";
+          (q.proc || 0) + "</td><td>" + q.margin + "%</td><td><b>" + ntdFmt(q.quote) + "</b></td><td>" + nowTxt + '</td><td>' + statSel(q) + '</td><td><button class="qdel" data-ts="' + q.ts + '">刪除</button></td></tr>';
+      }).join("") : '<tr><td colspan="11" class="rempty">' + (Quotes.length ? "沒有符合條件的紀錄" : "還沒有報價紀錄。到「報價試算」算好後按「存這筆報價」就會出現在這裡。") + "</td></tr>";
       purgeInfo();
     }
     function oldList() { var days = parseInt(pDays.value, 10) || 0, now = Date.now(); return days > 0 ? Quotes.filter(function (q) { return now - q.ts > days * DAY; }) : []; }
     function purgeInfo() { var n = oldList().length; pInfo.textContent = "→ 會刪除 " + n + " 筆"; pInfo.style.color = n ? "var(--up)" : "var(--muted)"; }
-    [qEl, mEl, dEl].forEach(function (e) { e.addEventListener("input", render); e.addEventListener("change", render); });
+    [qEl, mEl, dEl, sEl].forEach(function (e) { if (!e) return; e.addEventListener("input", render); e.addEventListener("change", render); });
+    body.addEventListener("change", function (e) {
+      if (!e.target.classList.contains("rstat")) return;
+      quoteSetStatus(parseInt(e.target.getAttribute("data-ts"), 10), e.target.value); render();
+    });
     body.addEventListener("click", function (e) {
       if (!e.target.classList.contains("qdel")) return;
       var ts = parseInt(e.target.getAttribute("data-ts"), 10), q = Quotes.filter(function (x) { return x.ts === ts; })[0];
@@ -695,8 +778,8 @@
     });
     document.getElementById("rCsv").addEventListener("click", function () {
       var rows = filtered(), cell = function (v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-      var lines = [["日期", "客戶／備註", "材質", "重量(kg)", "料價(NT$/kg)", "加工費", "利潤%", "報價"].join(",")].concat(rows.map(function (q) {
-        return [fmtDate(q.ts), q.note || "", q.material, q.weight, q.price, q.proc || 0, q.margin, q.quote].map(cell).join(",");
+      var lines = [["日期", "客戶／備註", "材質", "重量(kg)", "料價(NT$/kg)", "加工費", "利潤%", "報價", "狀態"].join(",")].concat(rows.map(function (q) {
+        return [fmtDate(q.ts), q.note || "", q.material, q.weight, q.price, q.proc || 0, q.margin, q.quote, q.status || "等待中"].map(cell).join(",");
       }));
       var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
       a.download = "報價紀錄.csv"; document.body.appendChild(a); a.click(); a.remove();
@@ -769,6 +852,35 @@
       }
       requestAnimationFrame(step);
     });
+  }
+
+
+  // ============================================================ 首頁：朗讀今日行情（瀏覽器內建語音）
+  function initSpeak() {
+    var btn = document.getElementById("speakBtn"), note = document.getElementById("speakNote"); if (!btn) return;
+    if (!("speechSynthesis" in window)) { btn.hidden = true; return; }
+    function pickVoice() {
+      var vs = window.speechSynthesis.getVoices() || [];
+      return vs.filter(function (v) { return /^zh[-_]TW/i.test(v.lang); })[0] || vs.filter(function (v) { return /^zh/i.test(v.lang); })[0] || null;
+    }
+    function text() {
+      var parts = [], t = document.querySelector(".adv-t"); if (t) parts.push("今天該做什麼。" + t.textContent);
+      Array.prototype.forEach.call(document.querySelectorAll(".adv li"), function (li) { parts.push(li.textContent); });
+      var p = document.querySelector(".insight p"); if (p) parts.push("行情解讀。" + p.textContent);
+      return parts.join(" ").replace(/NT\$/g, "新台幣 ").replace(/／/g, "每").replace(/→/g, "到").replace(/\+(\d)/g, "上漲 $1").replace(/-(\d)/g, "下跌 $1").replace(/%/g, " 趴");
+    }
+    function paint(on) { btn.textContent = on ? "■ 停止" : "▶ 朗讀行情"; }
+    paint(false);
+    btn.addEventListener("click", function () {
+      var ss = window.speechSynthesis;
+      if (ss.speaking) { ss.cancel(); paint(false); return; }
+      var u = new SpeechSynthesisUtterance(text()), v = pickVoice();
+      u.lang = "zh-TW"; u.rate = 0.95; if (v) u.voice = v;
+      if (note) note.textContent = v ? "" : "這台裝置找不到中文語音，聲音可能不是中文。";
+      u.onend = u.onerror = function () { paint(false); };
+      ss.speak(u); paint(true);
+    });
+    window.addEventListener("beforeunload", function () { try { window.speechSynthesis.cancel(); } catch (e) {} });
   }
 
   // ============================================================ 我的提醒（原料頁）
@@ -857,6 +969,7 @@
     if (document.getElementById("alertBox")) initAlerts();
     if (document.getElementById("watchBox") && window.RECORD_MATERIALS) initWatch(window.RECORD_MATERIALS);
     animateNumbers();
+    initSpeak();
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
     // 情報下拉：點空白處收起（原生 details 負責開關）
     document.addEventListener("click", function (e) {
