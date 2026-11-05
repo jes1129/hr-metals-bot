@@ -94,14 +94,6 @@ def _fetch_news(max_n=6):
         return []
 
 
-def _read(path, default):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:  # noqa: BLE001
-        return default
-
-
 def main():
     result = asyncio.run(metals.run())   # 寫 prices.json、算告警
     daily = metals.backfill_daily()       # 回補日線 → daily.json
@@ -137,14 +129,8 @@ def main():
         sig["news"] = news
         json.dump(sig, f, ensure_ascii=False)
 
-    # 首頁總覽數字（跨 data 檔，可能落後數小時，可接受）
-    sup = _read(os.path.join(DATA_DIR, "suppliers.json"), [])
-    sup_total, sup_near = len(sup), sum(1 for s in sup if s.get("is_near"))
-    cust = _read(os.path.join(DATA_DIR, "customers.json"), None)
-    cust_total = len(cust) if isinstance(cust, list) else None
-
     with open(os.path.join("docs", "index.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_home(history, sup_total, sup_near, cust_total, health=health, advice_data=adv, insight=summary))
+        f.write(dashboard.render_home(history, health=health, advice_data=adv, insight=summary))
     print("[run_metals] 已更新 docs/metals.html 與 docs/index.html（首頁）")
 
 

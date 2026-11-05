@@ -33,6 +33,7 @@
 | `insight.py` | 新聞分類與每日白話解讀（Groq，失敗退規則式） |
 | `datahealth.py` | 資料來源健康燈號（新鮮度、價差、凍結、匯率…） |
 | `ai_json.py` | Groq 呼叫與 JSON 解析；`config.py` 設定模型與額度 |
+| `scripts/probe_free_models.py` | 手動檢查 Groq 金鑰與額度是否可用（`probe-ai.yml`，唯讀） |
 | `dashboard.py` | 產生 `docs/` 底下所有 HTML 頁面 |
 | `docs/assets/app.js`、`style.css` | 前端互動與樣式 |
 | `google-apps-script.gs` | 登入、報價與收藏同步到試算表的後端 |
@@ -41,7 +42,7 @@
 | `backup.gs` | 每天備份試算表、每月還原演練 |
 | `tests/` | 全部自動測試（Node 與 Python） |
 
-> 供應商雷達、客戶開發雷達（`run_radar.py`、`crossmatch.py`、`suppliers.yml`、`customers.yml`）的程式與資料保留，但**排程暫停、頁面已拿掉**。要恢復就把兩個 workflow 的 `schedule` 取消註解並在 `dashboard._nav` 加回選單。雷達共用 AI 流程，現在只用 Groq（每批 8 家、批次間等 60 秒），會比以前慢很多。
+> 供應商雷達與客戶開發雷達已於 2026-11 整個移除（程式、排程、資料、設定）。需要的話可從 git 歷史找回，最後一個含雷達的版本是 `main` 的 `47d8bef`。
 
 ## 部署（GitHub Actions + Pages）
 
