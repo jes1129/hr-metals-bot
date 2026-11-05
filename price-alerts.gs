@@ -4,7 +4,7 @@
  * 用途：每個人在儀表板「原料行情」頁設好自己的提醒（例如「銅超過 NT$480,000/噸就通知我」），
  *       這支程式在行情更新後檢查全部規則，符合的就寄 Email 給設定的人。
  *
- * 規則存在試算表的 alerts 分頁（由網頁的通用資料表功能寫入）：
+ * 規則存在試算表的「價格提醒」分頁（程式內部代號 alerts，主檔 SHEET_MAP 會自動對應）（由網頁的通用資料表功能寫入）：
  *   id, email, metal(copper|aluminum), type(above|below|week_up|week_down), value, fired, firedAt …
  *
  * 防止重複轟炸：同一條規則觸發寄信後標記 fired=1；要等價格回到線的另一邊（fired 清掉）才會再通知。
@@ -21,6 +21,13 @@
 var ALERT_TABLE = "alerts";
 var ALERT_SITE = "https://jes1129.github.io/hr-metals-bot/";
 
+// 不會卡住的提示：右下角小提示 + 執行記錄。
+// （不要用 getUi().alert：從 Apps Script 編輯器執行時，提示框會跑到試算表分頁，編輯器就一直等你按確定，直到逾時。）
+function note_(msg) {
+  try { Logger.log(msg); } catch (e) {}
+  try { SpreadsheetApp.getActiveSpreadsheet().toast(msg, "九上儀表板", 8); } catch (e) {}
+}
+
 // ---- 觸發器 ----
 function installAlertTriggers() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
@@ -28,14 +35,14 @@ function installAlertTriggers() {
   });
   ScriptApp.newTrigger("checkPriceAlerts").timeBased().everyDays(1).atHour(11).create();   // 台灣 10:00 行情更新後
   ScriptApp.newTrigger("checkPriceAlerts").timeBased().everyDays(1).atHour(23).create();   // 台灣 22:00 行情更新後
-  try { SpreadsheetApp.getUi().alert("已開啟價格提醒（每天約 11 點與 23 點檢查）✅"); } catch (e) {}
+  note_("已開啟價格提醒（每天約 11 點與 23 點檢查）✅");
 }
 function installWeeklyDigestTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === "sendWeeklyDigest") ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger("sendWeeklyDigest").timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(9).create();
-  try { SpreadsheetApp.getUi().alert("已開啟每週一早上的行情摘要信 ✅"); } catch (e) {}
+  note_("已開啟每週一早上的行情摘要信 ✅");
 }
 
 // ---- 規則判斷（純函式，方便測試）----

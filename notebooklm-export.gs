@@ -22,6 +22,13 @@ var NOTEBOOK_DOC_NAME = "九上科技 原料行情每日簡報";
 var SITE_BASE = "https://jes1129.github.io/hr-metals-bot/";
 var DATA_BASE = "https://raw.githubusercontent.com/jes1129/hr-metals-bot/main/data/";
 
+// 不會卡住的提示：右下角小提示 + 執行記錄。
+// （不要用 getUi().alert：從 Apps Script 編輯器執行時，提示框會跑到試算表分頁，編輯器就一直等你按確定，直到逾時。）
+function note_(msg) {
+  try { Logger.log(msg); } catch (e) {}
+  try { SpreadsheetApp.getActiveSpreadsheet().toast(msg, "九上儀表板", 8); } catch (e) {}
+}
+
 // ---- 試算表選單 ----
 function onOpen() {
   SpreadsheetApp.getUi()
@@ -47,7 +54,7 @@ function installDailyTrigger() {
     if (t.getHandlerFunction() === "updateNotebookDoc") ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger("updateNotebookDoc").timeBased().everyDays(1).atHour(11).create();  // 行情 10:00 更新，11 點之後讀才是新的
-  try { SpreadsheetApp.getUi().alert("已開啟自動更新（每天上午約 11 點）✅"); } catch (e) {}
+  note_("已開啟自動更新（每天上午約 11 點）✅");
 }
 
 // ---- 主流程：抓行情 → 算摘要 → 寫進固定的 Google 文件 ----
@@ -74,7 +81,9 @@ function fetchJson_(url) {
   } catch (e) { return null; }
 }
 function readTable_(name) {
-  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  // 分頁顯示名稱是中文（主檔的 SHEET_MAP：quotes → 報價紀錄），先用中文名找，找不到再試英文代號
+  var zh = (typeof SHEET_MAP !== "undefined" && SHEET_MAP[name]) || name, ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(zh) || ss.getSheetByName(name);
   if (!sh) return [];
   var vals = sh.getDataRange().getValues();
   if (vals.length < 2) return [];

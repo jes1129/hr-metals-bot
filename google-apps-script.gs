@@ -66,7 +66,7 @@ function verify_(token) {
 // 改名成中文(只改名、不複製不刪資料)；沒有舊分頁才新建。未部署本檔＝完全不影響。
 var SHEET_MAP = {
   orders: "訂單", items: "料號庫存", bom: "產品用料",
-  mylist: "我的名單", marks: "收藏標記", quotes: "報價紀錄"
+  mylist: "我的名單", marks: "收藏標記", quotes: "報價紀錄", alerts: "價格提醒"
 };
 function resolveSheet_(key, header) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();

@@ -137,3 +137,32 @@ test("sparkText_：長度對、最低最高對應 ▁ 與 █", () => {
   const t = w.sparkText_([1, 5, 10]);
   assert.equal(t.length, 3); assert.equal(t[0], "▁"); assert.equal(t[2], "█");
 });
+
+// ---------------- 安裝觸發器：不能用會卡住的提示框 ----------------
+function installWorld(file) {
+  const created = [], toasts = [];
+  const trig = (fn) => ({ timeBased: () => ({ everyDays: () => ({ atHour: () => ({ create: () => created.push(fn) }) }), onWeekDay: () => ({ atHour: () => ({ create: () => created.push(fn) }) }) }) });
+  const ctx = {
+    console, created, toasts, Logger: { log: () => {} },
+    ScriptApp: { getProjectTriggers: () => [], deleteTrigger: () => {}, newTrigger: trig, WeekDay: { MONDAY: 1 } },
+    // 若有人呼叫 getUi().alert，就代表從編輯器執行時會卡到逾時 → 直接讓測試失敗
+    SpreadsheetApp: { getUi: () => { throw new Error("getUi().alert 會讓編輯器等到逾時"); }, getActiveSpreadsheet: () => ({ toast: (m) => toasts.push(m) }) },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(read(file), ctx, { filename: file });
+  return ctx;
+}
+
+test("installAlertTriggers／installWeeklyDigestTrigger：建好觸發器、用 toast 提示、不呼叫會卡住的 getUi().alert", () => {
+  const w = installWorld("price-alerts.gs");
+  w.installAlertTriggers(); w.installWeeklyDigestTrigger();
+  assert.deepEqual(w.created, ["checkPriceAlerts", "checkPriceAlerts", "sendWeeklyDigest"]);
+  assert.equal(w.toasts.length, 2);
+});
+
+test("notebooklm-export 的 installDailyTrigger 同樣不卡住", () => {
+  const w = installWorld("notebooklm-export.gs");
+  w.installDailyTrigger();
+  assert.deepEqual(w.created, ["updateNotebookDoc"]);
+  assert.equal(w.toasts.length, 1);
+});

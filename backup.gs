@@ -3,7 +3,7 @@
  *
  * 做什麼：
  *   backupNow()      每天把「整份公司試算表」複製一份到雲端硬碟資料夾「九上儀表板備份」，留最近 30 份，
- *                    並檢查有沒有哪張表的資料列數突然大減（誤刪的早期訊號）。結果寫在「backup_log」分頁。
+ *                    並檢查有沒有哪張表的資料列數突然大減（誤刪的早期訊號）。結果寫在「備份紀錄」分頁。
  *   restoreDrill()   還原演練：打開最新一份備份，確認真的打得開、分頁沒少、列數對得上，
  *                    ERP 資料還通過引擎的完整檢查——證明「備份是能用的」，而不是只有檔案存在。
  *   restoreSheet()   真的要救資料時：把某一張分頁從備份救回來（會先把現在那張改名留底，不覆蓋）。
@@ -11,7 +11,7 @@
  * 安裝（只要做一次）：
  *   1. 把本檔全部貼進 Apps Script 新增的檔案（名稱例：backup）。
  *   2. 上方函式選單選 installBackupTrigger → 按「執行」→ 第一次會要求「雲端硬碟」授權，按允許。
- *   3. 想立刻試一次：選 backupNow 執行；再選 restoreDrill 執行。到「backup_log」分頁看結果。
+ *   3. 想立刻試一次：選 backupNow 執行；再選 restoreDrill 執行。到「備份紀錄」分頁看結果。
  *
  * 備份失敗、列數異常、還原演練沒過，都會寄信給老闆（門檻設定裡填的 Email；沒填就寄給你自己）。
  * 本檔不含任何帳號、金鑰或白名單。
@@ -19,10 +19,11 @@
 var BK_API = 1;
 var BK_FOLDER = "九上儀表板備份";
 var BK_KEEP = 30;                                         // 保留最近幾份
-var BK_LOG = "backup_log";
+var BK_LOG = "備份紀錄";
+var BK_LOG_OLD = "backup_log";                           // 舊名稱：第一次用到時自動改名成上面的中文名稱
 var BK_HDR = ["ts", "kind", "ok", "fileId", "name", "counts", "msg"];
 var BK_DROP = 0.3;                                        // 某張表列數比上次少超過 30% → 警告
-var BK_SKIP = { "backup_log": 1 };                        // 不列入列數比較的分頁
+var BK_SKIP = { "備份紀錄": 1, "backup_log": 1 };                        // 不列入列數比較的分頁
 
 function bk_boss_() {
   if (typeof sa_cfg_ === "function") { try { return sa_cfg_().boss; } catch (e) {} }
@@ -32,13 +33,18 @@ function bk_boss_() {
 function bk_mail_(subject, body) {
   try { GmailApp.sendEmail(bk_boss_(), subject, body); } catch (e) { console.log("備份通知寄信失敗：" + e); }
 }
-function bk_sheet_(ss) {
+function bk_find_(ss) {                                   // 找備份紀錄分頁；只有舊名稱時直接改名（保留裡面的紀錄）
   var sh = ss.getSheetByName(BK_LOG);
+  if (!sh) { var old = ss.getSheetByName(BK_LOG_OLD); if (old) { old.setName(BK_LOG); sh = old; } }
+  return sh;
+}
+function bk_sheet_(ss) {
+  var sh = bk_find_(ss);
   if (!sh) { sh = ss.insertSheet(BK_LOG); sh.getRange(1, 1, 1, BK_HDR.length).setValues([BK_HDR]); sh.setFrozenRows(1); }
   return sh;
 }
-function bk_rows_(ss) {                                   // 讀 backup_log → [{ts,kind,ok,...}]
-  var sh = ss.getSheetByName(BK_LOG);
+function bk_rows_(ss) {                                   // 讀「備份紀錄」→ [{ts,kind,ok,...}]
+  var sh = bk_find_(ss);
   if (!sh || sh.getLastRow() < 2) return [];
   var v = sh.getRange(1, 1, sh.getLastRow(), BK_HDR.length).getValues(), out = [];
   for (var i = 1; i < v.length; i++) { var o = {}; for (var c = 0; c < BK_HDR.length; c++) o[BK_HDR[c]] = v[i][c]; out.push(o); }
@@ -104,7 +110,7 @@ function bk_prune_(ss) {                                  // 只清「備份資�
 
 function restoreDrill() {
   var ss = SpreadsheetApp.getActiveSpreadsheet(), rows = bk_rows_(ss), last = bk_lastOk_(rows, "backup"), problems = [], info = [];
-  if (!last) { problems.push("找不到任何成功的備份紀錄（backup_log 沒有成功的備份）"); }
+  if (!last) { problems.push("找不到任何成功的備份紀錄（備份紀錄 沒有成功的備份）"); }
   else {
     var bk = null;
     try { bk = SpreadsheetApp.openById(last.fileId); } catch (e) { problems.push("最新備份打不開：" + e); }
@@ -154,7 +160,7 @@ function backupStatus_() {
   var lastRow = rows.length ? rows[rows.length - 1] : null;
   var days = function (r) { return r ? Math.floor((now - new Date(r.ts).getTime()) / 86400000) : null; };
   var fails = 0; for (var i = rows.length - 1; i >= 0 && rows[i].kind === "backup" && Number(rows[i].ok) !== 1; i--) fails++;
-  return { installed: !!ss.getSheetByName(BK_LOG), backupDays: days(b), drillDays: days(d), failStreak: fails, lastMsg: lastRow ? String(lastRow.msg || "") : "" };
+  return { installed: !!bk_find_(ss), backupDays: days(b), drillDays: days(d), failStreak: fails, lastMsg: lastRow ? String(lastRow.msg || "") : "" };
 }
 
 function installBackupTrigger() {
