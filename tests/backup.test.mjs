@@ -40,7 +40,7 @@ function world() {
   vm.createContext(ctx);
   vm.runInContext(read("backup.gs"), ctx, { filename: "backup.gs" });
   return { ctx, books, live, files, mails, advance: (d) => { now += d * 86400000; }, failCopy: (v) => { failCopy = v; },
-    log: () => { const r = books[live].sheets.backup_log || []; return r.slice(1).map((x) => Object.fromEntries(r[0].map((h, i) => [h, x[i]]))); } };
+    log: () => { const r = books[live].sheets["備份紀錄"] || []; return r.slice(1).map((x) => Object.fromEntries(r[0].map((h, i) => [h, x[i]]))); } };
 }
 
 test("備份：複製整份試算表、寫紀錄；狀態顯示 0 天前", () => {
@@ -119,4 +119,14 @@ test("backupStatus_ 從沒備份過 → installed:false、天數 null", () => {
 
 test("installBackupTrigger：每天備份＋每月演練兩個觸發器", () => {
   const w = world(); w.ctx.installBackupTrigger(); assert.equal(w.ctx.created.length, 2);
+});
+
+test("舊名稱的 backup_log 分頁：第一次用到時改名成「備份紀錄」，原有紀錄保留，不會多出空白分頁", () => {
+  const w = world();
+  const old = [["ts", "kind", "ok", "fileId", "name", "counts", "msg"], ["2026-10-01T00:00:00.000Z", "backup", 1, "f0", "舊備份", "{}", "舊的一筆"]];
+  w.books[w.live].sheets["backup_log"] = old;
+  w.ctx.backupNow();
+  const names = Object.keys(w.books[w.live].sheets);
+  assert.ok(names.includes("備份紀錄")); assert.ok(!names.includes("backup_log"));
+  assert.equal(w.log().length, 2); assert.equal(w.log()[0].msg, "舊的一筆");
 });
