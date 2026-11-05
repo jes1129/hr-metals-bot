@@ -1,169 +1,106 @@
-# 九上科技 · 智慧儀表板（原料監控 × 供應鏈雷達）
+# 九上科技 · 智慧儀表板（原料行情自動化助理）
 
-三個雲端代理人，共用一組 Playwright + 分層備援 AI + Discord。
+每天自動抓銅、鋁行情，告訴你「今天該做什麼」，並幫忙報價、盯報價、寄提醒與週報。
+**不做 ERP，也不做生產管理**——這是一個每天幫你看盤的助理，不是資源管理系統。
+
 **部署方式：GitHub Actions + GitHub Pages（免費、不綁卡、關機也照跑）**
 
-| 功能 | 資料來源 | 流程 | 排程（台灣時間） | 輸出 |
-|------|----------|------|------------------|------|
-| **B 原料監控** | Westmetall（LME 官方銅鋁結算價）＋ Yahoo 匯率 | httpx 取價 → 換算台幣 → 存時間序列 → 判斷突破 | 每天 10:00、22:00 | 首頁／原料頁／報價試算 ＋ 突破時 Discord |
-| **C 供應商雷達** | 104 公司搜尋 ＋ 財政部營業稅籍開放資料 | Playwright 擷取 ＋ 串流過濾 → 合併去重 → 分類評分 → AI 建議 | 每月 1 號 09:00 | `docs/suppliers.html` ＋ Discord |
-| **D 客戶開發雷達** | 同上（僅換設定檔關鍵字） | 同上 | 每月 1 號 10:00 | `docs/customers.html` ＋ Discord |
+## 有哪些功能
 
-> **2026-10-11 起，供應商雷達（C）與客戶開發雷達（D）已從儀表板移除**：頁面與選單拿掉、每月排程暫停（`suppliers.yml`／`customers.yml` 保留手動觸發），程式與 `data/` 名單保留；要恢復就把兩個 workflow 的 `schedule` 取消註解並在 `dashboard._nav` 加回選單。
+| 頁面 / 功能 | 做什麼 |
+|---|---|
+| **今日總覽** | 「今天該做什麼」白話建議、AI 行情解讀、銅鋁價格卡（含走勢、近一年位置）、漲跌原因拆解（國際價 vs 匯率）、報價盯盤、本週行情摘要、資料健康燈號 |
+| **原料行情** | 銅鋁日線走勢、均線、期間統計；相關新聞（自動標「偏多／偏空／中性」）；**我的提醒**（價格到線就寄 Email） |
+| **報價試算** | 左右兩欄；料價自動帶入最新行情；可手動輸入其他材料（會記住）；情境模擬滑桿；複製報價文字 |
+| **報價紀錄** | 專門存放報價：搜尋、材質／時間篩選、刪除單筆、一鍵清除舊資料、匯出 CSV、「和現在比」 |
+| **Email（Apps Script）** | 價格提醒信、報價盯盤信、每週一早上的 HTML 週報、NotebookLM 行情簡報 |
 
-> 供應商雷達與客戶開發雷達**共用同一份感知程式碼**，差別只在 `config.py` 的關鍵字與排序權重——這是本專案的設計主張。
+### 判斷怎麼做的
+
+- **今天該做什麼**（`advice.py`）：純規則，門檻在檔頭——單日漲跌 ≥ 1.5%、7 天累計 ≥ 3%、近一年區間位置 ≥ 90% 或 ≤ 10%、資料燈號有黃紅。只說明行情，不是買賣建議。
+- **漲跌原因拆解**：台幣價 ＝ 國際價（美元）× 匯率，用日線「收盤對收盤」拆成兩塊。和首頁即時價的漲跌幅來源不同，數字會有落差，頁面上有註明。
+- **AI 解讀與新聞分類**（`insight.py`）：只用 **Groq**（免費）；**沒金鑰、失敗、格式不對、或解讀裡出現我們沒給的數字，一律退回規則式**，頁面照常產出，並標示來源是「AI」還是「自動」。不使用任何付費服務。
+- **報價盯盤**：拿你存的報價和現在料價比，料價漲超過 3% 就提醒重報（首頁＋Email）。
 
 ## 檔案結構
 
 | 檔案 | 說明 |
 |------|------|
-| `.github/workflows/{metals,suppliers,customers}.yml` | 三個代理人的排程 ＋ commit 產物 |
-| `run_metals.py` / `run_suppliers.py` / `run_customers.py` | GitHub Actions 入口腳本 |
-| `config.py` | **主要客製處**：企業 Profile、搜尋關鍵字、分類詞庫、評分權重、關注區間 |
+| `.github/workflows/metals.yml` | 行情排程（每天 10:00、22:00）＋ 先跑測試 ＋ commit 產物 ＋ 部署 Pages |
+| `run_metals.py` | 入口：取價 → 健康檢查 → 新聞 → AI 解讀 → 產生所有頁面與 `signals.json` |
 | `metals.py` | 取 LME 銅鋁價與匯率 → 讀寫 `data/prices.json`／`daily.json` |
-| `suppliers.py` / `customers.py` | 上下游名單：擷取 → 合併 → 分類評分 → 保留規則 |
-| `jobs.py` | 104 公開職缺爬取層（供應鏈用：從職缺反推廠商設備能力） |
-| `browser.py` | Playwright 真實 Chrome ＋ 指紋偽裝套件（過 Cloudflare） |
-| `ai.py` | **判斷端分層備援**：免費模型 → 付費模型 → 內建備援 |
-| `prompts.py` | 各代理人的結構化提示詞 |
+| `advice.py` | 今天該做什麼、價格拆解、各種統計 |
+| `insight.py` | 新聞分類與每日白話解讀（Groq，失敗退規則式） |
+| `datahealth.py` | 資料來源健康燈號（新鮮度、價差、凍結、匯率…） |
+| `ai_json.py` | Groq 呼叫與 JSON 解析；`config.py` 設定模型與額度 |
 | `dashboard.py` | 產生 `docs/` 底下所有 HTML 頁面 |
-| `notify.py` | Discord Webhook 推送（embed 卡片） |
-| `scripts/compare_factory_source.py` | 資料源比較（唯讀，不影響正式流程） |
+| `docs/assets/app.js`、`style.css` | 前端互動與樣式 |
+| `google-apps-script.gs` | 登入、報價與收藏同步到試算表的後端 |
+| `price-alerts.gs` | 價格提醒、報價盯盤、每週摘要信 |
+| `notebooklm-export.gs` | 每天把行情寫成 Google 文件，給 NotebookLM 當來源 |
+| `backup.gs` | 每天備份試算表、每月還原演練 |
+| `tests/` | 全部自動測試（Node 與 Python） |
+
+> 供應商雷達、客戶開發雷達（`run_radar.py`、`crossmatch.py`、`suppliers.yml`、`customers.yml`）的程式與資料保留，但**排程暫停、頁面已拿掉**。要恢復就把兩個 workflow 的 `schedule` 取消註解並在 `dashboard._nav` 加回選單。雷達共用 AI 流程，現在只用 Groq（每批 8 家、批次間等 60 秒），會比以前慢很多。
 
 ## 部署（GitHub Actions + Pages）
 
-### 1. 推專案上 GitHub
-建一個 repo，把整個資料夾推上去。
+1. **推專案上 GitHub**。
+2. **設定 Secrets**（Repo → Settings → Secrets and variables → Actions）：
 
-### 2. 設定 Secrets
-Repo → **Settings → Secrets and variables → Actions → New repository secret**：
+   | Secret 名稱 | 用途 | 是否必填 |
+   |---|---|---|
+   | `GROQ_API_KEY` | AI 行情解讀與新聞分類（免費額度） | 選填 |
 
-| Secret 名稱 | 用途 | 是否必填 |
-|-------------|------|----------|
-| `DISCORD_WEBHOOK_URL` | Discord 推送（頻道 → 整合 → Webhook） | 選填 |
-| `GROQ_API_KEY` | 判斷端**第一層**（免費額度） | 選填 |
-| `ANTHROPIC_API_KEY` | 判斷端**第二層**（付費，品質較佳） | 選填 |
+   **不填也能跑**：解讀會用規則式整理，其他功能不受影響。
+3. **開啟網頁**：Settings → Pages → Source: Deploy from a branch → `main` / `docs`。網址：`https://<帳號>.github.io/<repo 名>/`
+4. **測試**：Actions → 「銅鋁監控」→ Run workflow。日誌找 `[insight] 今日解讀來源：ai`（或 `rule`，代表退回規則式）。
 
-> **三個都不填也能跑。** 判斷端會落入第三層內建備援，名單、統計與儀表板照常產出——
-> 這是本專案的韌性設計：外部 AI 服務不可用時，系統不中斷。
+> 注意：「銅鋁監控」會 commit 並部署到 `main`。要在不影響線上網站的情況下試改動，請用分支，不要在分支上手動觸發它。
 
-### 3. 開啟儀表板網頁（GitHub Pages）
-Repo → **Settings → Pages → Source: Deploy from a branch → 選 `main` / `docs`**。
-網址：`https://<你的帳號>.github.io/<repo 名>/`
+## Google 設定（報價同步、價格提醒需要）
 
-### 4. 測試 / 排程
-- **手動測試**：Repo → **Actions → 選 workflow → Run workflow**（先測「銅鋁監控」最快看到結果）。
-- **自動排程**：workflow 已設 cron，電腦關機也照跑。
+報價、收藏預設只存在**本機瀏覽器**。要團隊共用、多裝置同步，改存到公司自己的 Google 試算表（約 15 分鐘，個人 Gmail 也可以，只要「基本身分」權限）：
 
-> GitHub Actions 是機房 IP，爬 104 可能較易被 Cloudflare 擋；取 LME 報價與政府開放資料不需瀏覽器，不受影響。
+1. 用公司 Google 帳號新建一個空白**試算表**。
+2. 擴充功能 → Apps Script → 貼上 `google-apps-script.gs` 全部內容。
+3. 到 [Google Cloud Console](https://console.cloud.google.com/) 建專案 → OAuth 同意畫面（外部，範圍不用加，測試使用者加入會用的人）→ 憑證 → OAuth 用戶端 ID（網頁應用程式，已授權 JavaScript 來源填 `https://<帳號>.github.io`）→ 複製用戶端 ID。
+4. 回 Apps Script 填 `CLIENT_ID`、`ALLOWED_EMAILS`。
+5. 部署 → 新增部署 → 網頁應用程式，執行身分「我」、存取「任何人」→ 複製網址。
+6. 編輯 `docs/config.js` 填 `GOOGLE_CLIENT_ID`、`APPS_SCRIPT_URL`，commit。
+
+登入後，報價紀錄存進試算表「報價紀錄」分頁，價格提醒存進 `alerts` 分頁。報價有「客戶／備註」欄（第 9 欄），舊試算表會自動補欄。
+
+### 價格提醒、報價盯盤、週報（`price-alerts.gs`）
+
+貼進**同一個** Apps Script 專案（新增一個指令碼檔）：
+
+1. 執行 `checkPriceAlerts` 一次並授權（需要寄信權限）。
+2. 執行 `installAlertTriggers` → 每天 11 點與 23 點左右自動檢查。
+3. （選用）執行 `installWeeklyDigestTrigger` → 每週一早上寄 HTML 週報（解讀、30 天走勢、新聞）給有設提醒的人；要多寄給別人，在「專案設定 → 指令碼屬性」新增 `WEEKLY_EMAILS`（email，逗號分隔）。
+4. 報價盯盤不用另外安裝，`checkPriceAlerts` 會順便檢查：存過的報價料價漲超過 3%，就寄信給存報價的人，每筆只通知一次。
+
+資料紅燈時不寄信（資料不可信，通知只會誤導）。一般 Google 帳號每天約可寄 100 封。
+
+### NotebookLM（選填）
+
+貼 `notebooklm-export.gs`，執行 `updateNotebookDoc` → 取得文件連結 → `installDailyTrigger`。它每天把銅鋁行情寫成「九上科技 原料行情每日簡報」，加進 NotebookLM 當來源即可問答。筆記本網址填進 `docs/config.js` 的 `NOTEBOOK_URL`，首頁會有直達方塊。
+
+### 備份（選填但建議）
+
+貼 `backup.gs` → 執行 `installBackupTrigger`：每天複製整份試算表（留 30 份）、列數大減警示、每月還原演練、`restoreSheet` 單張救回。
+
+## 變更控制與資料健康
+
+- 程式有改先跑全部測試（`metals.yml` 的 test job，失敗不部署；排程觸發時失敗不擋更新但會標紅；其他分支與 PR 由 `tests.yml` 跑）。
+- `datahealth.py` 每次更新檢查 11 項：新鮮度、連續抓不到、單日異常、兩來源價差、價格凍結、匯率差距。首頁燈號、Actions 紅色註解都來自這裡；頁面太久沒更新時，瀏覽器也會自己警示。
 
 ## 客製方式
 
-- **改關注區間**：`config.py` 的 `METALS` → `watch_low` / `watch_high`
-- **改找誰**：`config.py` 的 `SUPPLIER_QUERIES` / `CUSTOMER_QUERIES` 與對應的分類詞庫
-- **改排序偏好**：`SUPPLIER_SCORE` / `CUSTOMER_SCORE` 的權重
-- 換資料源 ＋ 換設定檔 = 新的代理人，骨幹程式碼不動。
+- 提醒門檻：`advice.py` 檔頭（可在 `config.py` 以 `ADVICE_DAY_PCT`、`ADVICE_WEEK_PCT`、`ADVICE_HIGH_POS`、`ADVICE_LOW_POS` 覆蓋）。
+- 關注區間：`config.py` 的 `METALS`。
+- 報價盯盤門檻：`app.js` 的 `initWatch`（`TH`）與 `price-alerts.gs` 的 `QW_TH`，目前都是 3%。
 
 ## 合規提醒
 
-104 公開頁面以未登入狀態擷取，系統不持有任何帳號密碼；政府開放資料依「政府資料開放授權條款」使用。
-取用範圍限於企業基本資訊（統一編號、產業分類、地址、網址），不擷取任何自然人資料。
-
----
-
-## 功能 7：資料庫（Google 整合）設定教學
-
-網站的「收藏/標記/備註、報價歷史」預設存在**本機瀏覽器**（單機可用、不同步、不需登入）。
-要**團隊共用、多裝置同步**，就照下面設定，改存到**你們公司自己的 Google 試算表**。
-全部用你們自己的 Google 帳號，程式碼裡沒有任何人的個資。約 15 分鐘。
-
-> 你們用個人 Gmail 也可以。登入只要「基本身分」權限，不會跳「未驗證應用」的紅色警告。
-
-### 步驟
-
-1. **建資料庫試算表**：用公司 Google 帳號到 Google 試算表新建一個空白試算表（名稱隨意）。
-2. **貼後端程式**：該試算表 → 上方「擴充功能」→「Apps Script」→ 把 repo 的 `google-apps-script.gs` 內容**全部貼上**，覆蓋原本的。先別關。
-3. **建登入用 ID（OAuth 用戶端）**：
-   - 到 [Google Cloud Console](https://console.cloud.google.com/) → 建立專案（用同一個 Google 帳號）。
-   - 「API 和服務」→「OAuth 同意畫面」→ User Type 選 **外部** → 填 App 名稱/你的信箱 → **範圍不用加**（只用基本身分）→「測試使用者」加入**會用這網站的人的 Gmail** → 儲存。
-   - 「憑證」→「建立憑證」→「OAuth 用戶端 ID」→ 類型 **網頁應用程式** →「已授權的 JavaScript 來源」填你的網站網址 `https://<你的帳號>.github.io`（結尾不要斜線）→ 建立 → **複製「用戶端 ID」**（`xxxx.apps.googleusercontent.com`）。
-4. **填進 Apps Script**：回到步驟 2 的 Apps Script，把最上面的
-   - `CLIENT_ID` = 剛剛複製的用戶端 ID
-   - `ALLOWED_EMAILS` = 允許登入的人的 email（可多個）
-5. **部署 Apps Script**：右上「部署」→「新增部署」→ 類型選**網頁應用程式** → 執行身分「**我**」、誰可以存取「**任何人**」→ 部署 → 授權（第一次會要你同意）→ **複製網頁應用程式網址**。
-6. **填進網站**：編輯 repo 的 `docs/config.js`：
-   - `GOOGLE_CLIENT_ID` = 步驟 3 的用戶端 ID
-   - `APPS_SCRIPT_URL` = 步驟 5 的網址
-   - commit → 等 Pages 更新。
-
-完成後，網站右上角會出現「使用 Google 登入」；登入後收藏/標記/報價就會存進你們的試算表，換裝置、換人登入都看得到。試算表裡會自動長出 `marks`、`quotes` 兩個分頁，你們也能直接在試算表看/改。
-
-### ERP 設定（🏭 ERP 作業頁）
-
-ERP（料號庫存 FIFO、進貨、報價、銷售訂單、BOM／工單、客戶商機）沿用上面同一個 Apps Script 與登入，資料寫進試算表 `ERP_` 開頭的分頁，**不碰原本的分頁**。沒做這段設定時，ERP 頁是「本機試用」，其他功能完全不受影響。
-
-1. **先備份**：Google 試算表 →「檔案」→「建立副本」。
-2. **加 ERP 檔**：Apps Script 編輯器左側「檔案」旁的 **＋ → 指令碼**，命名 `erp`，把 repo 的 `google-apps-script-erp.gs` **全部貼上**、儲存。
-3. **改主檔一行**：在原本的程式碼檔（`google-apps-script.gs`）找到
-   `default:         out = { error: "unknown action" };`
-   換成 repo 新版的這一行（含上面那行註解）：
-   `default:         out = (typeof erpDispatch_ === "function" && erpDispatch_(body.action, p, email)) || { error: "unknown action" };`
-   ⚠️ **只換這一行，不要整個檔覆蓋**，否則你填好的 `CLIENT_ID`、`ALLOWED_EMAILS` 會被蓋掉。
-4. **（選填）限定誰能用 ERP**：「專案設定 → 指令碼屬性」新增 `ERP_EMAILS`，值填可使用 ERP 的人的 Google 帳號（多個用半形逗號分隔）。ERP 有成本與毛利，不想讓所有人看到就設這個；沒設 = 所有能登入的人都能用。
-5. **重新部署（網址不變）**：「部署 → 管理部署 → ✏️ 編輯 → 版本：**新版本** → 部署」。不要按「新增部署」，那會產生新網址。
-
-完成後到 ERP 頁登入，上方會顯示「☁️ 公司正式資料」。若顯示「公司後端尚未加入 ERP 檔」代表第 2 或 5 步還沒完成。
-
-同一個 ERP 檔也包含**行政工作台**（組織、員工、週班表、出勤、申請簽核、設備預約、公告）以及客服案件、服務交付、專案、備份匯入，資料都寫在 `ERP_` 開頭的分頁（例：`ERP_員工`、`ERP_班表`、`ERP_申請`）。之後更新功能時，只要重新貼上新版 `google-apps-script-erp.gs` 並「管理部署 → 新版本」即可，主檔不用再改。
-
-開發者：ERP 規則只有一份 `docs/assets/erp-engine.js`（瀏覽器與 Apps Script 共用）。改了它或 `gas/erp-adapter.gs` 後執行 `python scripts/build_erp_gas.py` 重新產生 `google-apps-script-erp.gs`，並跑 `node --test tests/erp-engine.test.mjs`。ERP 規則移植自 [mars-tw/freedom-erp-crm](https://github.com/mars-tw/freedom-erp-crm)（MIT License, Copyright (c) 2026 mars-tw）。
-
-### 生產排程（🗓 生產排程頁）
-
-多站別、每站多種機型的**混合流線型排程**（站別預設：下料 → CNC 加工 → 表面處理 → 品檢包裝，可在「工廠設定」隨時改）。選單「生產排程」進入：一鍵最佳化、甘特圖、白話重點、和「現場經驗做法／EDD／ATC」的比較、效率×準時取捨圖，以及**插單、急單、外包、機台故障／保養、取消／完工、改交期／數量**的重排程（已開工的不動、盡量少改原計畫、前後對照後才採用）。
-
-- **不用重新部署 Apps Script**：登入後設定、訂單與採用的排程存進公司試算表的 `sched` 分頁（沿用主檔的通用資料表 `tList／tImport`）；未登入則只存本機瀏覽器。
-- **計算都在瀏覽器**（`sched-worker.js` 背景執行緒），訂單不會送到外部服務。
-- **方法**：陳建銘（2015，清大博士論文）／Lin & Chen（2015, SIMPAT 51:100–114）的「離散事件模擬＋基因演算法＋OCBA」為核心，融合迭代貪婪（Ruiz & Stützle 2007）、NEH 插入、ATC 派工（Vepsalainen & Morton 1987）、多目標（平均週期×加權延遲）與事件驅動重排程（Peng et al. 2019；Uhlmann et al. 2022）。完整文獻在頁面「方法說明」，同一頁也會把系統算的結果和論文範例（50,000／44,000／48,000／42,000）逐項對答案。
-- **檔案**：`docs/assets/sched-engine.js`（引擎，瀏覽器與 Node 測試共用）、`sched-worker.js`、`sched.js`＋`sched.css`（畫面）、`sched-data.js`（預設工廠與範例訂單）。測試：`node --test tests/sched-engine.test.mjs`。
-- **風險監控與自動通知**（`docs/assets/sched-kri.js`、`sched-alerts.gs`；測試 `tests/sched-risk.test.mjs`、`sched-brief.test.mjs`、`sched-alerts.test.mjs`）：風險 → 17 個監控指標（KRI，含領先指標：未來 5 個工作日負荷、交期寬裕、平均準時機率、外包佔比）→ 黃／紅門檻 → 觸發。「風險儀表板」有熱度圖、小曲線、惡化箭頭、預計幾天後轉壞的預警、最近惡化排行（歷史每 30 分鐘記一筆，存小表 `sched_hist`）；「進度回報」每一站回報實際時間，ERP 工單完工自動帶入整張單完工；採用新排程前依燈號檢查（黃燈勾選、紅燈填原因＋二次確認）；每次採用、每次工廠設定修改都留紀錄可預覽回復（`sched_ver`）。**自動通知**：把 `sched-alerts.gs` 貼進 Apps Script 並執行 `installSchedAlertTrigger`，平日 08:00–18:59 每 30 分鐘檢查，黃燈通知負責人、紅燈加老闆、同一次檢查合併成每人一封、24 小時不重複、紅燈 30 分鐘沒人「已知悉」升級老闆；趨勢預警只放在網頁右上角通知中心（`sched_notice`、`sched_alert`、`sched_cfg`、`sched_kri` 幾張小表）。早報信要貼新版 `email-notify.gs`。設計參考 COSO 2026《GenAI 內部控制指引》的內控觀念。
-- **限制**：不含物料齊套檢查、人員技能排班、各機台各自的上下班時間；燈號在有人開排程頁時才計算（早報信會在寄信當下補算「逾時沒回報」與「資料太久沒更新」）。
-
-### 交接給客戶時
-
-程式碼零個資。客戶只需：① 收下這個 repo（或 fork 到客戶 GitHub）② 設客戶自己的 `GROQ_API_KEY`（第一層，免費）或 `ANTHROPIC_API_KEY`（第二層，付費）——**兩者都不設也能跑**，判斷端會落入第三層規則式後備，名單與儀表板照常產出 ③ 照上面用**客戶自己的 Google 帳號**做一次設定。之後整套都在客戶名下，跟你無關。
-
-### 日曆／Gmail
-
-名錄每列有 📅（加到 Google 日曆提醒）、✉️（用 Gmail 寄開發信）按鈕，用「預填連結」開啟，不需任何權限設定，任何 Google 帳號都能用。
-
-### NotebookLM 串接（選填）
-
-`notebooklm-export.gs`（貼進同一個 Apps Script 專案）會把 ERP 現況每天寫成一份固定 Google 文件「九上科技 ERP 每日簡報」；把它加進 NotebookLM 當來源即可問答、生語音摘要。筆記本網址填進 `docs/config.js` 的 `NOTEBOOK_URL`，首頁「🧠 NotebookLM」卡片就會直達。NotebookLM 無寫入 API，第一次來源需手動加、之後按「同步」。
-
-## 內控與治理（五項）
-
-| 項目 | 做什麼 | 要貼／要做的事 |
-|---|---|---|
-| 原料資料來源監控 | `datahealth.py`：新鮮度、連續抓不到、單日異常、兩來源價差、價格凍結、匯率；首頁燈號、早報警示、Actions 紅色註解 | 貼新版 `email-notify.gs` |
-| 變更控制 | 程式有改先跑全部測試（`.github/workflows/metals.yml` 的 test job，失敗不部署；其他分支與 PR 由 `tests.yml` 跑）；頁尾顯示網頁版本與後端版本，對不上警告 | 貼新版 `google-apps-script-erp.gs` |
-| 備份與復原 | `backup.gs`：每天 03:00 複製整份試算表到雲端硬碟（留 30 份）、列數大減警示、每月還原演練、`restoreSheet` 單張救回 | 貼 `backup.gs` → 執行 `installBackupTrigger` |
-| 權限與職能分工 | 七種職務（老闆、主管、業務、生管倉管、會計、行政、唯讀），伺服器端把關並遮掉成本；高風險操作通知老闆；每季帳號盤點；停用或離職立刻失效 | 貼新版 ERP 檔 → 執行 `accessSetup` →（選用）主檔 doPost 加 `accessGate_` 那一行 → `installAccessTrigger` |
-| 營運風險儀表板 | `biz-kri.js`：14 個指標（負毛利、逾期應收、客戶集中度、缺料、盤點差異、工單成本超支、簽核卡關、設備保養、加班上限…），與排程風險同一套燈號／趨勢／通知 | 貼新版 `sched-alerts.gs`（已裝過的要重貼） |
-
-### 內控治理（COSO 2026《GenAI 內部控制指引》6 步驟）
-
-行政工作台新增「內控治理」分頁（`docs/assets/governance.js` 資料與規則、`gov-ui.js` 畫面；測試 `tests/governance.test.mjs`）。
-
-| 步驟 | 對應 |
-|---|---|
-| 1 建立治理架構 | 「分工」：誰負責什麼；每季由老闆在「紀錄」簽治理檢視 |
-| 2 盤點使用案例 | 「功能清單」：11 項自動化／AI，含負責人、資料來源、依賴程度；新增功能先登記再上線 |
-| 3 評估風險 | 「風險評分」：13 項風險，可能性 × 影響排序，附「如果……會怎樣」情境（「情境演練」） |
-| 4 設計並對應控制 | 「控制對照」：16 項控制，標預防／偵測／改正與憑據位置；測試會擋下「風險沒有控制」「高分風險只有偵測」 |
-| 5 執行與溝通 | 「速查」一頁守則（含影子 AI 規定）；重大設定變更在「紀錄」記提出人與核准人（沒有核准人不會記錄） |
-| 6 監督與調整 | 「外部相依」7 項服務的改版檢查表；每月 AI 摘要抽查；每月 1 號 08:00 寄**內控月報**給老闆 |
-
-定期紀錄存在試算表 `gov_log` 分頁（只有老闆、主管能寫）。**要做的事（只做一次）**：重貼最新的 `google-apps-script-erp.gs`（後端版本升為 2）→ 執行 `installGovTrigger`；想先看內容可執行 `govMonthlyReport`。新增功能、外部服務或風險時改 `governance.js`，跑測試確認沒有缺漏，再執行 `python scripts/build_erp_gas.py`。
-
-主檔 `google-apps-script.gs` 在 `var p = body.payload || {};` 下面多了三行（`accessGate_`）。你自己的主檔有填 CLIENT_ID／ALLOWED_EMAILS，**不要整份覆蓋**，只把那三行貼進去。
+行情來自 Westmetall（LME 結算價）與 Yahoo 匯率，僅供內部參考。AI 解讀只說明行情，不構成投資或報價建議。程式碼不含任何個資或金鑰，金鑰只放在 GitHub Secrets 與 Apps Script 屬性。

@@ -126,7 +126,7 @@ def verify(scored: list) -> tuple:
 # ---------------------------------------------------------------------------
 # 單一供應商的分批評分
 # ---------------------------------------------------------------------------
-_LAYER_OF = {"gemini": "free", "groq": "free", "paid": "paid"}
+_LAYER_OF = {"groq": "free"}
 
 
 def _score_with(provider: str, system: str, pool: list, run=None) -> tuple:
@@ -170,7 +170,7 @@ def _score_with(provider: str, system: str, pool: list, run=None) -> tuple:
 # 主流程
 # ---------------------------------------------------------------------------
 def select(profile: dict, radar: dict, cands: list, top_n=None, run=None) -> tuple:
-    """回傳 (最終前 N 家, layer)。layer 為 "rule" / "free" / "paid"。"""
+    """回傳 (最終前 N 家, layer)。layer 為 "rule" / "free"。"""
     top_n = top_n or config.DASHBOARD_TOP
 
     def fallback(why):

@@ -27,10 +27,8 @@ import sys
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 假金鑰：讓降級鏈認為兩家免費層都在，但呼叫會被下面的假函式攔掉，不會連網
-os.environ["GEMINI_API_KEY"] = "fake-for-test"
+# 假金鑰：讓降級鏈認為 Groq 在，但呼叫會被下面的假函式攔掉，不會連網
 os.environ["GROQ_API_KEY"] = "fake-for-test"
-os.environ.pop("ANTHROPIC_API_KEY", None)
 
 import ai_json      # noqa: E402
 import ai_select    # noqa: E402
@@ -87,10 +85,7 @@ chk("根本不是 JSON → None", ai_json._parse("抱歉，我無法處理"), No
 # ---------------------------------------------------------------------------
 head("二、供應商鏈與批次設定")
 
-chk("Gemini 優先於 Groq", ai_json.providers(), ["gemini", "groq"])
-chk("Gemini 批次大於 Groq",
-    ai_json.plan("gemini")["batch"] > ai_json.plan("groq")["batch"], True)
-chk("Gemini 不必等（非每分鐘額度制）", ai_json.plan("gemini")["sleep"], 0)
+chk("免費層只剩 Groq", ai_json.providers(), ["groq"])
 chk("Groq 批次間要等（TPM 是每分鐘制）",
     ai_json.plan("groq")["sleep"] > 0, True)
 chk("指定不存在的供應商不會爆",
@@ -116,21 +111,21 @@ def _cands(n):
     } for i in range(n)]
 
 
-def _fake(gemini_ok: bool):
+def _fake(groq_ok: bool):
     def call_one(provider, system, payload, temperature=0.0, max_tokens=4000):
         rows = payload["候選廠商"]
         _CALLS.append((provider, len(rows)))
-        if provider == "gemini" and not gemini_ok:
-            return None, None                    # 模擬 503 需求過高
+        if provider == "groq" and not groq_ok:
+            return None, None                    # 模擬額度用盡或服務壅塞
         return {"ranked": [{"ban": r["ban"], "score": 50,
                             "reason": "位於神岡區，且做代客加工"}
                            for r in rows]}, "free"
     return call_one
 
 
-def _run(gemini_ok):
+def _run(groq_ok):
     _CALLS.clear()
-    ai_json.call_one = _fake(gemini_ok)
+    ai_json.call_one = _fake(groq_ok)
     top, layer = ai_select.select(config.SUPPLIER_PROFILE,
                                   config.RADARS["suppliers"],
                                   _cands(100), top_n=50)
@@ -140,28 +135,15 @@ def _run(gemini_ok):
     return sizes, top, layer
 
 
-sizes, top, layer = _run(gemini_ok=True)
-chk("Gemini 正常 → 只用 Gemini", list(sizes), ["gemini"])
-chk("Gemini 正常 → 回 50 家", len(top), 50)
-chk("Gemini 正常 → 層級為 free", layer, "free")
+sizes, top, layer = _run(groq_ok=True)
+chk("Groq 正常 → 只用 Groq", list(sizes), ["groq"])
+chk("Groq 正常 → 每批不超過 Groq 的處理量", max(sizes["groq"]) <= ai_json.plan("groq")["batch"], True)
+chk("Groq 正常 → 回 50 家", len(top), 50)
+chk("Groq 正常 → 層級為 free", layer, "free")
 
-sizes, top, layer = _run(gemini_ok=False)
-chk("Gemini 全掛 → 兩家都試過", list(sizes), ["gemini", "groq"])
-chk("★ Groq 接手時重切批次（不沿用 Gemini 的大小）",
-    max(sizes["groq"]), ai_json.plan("groq")["batch"])
-chk("Gemini 全掛 → 名單仍完整回 50 家", len(top), 50)
-chk("Gemini 全掛 → 層級仍為 free（由 Groq 產出）", layer, "free")
-
-
-def _both_fail(provider, system, payload, temperature=0.0, max_tokens=4000):
-    return None, None
-
-
-ai_json.call_one = _both_fail
-top, layer = ai_select.select(config.SUPPLIER_PROFILE,
-                              config.RADARS["suppliers"], _cands(100), top_n=50)
-chk("兩家都掛 → 降級到規則層", layer, "rule")
-chk("★ 兩家都掛 → 名單仍有 50 家（絕不消失）", len(top), 50)
+sizes, top, layer = _run(groq_ok=False)
+chk("Groq 掛掉 → 降到規則層", layer, "rule")
+chk("★ Groq 掛掉 → 名單仍有 50 家（絕不消失）", len(top), 50)
 
 
 # ---------------------------------------------------------------------------

@@ -55,7 +55,8 @@ jobs:
       - name: 執行銅鋁監控
         env:
           METALS_DATA_DIR: data
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # 今日行情解讀與新聞分類用的免費 AI（Groq；沒設或失敗就自動退回規則式，不會讓排程失敗）
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python run_metals.py
 
       - name: 提交歷史

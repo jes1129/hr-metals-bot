@@ -7,17 +7,13 @@
 兩輪篩選需要的是**陣列**：第一輪回統編清單、第二輪回每家一筆評分與理由。
 故另立一條路徑，`ai.py` 完全不動——舊流程零風險。
 
-降級鏈與 `ai.summarize()` 相同，但多三件事：
+降級鏈：Groq → 規則式（由呼叫端負責）。另外多兩件事：
 
   1. **回報用了哪一層**。現行前端看不出降級發生過（靜默降級），
      回報層級才能把它變成透明降級。
-  2. **難度分流**：`call_paid_first()` 讓困難或重要的案件直接送付費層。
-     理由是「答得出來」不等於「答對」——弱模型面對困難案例不會拒答，
-     會產出看似合理但錯誤的答案，而純可用性分層只檢查「有無回應」。
-  3. **第一層放兩個不同供應商**（Gemini → Groq），且各自有自己的處理量
-     （見 `plan()`）。實測到的失效彼此獨立：Gemini 回 503「需求過高」、
-     Groq 回 413「TPM 超限」——同一家的兩個模型會一起被額度擋下，
-     不同家不會，這才算真的備援。
+  2. **每家供應商有自己的處理量**（見 `plan()`）。2026-11 起只用 Groq（免費）；
+     Gemini 已移除（實測常回 503「需求過高」），付費層也已移除。Groq 失敗時由呼叫端
+     直接走規則式，頁面照常產出。換供應商時批次要跟著重切，這個機制仍保留。
 """
 import json
 import os
@@ -128,11 +124,9 @@ def _key(name) -> str:
 
 
 # 供應商名稱 → (環境變數, 呼叫函式, 回報的層級)
-# 順序即降級順序。成本優先：兩個免費的在前，付費的在後。
+# 順序即降級順序。成本優先：免費的在前，付費的在後。
 _CHAIN = (
-    ("gemini", config.ENV_GEMINI_KEY, "_gemini", "free"),
     ("groq", config.ENV_GROQ_KEY, "_groq", "free"),
-    ("paid", config.ENV_ANTHROPIC_KEY, "_anthropic", "paid"),
 )
 
 
@@ -195,22 +189,12 @@ def _run_chain(order, system, payload, temperature, max_tokens):
 
 
 def call(system: str, payload: dict, temperature=0.0, max_tokens=4000):
-    """成本優先：Gemini → Groq → 付費層 → (None, None)。回傳 (parsed, layer)。
+    """成本優先：Groq → 付費層 → (None, None)。回傳 (parsed, layer)。
 
     注意：這條路徑**不重切批次**，適合單一請求（如評語）。分批處理請改用
     `providers()` ＋ `call_one()`，否則換供應商後批次大小會不合（見 providers）。
     """
     return _run_chain(_CHAIN, system, payload, temperature, max_tokens)
-
-
-def call_paid_first(system: str, payload: dict, temperature=0.0, max_tokens=4000):
-    """難度分流：困難或重要的案件直接送最強的模型，不可用才降回免費層。
-
-    「答得出來」不等於「答對」——弱模型面對困難案例不會拒答。
-    """
-    order = [c for c in _CHAIN if c[3] == "paid"] + \
-            [c for c in _CHAIN if c[3] != "paid"]
-    return _run_chain(order, system, payload, temperature, max_tokens)
 
 
 def available() -> bool:
@@ -219,71 +203,7 @@ def available() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# 第一層之一：Gemini（免費額度，處理量最大）
-# ---------------------------------------------------------------------------
-def _gemini(key, system, payload, temperature, max_tokens):
-    """用 REST 直接呼叫，不裝 google SDK。
-
-    只為了一個 POST 就多一個依賴不值得——`requirements.txt` 目前只有兩項
-    （httpx、anthropic），而依賴愈少，這份專案愈容易被別人複製起來跑。
-
-    `responseMimeType: application/json` 是 Gemini 端的 JSON 模式，
-    等同 Groq 的 `response_format`。
-    """
-    import httpx
-
-    model = config.GEMINI_MODEL
-    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
-           f"{model}:generateContent")
-    body = {
-        "systemInstruction": {"parts": [{"text": system + _JSON_ONLY}]},
-        "contents": [{"role": "user", "parts": [
-            {"text": json.dumps(payload, ensure_ascii=False)}]}],
-        "generationConfig": {
-            "temperature": temperature,
-            "responseMimeType": "application/json",
-            "maxOutputTokens": max_tokens,
-        },
-    }
-    for attempt in range(config.AI_RETRY + 1):
-        try:
-            r = httpx.post(url, params={"key": key}, json=body, timeout=180)
-            r.raise_for_status()
-            d = r.json()
-            # 回應可能分成多個 part，必須全部串起來才是完整的 JSON
-            text = "".join(p.get("text", "")
-                           for c in d.get("candidates", [])
-                           for p in c.get("content", {}).get("parts", []))
-            if not text.strip():
-                # 有回應但沒內容——最常見是輸出被 maxOutputTokens 吃完
-                # （★ Gemini 3.x 的思考 tokens 也算在裡面），或被安全機制擋掉。
-                # 印出 finishReason，否則只會看到「解析失敗」而查錯方向。
-                fin = (d.get("candidates") or [{}])[0].get("finishReason", "未知")
-                print(f"[ai_json] Gemini 回應無內容（finishReason={fin}）")
-                return None
-            out = _parse(text)
-            if out is None:
-                print(f"[ai_json] Gemini 回應無法解析（{len(text)} 字，"
-                      f"且無可搶救的完整結果）")
-                return None
-            print("[ai_json] 使用 Gemini（" + model + "）。")
-            return out
-        except Exception as e:  # noqa: BLE001
-            code = _status(e)
-            last = attempt >= config.AI_RETRY
-            if code in _RETRY_STATUS and not last:
-                wait = config.AI_RETRY_WAIT * (attempt + 1)
-                print(f"[ai_json] Gemini 暫時性失敗（HTTP {code}），"
-                      f"等 {wait} 秒後重試（第 {attempt + 1} 次）")
-                time.sleep(wait)
-                continue
-            print("[ai_json] Gemini 失敗：" + str(e) + _detail(e, model))
-            return None
-    return None
-
-
-# ---------------------------------------------------------------------------
-# 第一層之二：Groq（免費額度，不同供應商）
+# 第一層：Groq（免費額度）
 # ---------------------------------------------------------------------------
 def _groq(key, system, payload, temperature, max_tokens):
     import httpx
@@ -327,28 +247,3 @@ def _groq(key, system, payload, temperature, max_tokens):
             print("[ai_json] Groq 失敗：" + str(e) + _detail(e, model))
             return None
     return None
-
-
-# ---------------------------------------------------------------------------
-# 第二層：Claude（付費，目前未設定金鑰）
-# ---------------------------------------------------------------------------
-def _anthropic(key, system, payload, temperature, max_tokens):
-    import anthropic
-
-    try:
-        client = anthropic.Anthropic(api_key=key)
-        resp = client.messages.create(
-            model=config.AI_MODEL,
-            max_tokens=max_tokens,
-            system=system + _JSON_ONLY,
-            messages=[{"role": "user",
-                       "content": json.dumps(payload, ensure_ascii=False)}],
-        )
-        text = next(b.text for b in resp.content if b.type == "text").strip()
-        if text.startswith("```"):          # 保險：去掉程式碼框
-            text = text.split("\n", 1)[-1].rsplit("```", 1)[0]
-        print("[ai_json] 使用 Claude。")
-        return json.loads(text)
-    except Exception as e:  # noqa: BLE001
-        print("[ai_json] Claude 失敗：" + str(e) + _detail(e, config.AI_MODEL))
-        return None

@@ -16,7 +16,6 @@
     ai_select   兩輪細選 → 前 50 家（失敗則降級為規則粗排序）
     radar_page  產出網頁
     snapshot    寫本期快照（下期比對的基準）
-    notify      只推播「變化」，不推全量（config.NOTIFY_ENABLED 控制）
     runlog      記錄本次執行（走了哪一層、耗時、降級原因）
 
 誠實的邊界：本檔只能衍生「使用同一組資料源」的代理人。若要換資料源
@@ -29,7 +28,6 @@ import traceback
 import ai_select
 import config
 import crossmatch
-import notify
 import radar_page
 import runlog
 import snapshot
@@ -38,47 +36,8 @@ DOCS = "docs"
 
 
 def _alert(msg: str):
-    """失敗告警。受 config.NOTIFY_ENABLED 控制，關閉時只寫日誌。"""
+    """失敗告警：只寫日誌（Actions 的執行紀錄看得到）。"""
     print("[run_radar] " + msg.replace("\n", " "))
-    if not getattr(config, "NOTIFY_ENABLED", False):
-        return
-    try:
-        notify.send(msg)
-    except Exception as e:  # noqa: BLE001
-        print(f"[run_radar] 告警推播失敗：{e}")
-
-
-def _notify(title: str, ch: dict, layer: str):
-    """只發變化。全量名單每期幾乎一樣，發兩次就沒人看了。"""
-    if not getattr(config, "NOTIFY_ENABLED", False):
-        print(f"[run_radar] 推播已關閉（NOTIFY_ENABLED=False）。"
-              f"變化摘要：{snapshot.summary_line(ch)}")
-        return None
-
-    lines = [f"**{title}**　{snapshot.summary_line(ch)}"]
-    if ch.get("partner_alerts"):
-        lines += ["", "🔔 **現有協力廠發生變化**"]
-        for a in ch["partner_alerts"][:5]:
-            kind = {"gone_closed": "已離開生產中清冊（可能歇業）",
-                    "gone_moved": "搬遷或改行業",
-                    "improved": "資料更新"}.get(a.get("kind"), "變化")
-            lines.append(f"・{a['name']}　{kind}")
-    if ch.get("comparable") and ch["gone_closed"]:
-        lines += ["", f"⚠️ **確認歇業 {len(ch['gone_closed'])} 家**"]
-        lines += [f"・{x['name']}（{x.get('area', '')}）" for x in ch["gone_closed"][:5]]
-    if ch.get("comparable") and ch["new"]:
-        lines += ["", f"✨ **本月新增 {len(ch['new'])} 家**（新登記的通常正在找生意）"]
-        lines += [f"・{x['name']}（{x.get('area', '')}　{'／'.join(x.get('caps', []))}）"
-                  for x in ch["new"][:5]]
-    if layer == "rule":
-        lines += ["", "⚪ 本期分析層未啟用（外部模型不可用），名單與變化仍完整產出。"]
-
-    try:
-        notify.send("\n".join(lines))
-        return True
-    except Exception as e:  # noqa: BLE001
-        print(f"[run_radar] 推播失敗（不影響產出）：{e}")
-        return False
 
 
 def main(argv=None) -> int:
@@ -142,9 +101,7 @@ def main(argv=None) -> int:
         # --- 狀態留存：寫本期快照（下期比對的基準）--------------------
         snapshot.save(agent, cands, all_bans, rules, st.get("version"))
 
-        # --- 行動端：推播「變化」 ------------------------------------
-        notified = _notify(title, changes, layer)
-        run.finish(ok=True, notified=notified)
+        run.finish(ok=True)
         print(f"[run_radar] 完成：{agent} 候選 {len(cands):,} 家、"
               f"前 {len(top)} 家、層級 {layer}")
         return 0
