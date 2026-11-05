@@ -1,11 +1,11 @@
 /**
  * 九上科技儀表板 — NotebookLM 匯出橋樑（Google Apps Script）【原料行情版】
  *
- * 用途：每天把銅、鋁的最新行情寫成一份固定的 Google 文件「九上科技 原料行情每日簡報」，
+ * 用途：每天把銅、鋁的最新行情（含今天該做什麼、AI 行情解讀、相關新聞）寫成一份固定的 Google 文件「九上科技 原料行情每日簡報」，
  *       讓 NotebookLM 當來源，可以直接問「銅這週走勢如何」「現在適合報價嗎」。
  *
  * 資料來源（都是公開網址，不需要 ERP，也不需要登入）：
- *   - 網站的 signals.json   ：目前價格、今日漲跌、資料健康燈號
+ *   - 網站的 signals.json   ：目前價格、今日漲跌、資料健康燈號、今天該做什麼、行情解讀、相關新聞
  *   - repo 的 data/daily.json：一年的日線，算 7／30／90 天漲跌與區間高低
  *   - 試算表的 quotes 分頁   ：最近的報價紀錄（有登入存過才有；沒有就略過）
  *
@@ -148,6 +148,7 @@ function buildBriefText_() {
     sig.metals.forEach(function (m) {
       L.push("- " + m.name + "：" + nt_(m.price_twd) + " / 噸，單日 " + pct_(m.pct) + (m.note ? "（" + m.note + "）" : ""));
     });
+    L.push("（說明：這裡的「單日」是最新價相對上一次更新的漲跌；下面各金屬的 7／30／90 天與「最近一個交易日」是用日線收盤計算，兩者資料來源不同，數字會有落差，不是矛盾。）");
     L.push("");
   }
 
@@ -155,6 +156,29 @@ function buildBriefText_() {
     var h = sig.health, bad = (h.items || []).filter(function (i) { return i.level !== "green"; });
     L.push("【資料健康】" + (h.level === "green" ? "全部正常（綠燈）。報價可以使用。" : (h.red ? "有紅燈" : "有黃燈") + "，報價先別直接照用："));
     bad.forEach(function (i) { L.push("- " + (i.level === "red" ? "紅燈" : "黃燈") + " " + i.name + "：" + i.display + (i.msg ? "，" + i.msg : "")); });
+    L.push("");
+  }
+
+  var adv = sig && sig.advice;
+  if (adv && adv.headline) {
+    L.push("【今天該做什麼】" + adv.headline);
+    (adv.items || []).forEach(function (i) { L.push("- " + i.text); });
+    L.push("");
+  }
+
+  var ins = sig && sig.insight;
+  if (ins && ins.text) {
+    L.push("【行情解讀】" + (ins.source === "ai" ? "（行情數字由程式計算；新聞面的說明由 AI 依新聞標題撰寫）" : "（依規則自動整理）") + (ins.updated ? " 更新於 " + ins.updated : ""));
+    L.push(ins.text);
+    L.push("");
+  }
+
+  var news = (sig && sig.news) || [];
+  if (news.length) {
+    L.push("【最近相關新聞】（偏多／偏空／中性是系統依標題自動判斷，僅供參考）");
+    news.slice(0, 8).forEach(function (n) {
+      L.push("- [" + (n.tag || "中性") + "] " + n.title + (n.source ? "（" + n.source + (n.date ? " " + n.date : "") + "）" : ""));
+    });
     L.push("");
   }
 
