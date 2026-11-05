@@ -27,7 +27,7 @@ jobs:
 
       # 104 資料源已移除，不再需要瀏覽器——CI 裡最慢的一步（安裝 Chrome）省掉了
       - name: 安裝依賴
-        run: pip install httpx anthropic
+        run: pip install httpx
 
       - name: 執行供應商雷達
         env:
@@ -35,10 +35,7 @@ jobs:
           # 第一層放兩個**不同供應商**的免費額度，而不是同一家的兩個模型
           # ——實測到的失效彼此獨立（Gemini 回 503 壅塞、Groq 回 413 額度），
           # 同一家的兩個模型會一起被擋，不同家不會。
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}       # 第一層首選，每批 50 家
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}           # 第一層備援，每批 15 家
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 第二層，付費（目前未設定）
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python run_radar.py suppliers
 
       # 快照就是狀態留存機制：每個 commit 即一份快照，下期據此比對變化。

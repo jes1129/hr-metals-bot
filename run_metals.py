@@ -11,9 +11,11 @@ import datetime
 import json
 import os
 
+import advice
 import config
 import dashboard
 import datahealth
+import insight
 import metals
 
 DATA_DIR = os.environ.get("METALS_DATA_DIR", "/data")
@@ -108,40 +110,31 @@ def main():
     os.makedirs("docs", exist_ok=True)
     # 原料頁（含相關新聞）
     health = _health(history, daily)
+    # 新聞 → 偏多／偏空／中性分類 → 今日白話解讀（AI 不可用時自動退回規則式，頁面照常產出）
+    news = insight.classify_news(insight.filter_relevant(_fetch_news()))
+    adv = advice.build(history, daily, health)
+    stats = {m["key"]: m for m in adv["metals"]}
+    summary = insight.daily_summary(stats, news)
+    summary["updated"] = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    print(f"[insight] 今日解讀來源：{summary['source']}；新聞 {len(news)} 則")
     with open(os.path.join("docs", "metals.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_html(history, daily, news=_fetch_news()))
+        f.write(dashboard.render_html(history, daily, news=news))
     # 報價試算頁（用最新原料現價）
     with open(os.path.join("docs", "quote.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_quote_html(history))
+        f.write(dashboard.render_quote_html(history, daily))
+    # 報價紀錄頁（純靜態外殼，資料來自瀏覽器／登入後的試算表）
+    with open(os.path.join("docs", "records.html"), "w", encoding="utf-8") as f:
+        f.write(dashboard.render_records_html(history))
     # 說明頁（純靜態教學，隨每次部署更新）
     with open(os.path.join("docs", "help.html"), "w", encoding="utf-8") as f:
         f.write(dashboard.render_help_html())
-    # 資料庫操作中心（純靜態外殼，資料登入後由前端載入）
-    with open(os.path.join("docs", "db.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_db_html())
-    # 訂單 + 老闆儀表板（純靜態外殼，訂單登入後由前端載入）
-    with open(os.path.join("docs", "orders.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_orders_html())
-    # ERP 作業（純靜態外殼）；任何錯誤都不影響原料行情等既有頁面的產生
-    try:
-        with open(os.path.join("docs", "erp.html"), "w", encoding="utf-8") as f:
-            f.write(dashboard.render_erp_html())
-    except Exception as e:  # noqa: BLE001
-        print("[run_metals] ERP 頁產生失敗（略過，不影響其他頁）：", e)
-    try:
-        with open(os.path.join("docs", "admin.html"), "w", encoding="utf-8") as f:
-            f.write(dashboard.render_admin_html())
-    except Exception as e:  # noqa: BLE001
-        print("[run_metals] 行政工作台頁產生失敗（略過，不影響其他頁）：", e)
-    try:
-        with open(os.path.join("docs", "schedule.html"), "w", encoding="utf-8") as f:
-            f.write(dashboard.render_schedule_html())
-    except Exception as e:  # noqa: BLE001
-        print("[run_metals] 生產排程頁產生失敗（略過，不影響其他頁）：", e)
-    # 原料現況/突破訊號（供 email 早報讀取）
+    # 原料現況/突破訊號（供提醒信讀取）
     with open(os.path.join("docs", "signals.json"), "w", encoding="utf-8") as f:
         sig = _build_signals(history)
-        sig["health"] = health          # 早報信與首頁都讀這個
+        sig["health"] = health          # 首頁與提醒信都讀這個
+        sig["advice"] = adv
+        sig["insight"] = summary
+        sig["news"] = news
         json.dump(sig, f, ensure_ascii=False)
 
     # 首頁總覽數字（跨 data 檔，可能落後數小時，可接受）
@@ -151,7 +144,7 @@ def main():
     cust_total = len(cust) if isinstance(cust, list) else None
 
     with open(os.path.join("docs", "index.html"), "w", encoding="utf-8") as f:
-        f.write(dashboard.render_home(history, sup_total, sup_near, cust_total, health=health))
+        f.write(dashboard.render_home(history, sup_total, sup_near, cust_total, health=health, advice_data=adv, insight=summary))
     print("[run_metals] 已更新 docs/metals.html 與 docs/index.html（首頁）")
 
 

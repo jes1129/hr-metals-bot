@@ -120,10 +120,3 @@ test("backupStatus_ 從沒備份過 → installed:false、天數 null", () => {
 test("installBackupTrigger：每天備份＋每月演練兩個觸發器", () => {
   const w = world(); w.ctx.installBackupTrigger(); assert.equal(w.ctx.created.length, 2);
 });
-
-test("還原演練會用 ERP 引擎檢查備份裡的 ERP 資料（和 ERP 後端檔一起載入時）", () => {
-  const w = world();
-  vm.runInContext(read("google-apps-script-erp.gs"), w.ctx, { filename: "erp.gs" });
-  w.ctx.backupNow();
-  assert.match(w.ctx.restoreDrill(), /ERP 資料通過完整檢查/);
-});

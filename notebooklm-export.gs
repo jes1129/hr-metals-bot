@@ -1,41 +1,44 @@
 /**
- * 九上科技儀表板 — NotebookLM 匯出橋樑（Google Apps Script）
+ * 九上科技儀表板 — NotebookLM 匯出橋樑（Google Apps Script）【原料行情版】
  *
- * 用途：每天（或手動）把試算表裡的 ERP 現況（訂單/營收/待出貨/逾期/報價/往來）
- *       寫成一份固定的 Google 文件「九上科技 ERP 每日簡報」，讓 NotebookLM 當來源。
+ * 用途：每天把銅、鋁的最新行情寫成一份固定的 Google 文件「九上科技 原料行情每日簡報」，
+ *       讓 NotebookLM 當來源，可以直接問「銅這週走勢如何」「現在適合報價嗎」。
  *
- * 安裝（貼進「同一個」Apps Script 專案，當第二個檔案）：
- *   1. 試算表 → 擴充功能 → Apps Script → 左側「＋ → 指令碼」新增檔案，貼上本檔 → 儲存。
+ * 資料來源（都是公開網址，不需要 ERP，也不需要登入）：
+ *   - 網站的 signals.json   ：目前價格、今日漲跌、資料健康燈號
+ *   - repo 的 data/daily.json：一年的日線，算 7／30／90 天漲跌與區間高低
+ *   - 試算表的 quotes 分頁   ：最近的報價紀錄（有登入存過才有；沒有就略過）
+ *
+ * 安裝（貼進「同一個」Apps Script 專案，當一個檔案；舊的 ERP 版請整個取代）：
+ *   1. 試算表 → 擴充功能 → Apps Script → 開啟 notebooklm-export 檔，貼上本檔 → 儲存。
  *   2. 上方函式選 updateNotebookDoc → 執行一次 → 授權 → 完成後彈窗會給你文件連結。
- *   3. 執行一次 installDailyTrigger → 每天上午自動更新。
- *   4. 打開那份 Google 文件 → 共用設「知道連結者可檢視」→ 複製連結。
- *   5. notebooklm.google.com → 新增筆記本 → 新增來源 → Google 文件 → 選這份（第一次手動加）。
- *      之後改寫同一份文件、在 NotebookLM 該來源按「同步」即可，不必重加。
+ *   3. 執行一次 installDailyTrigger → 每天上午自動更新（會先把舊的觸發器換掉）。
+ *   4. 同一份文件仍沿用原本的 NOTEBOOK_DOC_ID，NotebookLM 裡該來源按「同步」即可，不必重加。
  *
- * 註：本檔只「讀試算表 + 寫一份文件」，與網頁後端 google-apps-script.gs 互不影響。
+ * 註：本檔只「讀公開網址 + 讀 quotes 分頁 + 寫一份文件」，與網頁後端 google-apps-script.gs 互不影響。
  */
 
-var NOTEBOOK_DOC_NAME = "九上科技 ERP 每日簡報";
+var NOTEBOOK_DOC_NAME = "九上科技 原料行情每日簡報";
+var SITE_BASE = "https://jes1129.github.io/hr-metals-bot/";
+var DATA_BASE = "https://raw.githubusercontent.com/jes1129/hr-metals-bot/main/data/";
 
-// ---- 試算表選單（打開試算表時出現）----
+// ---- 試算表選單 ----
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu("🧠 NotebookLM / 早報")
-    .addItem("📧 立即寄一封 ERP 早報", "sendDailyDigest")
-    .addSeparator()
-    .addItem("🔄 立即更新簡報文件", "menuUpdate_")
+    .createMenu("🧠 NotebookLM")
+    .addItem("🔄 立即更新行情簡報", "menuUpdate_")
     .addItem("🔗 顯示簡報文件連結", "menuLink_")
     .addItem("⏰ 開啟每日自動更新", "installDailyTrigger")
     .addToUi();
 }
 function menuUpdate_() {
   var url = updateNotebookDoc();
-  SpreadsheetApp.getUi().alert("ERP 簡報已更新 ✅\n\n文件連結：\n" + url);
+  SpreadsheetApp.getUi().alert("行情簡報已更新 ✅\n\n文件連結：\n" + url);
 }
 function menuLink_() {
   var id = PropertiesService.getScriptProperties().getProperty("NOTEBOOK_DOC_ID");
-  if (!id) { SpreadsheetApp.getUi().alert("尚未建立簡報。請先點「🔄 立即更新簡報」。"); return; }
-  SpreadsheetApp.getUi().alert("ERP 簡報文件連結：\n" + DocumentApp.openById(id).getUrl());
+  if (!id) { SpreadsheetApp.getUi().alert("尚未建立簡報。請先點「🔄 立即更新行情簡報」。"); return; }
+  SpreadsheetApp.getUi().alert("行情簡報文件連結：\n" + DocumentApp.openById(id).getUrl());
 }
 
 // ---- 每日自動更新（時間觸發器）----
@@ -43,28 +46,33 @@ function installDailyTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === "updateNotebookDoc") ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger("updateNotebookDoc").timeBased().everyDays(1).atHour(9).create();  // 每天早上約 9 點觸發；函式內會跳過週末
-  try { SpreadsheetApp.getUi().alert("已開啟自動更新（平日上午約 9 點）✅"); } catch (e) {}
+  ScriptApp.newTrigger("updateNotebookDoc").timeBased().everyDays(1).atHour(11).create();  // 行情 10:00 更新，11 點之後讀才是新的
+  try { SpreadsheetApp.getUi().alert("已開啟自動更新（每天上午約 11 點）✅"); } catch (e) {}
 }
 
-// ---- 主流程：算摘要 → 寫進固定的 Google 文件 ----
-function updateNotebookDoc(e) {
-  // 自動排程(e 有值)時，週末(六/日)不更新；手動從編輯器執行(e 為空)則一律更新，方便測試（台北時區）
-  var dow = Utilities.formatDate(new Date(), "Asia/Taipei", "u");  // 1=一 … 6=六 7=日
-  if (e && (dow === "6" || dow === "7")) return "週末不更新（自動排程）";
+// ---- 主流程：抓行情 → 算摘要 → 寫進固定的 Google 文件 ----
+function updateNotebookDoc() {
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty("NOTEBOOK_DOC_ID");
   var doc = null;
   if (id) { try { doc = DocumentApp.openById(id); } catch (e) { doc = null; } }
   if (!doc) { doc = DocumentApp.create(NOTEBOOK_DOC_NAME); props.setProperty("NOTEBOOK_DOC_ID", doc.getId()); }
+  doc.setName(NOTEBOOK_DOC_NAME);
   doc.getBody().setText(buildBriefText_());
   doc.saveAndClose();
   return doc.getUrl();
 }
 
 // ===========================================================================
-// 讀試算表 + 計算 + 組出簡報文字
+// 讀資料 + 計算 + 組出簡報文字
 // ===========================================================================
+function fetchJson_(url) {
+  try {
+    var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return null;
+    return JSON.parse(r.getContentText());
+  } catch (e) { return null; }
+}
 function readTable_(name) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   if (!sh) return [];
@@ -81,61 +89,80 @@ function readTable_(name) {
 function n_(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
 function comma_(v) { return String(Math.round(n_(v))).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 function nt_(v) { return "NT$ " + comma_(v); }
-function ymd_(v) { return (v instanceof Date) ? Utilities.formatDate(v, "Asia/Taipei", "yyyy-MM-dd") : String(v || ""); }
-function amt_(o) { var a = Number(o.amount); return (!isNaN(a) && o.amount !== "" && o.amount != null) ? a : n_(o.qty) * n_(o.price); }
+function pct_(v) { return (v > 0 ? "+" : "") + (Math.round(v * 100) / 100) + "%"; }
+
+// 日線 → 每天的台幣價（元/噸）
+function twdSeries_(rows) {
+  return (rows || []).filter(function (r) { return r.usd != null && r.rate != null; })
+    .map(function (r) { return { ts: r.ts, v: r.usd * r.rate }; });
+}
+// 距今 n 天前的價格（取不超過該日期的最近一筆）
+function priceAgo_(s, n) {
+  if (!s.length) return null;
+  var last = new Date(s[s.length - 1].ts), cut = new Date(last.getTime() - n * 86400000), hit = null;
+  for (var i = 0; i < s.length; i++) { if (new Date(s[i].ts) <= cut) hit = s[i]; else break; }
+  return hit ? hit.v : null;
+}
+function metalLines_(label, rows) {
+  var s = twdSeries_(rows), L = [];
+  if (s.length < 2) { L.push("- " + label + "：資料不足"); return L; }
+  var last = s[s.length - 1], vs = s.map(function (x) { return x.v; });
+  var hi = Math.max.apply(null, vs), lo = Math.min.apply(null, vs);
+  var ma20 = vs.slice(-20).reduce(function (a, b) { return a + b; }, 0) / Math.min(20, vs.length);
+  L.push("【" + label + "】最新（" + last.ts + "）：" + nt_(last.v) + " / 噸");
+  [["7 天", 7], ["30 天", 30], ["90 天", 90]].forEach(function (p) {
+    var old = priceAgo_(s, p[1]);
+    if (old) L.push("- 近 " + p[0] + "：" + pct_((last.v / old - 1) * 100) + "（當時 " + nt_(old) + "）");
+  });
+  L.push("- 近一年區間：最低 " + nt_(lo) + "、最高 " + nt_(hi) + "；目前位於區間的 " + Math.round((last.v - lo) / (hi - lo || 1) * 100) + "% 位置");
+  L.push("- 20 日均價 " + nt_(ma20) + "，目前" + (last.v >= ma20 ? "高於" : "低於") + "均價 " + pct_((last.v / ma20 - 1) * 100));
+  return L;
+}
 
 function buildBriefText_() {
-  var orders = readTable_("orders"),
-      quotes = readTable_("quotes"), marks = readTable_("marks");
-  var today = Utilities.formatDate(new Date(), "Asia/Taipei", "yyyy-MM-dd");
-  var month = today.slice(0, 7);
   var now = Utilities.formatDate(new Date(), "Asia/Taipei", "yyyy-MM-dd HH:mm");
-
-  function overdue(o) { var d = ymd_(o.due); return d && d < today && ["報價", "接單", "生產"].indexOf(o.status) >= 0; }
-
-  // KPI
-  var rev = 0, cnt = 0, ship = 0, overdueList = [], shipList = [];
-  orders.forEach(function (o) {
-    if (o.status === "取消") return;
-    if (ymd_(o.order_date).slice(0, 7) === month) { rev += amt_(o); cnt++; }
-    if (o.status === "接單" || o.status === "生產") { ship++; shipList.push(o); }
-    if (overdue(o)) overdueList.push(o);
-  });
+  var sig = fetchJson_(SITE_BASE + "signals.json");
+  var daily = fetchJson_(DATA_BASE + "daily.json");
 
   var L = [];
-  L.push("九上科技 ERP 每日簡報");
-  L.push("更新時間：" + now + "（此文件由系統自動產生，供 NotebookLM 問答/摘要用）");
-  L.push("");
-  L.push("【本月營收與訂單】月份 " + month);
-  L.push("- 本月營收：" + nt_(rev));
-  L.push("- 本月訂單數：" + cnt + " 筆");
-  L.push("- 待出貨（接單/生產中）：" + ship + " 筆");
-  L.push("- 逾期未出貨：" + overdueList.length + " 筆");
+  L.push("九上科技 原料行情每日簡報");
+  L.push("更新時間：" + now + "（此文件由系統自動產生，供 NotebookLM 問答/摘要用；價格單位為新台幣／噸）");
   L.push("");
 
-  L.push("【逾期訂單（交期已過、尚未出貨）】");
-  if (!overdueList.length) L.push("- 無");
-  else overdueList.forEach(function (o) { L.push("- " + (o.customer || "?") + "／" + (o.product || "") + "：交期 " + ymd_(o.due) + "，狀態 " + o.status + "，數量 " + n_(o.qty)); });
-  L.push("");
+  if (!sig && !daily) {
+    L.push("⚠️ 這次抓不到行情資料（網站或資料檔暫時無法連線），請稍後再更新。");
+    return L.join("\n");
+  }
 
-  L.push("【待出貨清單（接單/生產中）】");
-  if (!shipList.length) L.push("- 無");
-  else shipList.forEach(function (o) { L.push("- " + (o.customer || "?") + "／" + (o.product || "") + " ×" + n_(o.qty) + "（交期 " + (ymd_(o.due) || "未定") + "，金額 " + nt_(amt_(o)) + "）"); });
-  L.push("");
+  if (sig && sig.metals) {
+    L.push("【今日行情】資料時間 " + (sig.updated || "—"));
+    sig.metals.forEach(function (m) {
+      L.push("- " + m.name + "：" + nt_(m.price_twd) + " / 噸，單日 " + pct_(m.pct) + (m.note ? "（" + m.note + "）" : ""));
+    });
+    L.push("");
+  }
 
+  if (sig && sig.health) {
+    var h = sig.health, bad = (h.items || []).filter(function (i) { return i.level !== "green"; });
+    L.push("【資料健康】" + (h.level === "green" ? "全部正常（綠燈）。報價可以使用。" : (h.red ? "有紅燈" : "有黃燈") + "，報價先別直接照用："));
+    bad.forEach(function (i) { L.push("- " + (i.level === "red" ? "紅燈" : "黃燈") + " " + i.name + "：" + i.display + (i.msg ? "，" + i.msg : "")); });
+    L.push("");
+  }
+
+  if (daily) {
+    metalLines_("銅", daily.copper).forEach(function (x) { L.push(x); });
+    L.push("");
+    metalLines_("鋁", daily.aluminum).forEach(function (x) { L.push(x); });
+    L.push("");
+  }
 
   L.push("【最近報價（近 8 筆）】");
-  var qz = quotes.slice().sort(function (a, b) { return n_(b.ts) - n_(a.ts); }).slice(0, 8);
+  var qz = [];
+  try { qz = readTable_("quotes").sort(function (a, b) { return n_(b.ts) - n_(a.ts); }).slice(0, 8); } catch (e) { qz = []; }
   if (!qz.length) L.push("- 無");
   else qz.forEach(function (q) { L.push("- " + (q.material || "") + " " + n_(q.weight) + "kg → 報價 " + nt_(q.quote) + "（料價 " + comma_(q.price) + "/kg）"); });
   L.push("");
 
-  L.push("【往來標記重點（合作中／已收藏）】");
-  var hi = marks.filter(function (m) { return m.status === "合作中" || m.fav === true || m.fav === "TRUE" || m.fav === "true"; });
-  if (!hi.length) L.push("- 無");
-  else hi.forEach(function (m) { L.push("- " + m.id + "：" + (m.status || "已收藏") + (m.note ? "（備註：" + m.note + "）" : "")); });
-  L.push("");
-
-  L.push("— 以上為系統即時彙整。若需最新數字，回網站儀表板查看；本文件每天自動更新一次。");
+  L.push("— 以上為系統自動彙整，僅供參考，不構成投資建議。最新數字請看網站：" + SITE_BASE);
   return L.join("\n");
 }

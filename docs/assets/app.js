@@ -1,5 +1,5 @@
-/* 儀表板互動 — 主題切換 + 銅鋁日線走勢圖(單位切換/期間統計) + 報價/訂單/資料庫(對話)
-   等 ERP 模組。資料由頁面內嵌的 window.* 或登入後的試算表提供，無第三方外部請求。 */
+/* 儀表板互動 — 主題切換 + 銅鋁日線走勢圖(單位切換/期間統計) + 報價試算/供應商/客戶名單。
+   資料由頁面內嵌的 window.* 或登入後的試算表提供，無第三方外部請求。 */
 (function () {
   "use strict";
   var LB_PER_TONNE = 2204.62, MA_N = 20;
@@ -62,8 +62,6 @@
       body: JSON.stringify({ action: action, token: idToken, payload: payload || {} })
     }).then(function (r) { return r.json(); }).catch(function () { return null; });
   }
-  // 給 erp.js 用的橋接：沿用同一個登入與後端呼叫（erp.js 不另做登入）
-  window.__erpBridge = { call: dbCall, authed: function () { return !!(API && idToken); }, configured: function () { return !!(API && CLIENT_ID); }, user: function () { return gUser; } };
 
   // ---------- 原料資料來源：頁面本身太久沒更新就亮警示（機器人整個停擺時，伺服器端的檢查也會一起停，所以由瀏覽器補這一關） ----------
   (function dataStale() {
@@ -76,149 +74,6 @@
     }
   })();
 
-  // ---------- 變更控制：網頁版本 vs Apps Script 版本 ----------
-  // UI_VERSION 每次發佈改一次；NEED 是「網頁需要後端至少第幾版」。後端對不上就在頁尾與頂端警告，避免新網頁配舊後端悄悄出錯。
-  var UI_VERSION = "2026.10.14", NEED = { erp: 2, alerts: 1, digest: 1, backup: 1 };
-  var NEED_NAME = { erp: ["ERP 後端", "google-apps-script-erp.gs"], alerts: ["排程自動通知", "sched-alerts.gs"], digest: ["每日早報", "email-notify.gs"], backup: ["每日備份", "backup.gs"] };
-  function verBuild() { var l = document.querySelector('link[href*="style.css?v="]'); var m = l && /v=(\d+)/.exec(l.getAttribute("href")); return m ? m[1] : ""; }
-  function verCheck() {
-    dbCall("appVersion").then(function (r) {
-      var bad = [], note = [];
-      if (!r || !r.ok) {
-        bad.push("Apps Script 還沒有版本功能（太舊），請把最新的 google-apps-script-erp.gs 貼進去");
-      } else {
-        Object.keys(NEED).forEach(function (k) {
-          var have = r.api ? r.api[k] : null, nm = NEED_NAME[k];
-          if (have == null) note.push(nm[0] + "尚未安裝（" + nm[1] + "）");
-          else if (have < NEED[k]) bad.push(nm[0] + "版本太舊（後端 " + have + "，網頁需要 " + NEED[k] + "）：請重貼 " + nm[1]);
-        });
-      }
-      var bk = r && r.ok ? r.backup : null, bkTxt = "";
-      if (bk) {
-        bkTxt = " · 最近備份 " + (bk.backupDays == null ? "—" : bk.backupDays === 0 ? "今天" : bk.backupDays + " 天前");
-        if (bk.backupDays == null || bk.backupDays >= 3) bad.push("已經" + (bk.backupDays == null ? "沒有任何" : " " + bk.backupDays + " 天沒有") + "成功備份");
-        else if (bk.backupDays >= 2) note.push("備份已 " + bk.backupDays + " 天沒更新");
-        if (bk.drillDays == null || bk.drillDays > 90) note.push("還原演練" + (bk.drillDays == null ? "從未做過" : "已 " + bk.drillDays + " 天沒做") + "（執行 restoreDrill）");
-      }
-      var ac = r && r.ok ? r.access : null, acTxt = "";
-      if (ac) {
-        if (!ac.configured) note.push("權限控管尚未啟用（所有登入者權限相同，見行政工作台「帳號權限」）");
-        else acTxt = " · 你的職務：" + (ac.name || "—");
-      }
-      var foot = document.querySelector(".foot"), line = document.getElementById("verLine");
-      if (!line && foot) { line = document.createElement("div"); line.id = "verLine"; line.className = "verline"; foot.parentNode.insertBefore(line, foot.nextSibling); }
-      if (line) {
-        line.className = "verline" + (bad.length ? " bad" : note.length ? " note" : "");
-        line.textContent = "網頁版本 " + UI_VERSION + (verBuild() ? "（建置 " + verBuild() + "）" : "") + " · 後端版本 " + (r && r.ok ? r.build : "舊版") + bkTxt + acTxt +
-          (bad.length ? " ｜ ⚠ " + bad.join("；") : note.length ? " ｜ " + note.join("；") : " ｜ 版本一致");
-      }
-      var bar = document.getElementById("verBar");
-      if (bad.length) {
-        if (!bar) { bar = document.createElement("div"); bar.id = "verBar"; bar.className = "verbar"; document.body.insertBefore(bar, document.body.firstChild); }
-        bar.textContent = "⚠ 系統警示：" + bad.join("；");
-      } else if (bar) bar.remove();
-    });
-  }
-  window.__verCheck = verCheck;
-
-  // ---------- 排程風險燈號：選單紅點＋首頁燈號卡（資料來自排程頁存下的快照 sched_kri） ----------
-  function kriSnap() { try { return JSON.parse(localStorage.getItem("sched_kri_v1")); } catch (e) { return null; } }
-  function kriBadges() {
-    var s = kriSnap(), age = s ? (Date.now() - (s.ts || 0)) / 3600000 : 0, stale = !!s && age > 24;
-    var lvl = !s ? null : s.worst === "red" ? "red" : (s.worst === "yellow" || stale) ? "yellow" : "ok";
-    var link = document.querySelector('.side a[href="schedule.html"]');
-    if (link) {
-      var old = link.querySelector(".kri-dot"); if (old) old.parentNode.removeChild(old);
-      if (lvl === "red" || lvl === "yellow") {
-        var d = document.createElement("i"); d.className = "kri-dot " + lvl;
-        d.title = s.worst === "red" || s.worst === "yellow" ? "排程風險：" + (s.red || 0) + " 項紅燈、" + (s.yellow || 0) + " 項黃燈" : "排程風險資料已超過 24 小時沒有更新";
-        link.appendChild(d);
-      }
-    }
-    var box = document.getElementById("kriBox"); if (!box) return;
-    if (!s) { box.innerHTML = ""; return; }
-    var top = (s.items || []).slice(0, 3).map(function (x) { return "<li><b>" + escAttr(x.name) + "</b>（" + escAttr(x.display) + "）" + escAttr(x.msg || "") + "</li>"; }).join("");
-    box.innerHTML = '<a class="kri-card ' + lvl + '" href="schedule.html#tab=dash"><div class="kri-h">' + ic("alert") + "<b>排程風險燈號</b>"
-      + '<span class="kri-n">' + (s.red ? s.red + " 紅燈" : "") + (s.red && s.yellow ? "・" : "") + (s.yellow ? s.yellow + " 黃燈" : "") + (!s.red && !s.yellow ? "全部正常" : "") + (s.rising ? "・" + s.rising + " 項惡化中" : "") + "</span></div>"
-      + (top ? "<ul>" + top + "</ul>" : "") + ((s.soon || []).length ? '<div class="kri-soon">預警：' + s.soon.slice(0, 3).map(function (x) { return escAttr(x.name) + "預計 " + (x.days < 1 ? "不到 1" : x.days) + " 天後轉" + (x.to === "red" ? "紅燈" : "黃燈"); }).join("；") + "</div>" : "") + (stale ? '<div class="kri-stale">燈號資料已 ' + Math.floor(age) + " 小時沒有更新（最近一次有人打開排程頁是 " + new Date(s.ts).toLocaleString("zh-TW", { hour12: false }) + "）。沒人更新，燈號就不準。</div>" : "") + "</a>";
-  }
-  // ---------- 通知中心（鈴鐺）：sched-alerts.gs 每 30 分鐘檢查，結果寫進 sched_notice／sched_alert ----------
-  var NT_KEY = "sched_notice_v1";
-  var NOTICE_HDR = ["id", "t", "kind", "key", "level", "name", "display", "msg", "owner", "to", "read"];
-  var ALERT_HDR = ["id", "level", "active", "first", "lastN", "nlevel", "ack", "ackBy", "ackAt", "esc", "name", "display", "msg", "owner", "t"];
-  function ntGet() { try { return JSON.parse(localStorage.getItem(NT_KEY)) || {}; } catch (e) { return {}; } }
-  function ntSet(o) { try { localStorage.setItem(NT_KEY, JSON.stringify(o)); } catch (e) {} }
-  function ntWindow() { var d = new Date(Date.now() + 8 * 3600000), dow = d.getUTCDay(); return dow >= 1 && dow <= 5 && d.getUTCHours() >= 8 && d.getUTCHours() < 19; }
-  function ntAgo(ms) { var m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 60 ? m + " 分鐘前" : m < 1440 ? Math.floor(m / 60) + " 小時前" : Math.floor(m / 1440) + " 天前"; }
-  function ntUnread() { var st = ntGet(), k = kriSnap(); return (st.notices || []).filter(function (n) { return Number(n.read) !== 1 && n.kind !== "ok"; }).length + (k && k.soon ? k.soon.length : 0); }
-  function ntBell() {
-    var box = document.querySelector(".toplinks"); if (!box) return null;
-    var b = document.getElementById("noticeBtn");
-    if (!b) {
-      b = document.createElement("button"); b.type = "button"; b.id = "noticeBtn"; b.className = "tsearch np-btn"; b.setAttribute("aria-label", "通知中心");
-      b.innerHTML = ic("bell") + '<span class="np-badge" hidden></span>';
-      var after = document.getElementById("paletteBtn"); box.insertBefore(b, after ? after.nextSibling : box.firstChild);
-      b.addEventListener("click", function (e) { e.stopPropagation(); var p = document.getElementById("noticePanel"); if (p && p.style.display !== "none") { p.style.display = "none"; return; } ntPanel(true); noticePull(); });
-      document.addEventListener("click", function (e) { var p = document.getElementById("noticePanel"); if (p && p.style.display !== "none" && !p.contains(e.target)) p.style.display = "none"; });
-    }
-    return b;
-  }
-  function ntPaint() {
-    var b = ntBell(); if (!b) return;
-    b.hidden = !idToken;
-    var n = ntUnread(), bd = b.querySelector(".np-badge"); bd.hidden = !n; bd.textContent = n > 9 ? "9+" : n;
-    var st = ntGet(), red = (st.notices || []).some(function (x) { return Number(x.read) !== 1 && x.level === "red"; });
-    b.classList.toggle("red", red && n > 0);
-    var p = document.getElementById("noticePanel"); if (p && p.style.display !== "none") ntPanel(false);
-  }
-  function ntPanel(open) {
-    var p = document.getElementById("noticePanel");
-    if (!p) { p = document.createElement("div"); p.id = "noticePanel"; p.className = "np"; document.body.appendChild(p); p.addEventListener("click", function (e) {
-      var t = e.target.closest("[data-np]"); if (!t) return; var a = t.getAttribute("data-np");
-      if (a === "refresh") noticePull(); else if (a === "ack") { var q = t.getAttribute("data-v").split("|"); noticeAck(q[0], q[1]); }
-    }); }
-    var st = ntGet(), k = kriSnap(), hb = st.hb || 0, h = '<div class="np-h"><b>' + ic("bell") + "通知中心</b><button type=\"button\" class=\"np-b\" data-np=\"refresh\">重新整理</button></div>";
-    h += '<div class="np-hb ' + (!hb ? "bad" : (ntWindow() && Date.now() - hb > 100 * 60000 ? "bad" : "ok")) + '">'
-      + (!hb ? "自動通知排程還沒啟用（Apps Script 要貼上 sched-alerts.gs 並執行 installSchedAlertTrigger）。" : ntWindow() && Date.now() - hb > 100 * 60000 ? "自動通知已經 " + ntAgo(hb).replace("前", "") + "沒有執行，請確認 Apps Script 的觸發條件。" : "自動通知最近一次檢查：" + ntAgo(hb) + "（平日 08:00–18:59，每 30 分鐘）") + "</div>";
-    var soon = (k && k.soon) || [];
-    if (soon.length) h += '<div class="np-s">預警（趨勢，只在這裡提醒）</div>' + soon.map(function (x) { return '<div class="np-i soon"><b>' + escAttr(x.name) + "</b> 照目前速度，預計 " + (x.days < 1 ? "不到 1" : x.days) + " 天後轉" + (x.to === "red" ? "紅燈" : "黃燈") + "</div>"; }).join("");
-    var ns = (st.notices || []).slice(0, 20);
-    h += '<div class="np-s">通知</div>' + (ns.length ? ns.map(function (n) {
-      var unread = Number(n.read) !== 1 && n.kind !== "ok";
-      return '<div class="np-i ' + (n.level || "") + (unread ? " unread" : "") + '"><div class="np-t"><span class="np-lv ' + (n.level || "") + '">' + (n.kind === "ok" ? "恢復" : n.kind === "esc" ? "升級" : n.level === "red" ? "紅燈" : "黃燈") + "</span>" + escAttr(n.name) + (n.display ? "（" + escAttr(n.display) + "）" : "") + '<em>' + ntAgo(Number(n.t)) + "</em></div>"
-        + (n.msg ? '<div class="np-m">' + escAttr(n.msg) + "</div>" : "") + (n.to ? '<div class="np-m">已通知：' + escAttr(n.to) + "</div>" : "")
-        + (unread ? '<button type="button" class="np-b" data-np="ack" data-v="' + escAttr(n.id) + "|" + escAttr(n.key) + '">已知悉</button>' : "") + "</div>";
-    }).join("") : '<div class="np-m">還沒有通知。</div>') + '<a class="np-a" href="schedule.html#tab=dash">打開風險儀表板 →</a>';
-    p.innerHTML = h; if (open) p.style.display = "block";
-  }
-  function noticePull(cb) {
-    if (!API || !idToken) { ntPaint(); return; }
-    Promise.all([dbCall("tList", { table: "sched_notice" }), dbCall("tList", { table: "sched_alert" })]).then(function (r) {
-      var n = (r[0] && r[0].rows) || [], a = (r[1] && r[1].rows) || [], hb = 0, alerts = {};
-      a.forEach(function (x) { if (x.id === "_hb") hb = Number(x.t) || 0; else alerts[x.id] = x; });
-      n.sort(function (x, y) { return Number(y.t) - Number(x.t); });
-      ntSet({ ts: Date.now(), notices: n.slice(0, 40), alerts: alerts, hb: hb });
-      ntPaint(); if (cb) cb();
-    });
-  }
-  function noticeAck(id, key, cb) {                      // 已知悉：通知標已讀、這個警示標已處理（之後不再催，變更糟才再通知）
-    var st = ntGet(), now = Date.now(), who = gUser ? gUser.email : "";
-    (st.notices || []).forEach(function (n) {
-      if ((id && n.id === id) || (key && n.key === key)) { if (Number(n.read) !== 1) dbCall("tUpsert", { table: "sched_notice", row: { id: n.id, read: 1 }, header: NOTICE_HDR }); n.read = 1; }
-    });
-    if (key) { dbCall("tUpsert", { table: "sched_alert", row: { id: key, ack: 1, ackBy: who, ackAt: now }, header: ALERT_HDR }); if (st.alerts && st.alerts[key]) { st.alerts[key].ack = 1; st.alerts[key].ackBy = who; st.alerts[key].ackAt = now; } }
-    ntSet(st); ntPaint(); if (cb) cb();
-  }
-  window.__noticePull = noticePull; window.__noticeAck = noticeAck;
-  function kriPull() {                                   // 登入後從公司試算表讀最新快照（小表，不必載入整份排程）
-    if (!API || !idToken) return;
-    dbCall("tList", { table: "sched_kri" }).then(function (d) {
-      if (!d || !d.rows || !d.rows.length) return;
-      var parts = d.rows.filter(function (r) { return /^kri\.\d+$/.test(String(r.id)); }).sort(function (a, b) { return +String(a.id).split(".")[1] - +String(b.id).split(".")[1]; });
-      try { localStorage.setItem("sched_kri_v1", JSON.stringify(JSON.parse(parts.map(function (r) { return String(r.data).replace(/^~/, ""); }).join("")))); } catch (e) { return; }
-      kriBadges();
-    });
-  }
   function cloudPull() {   // 登入後從試算表拉最新，覆蓋本機並刷新畫面
     dbCall("load", {}).then(function (d) {
       if (!d || d.error) return;
@@ -226,7 +81,6 @@
       if (d.quotes) { Quotes = d.quotes; lsSet("quotes", Quotes); }
       if (window.__refreshMarks) window.__refreshMarks();
       if (window.__refreshQuotes) window.__refreshQuotes();
-      if (window.__refreshConsole) window.__refreshConsole();
     });
   }
   function markGet(id) { return Marks[id] || { status: "", note: "", fav: false }; }
@@ -276,13 +130,10 @@
       // 只放「Sign in with Google」按鈕，不呼叫 One Tap prompt()（避免自動彈窗與未登入時的 console 噪音）
       try { google.accounts.id.renderButton(document.getElementById("gBtn"), { type: "standard", size: "medium", text: "signin_with", shape: "pill" }); } catch (e) {}
     }
+    if (window.__refreshAlerts) window.__refreshAlerts();
+    if (window.__refreshAuthHint) window.__refreshAuthHint();
     // 登入狀態一改變就刷新資料庫操作中心 / 訂單頁 / 首頁數字（顯示/隱藏「未登入」橫幅、載入雲端資料）
-    if (window.__refreshConsole) window.__refreshConsole();
-    if (window.__refreshOrders) window.__refreshOrders();
-    if (window.__refreshHome) window.__refreshHome();
-    if (window.__refreshErp) window.__refreshErp();
-    if (window.__refreshSched) window.__refreshSched();
-    kriBadges(); if (gUser) { kriPull(); noticePull(); verCheck(); } else ntPaint();
+    
   }
   window.onGoogleLibraryLoad = initAuth;  // GIS 載入完成時回呼
   function needLogin() { return !!(CLIENT_ID && !idToken); }  // 有設定 Google 但尚未登入
@@ -659,547 +510,341 @@
   }
 
   // ============================================================ 報價試算器
+  // 沒登入時提醒：報價只存在這個瀏覽器
+  function authHint(el) {
+    if (!el) return;
+    var msg = "";
+    if (!API || !CLIENT_ID) msg = "尚未設定 Google 登入：報價只存在這個瀏覽器，換電腦或清除瀏覽器資料就會不見，同事也看不到。";
+    else if (!idToken) msg = "尚未登入 Google：報價目前只存在這個瀏覽器，同事看不到。請按右上角「使用 Google 帳戶登入」，之後的報價才會同步到公司試算表。";
+    el.hidden = !msg; el.textContent = msg ? "⚠ " + msg : "";
+  }
+  function ntdFmt(n) { return "NT$" + Math.round(n).toLocaleString("en-US"); }
+  // 這筆報價「和現在比」：用今天的料價重算成本
+  function quoteNow(q, MATS) {
+    var now = MATS.filter(function (m) { return m.name === q.material; })[0];
+    if (!now || now.nt == null || !(q.price > 0)) return null;
+    var dp = (now.nt / q.price - 1) * 100, dc = (now.nt - q.price) * q.weight;
+    return { dp: dp, dc: dc, cls: dp > 0.05 ? "up" : dp < -0.05 ? "down" : "", nt: now.nt };
+  }
+
   function initQuote(MATS) {
     var matEl = document.getElementById("qMat"), wEl = document.getElementById("qWeight");
     var pEl = document.getElementById("qPrice"), noteEl = document.getElementById("qPriceNote");
     var procEl = document.getElementById("qProc"), mgEl = document.getElementById("qMargin");
     var lEl = document.getElementById("qL"), wwEl = document.getElementById("qW"), hEl = document.getElementById("qH");
-    var ntd = function (n) { return "NT$" + Math.round(n).toLocaleString("en-US"); };
-
-    MATS.forEach(function (m, i) {
-      var o = document.createElement("option"); o.value = i; o.textContent = m.name; matEl.appendChild(o);
-    });
-    function cur() { return MATS[parseInt(matEl.value, 10) || 0]; }
+    var custEl = document.getElementById("qNote"), hintEl = document.getElementById("qHint");
+    var ntd = ntdFmt;
+    var otherEl = document.getElementById("qOther"), oName = document.getElementById("qOName"), oDen = document.getElementById("qODen"), forgetBtn = document.getElementById("qForget");
+    // 「我的材料」：手動輸入過的其他材料，記在這個瀏覽器，下次直接從選單選（帶入上次的價格與密度）
+    function loadCustom() { var a = lsGet("custom_mats", []); return Array.isArray(a) ? a : []; }
+    var LIST = [];
+    function buildList(selName) {
+      LIST = MATS.concat(loadCustom().map(function (c) { return { name: c.name, nt: c.nt, density: c.density || null, live: false, custom: true, note: "這是你上次輸入的價格，請確認是否還是現在的採購價" }; }));
+      matEl.innerHTML = "";
+      LIST.forEach(function (m, i) { var o = document.createElement("option"); o.value = i; o.textContent = m.name + (m.custom ? "（我的材料）" : ""); matEl.appendChild(o); });
+      var o2 = document.createElement("option"); o2.value = "new"; o2.textContent = "＋ 其他材料（手動輸入）"; matEl.appendChild(o2);
+      if (selName) LIST.forEach(function (m, i) { if (m.name === selName) matEl.value = i; });
+    }
+    buildList();
+    function isNew() { return matEl.value === "new"; }
+    function cur() {
+      if (isNew()) return { name: (oName.value || "").trim() || "其他材料", nt: null, density: parseFloat(oDen.value) || null, live: false, isNew: true, note: "請填實際採購價（每公斤）" };
+      return LIST[parseInt(matEl.value, 10) || 0];
+    }
     function onMat() {
       var m = cur();
-      if (m.nt != null && !pEl.value) pEl.value = m.nt;
-      else if (m.nt != null) pEl.value = m.nt;
+      otherEl.hidden = !isNew(); forgetBtn.hidden = !m.custom;
+      if (isNew()) pEl.value = ""; else if (m.nt != null) pEl.value = m.nt;
       noteEl.textContent = m.live ? "（已帶入最新行情，可修改）" : (m.note || "參考值，請填實際採購價");
       noteEl.style.color = m.live ? "var(--muted)" : "var(--up)";
+      if (hintEl) { hintEl.hidden = !m.hint; hintEl.textContent = m.hint ? "今日行情提醒：" + m.hint : ""; }
       calc();
     }
     function calcWeight() {
       var m = cur(), L = parseFloat(lEl.value), W = parseFloat(wwEl.value), H = parseFloat(hEl.value);
+      if (!(m.density > 0)) { alert("這個材料還沒有密度，請先填密度，或直接輸入重量。"); if (isNew()) oDen.focus(); return; }
       if (L > 0 && W > 0 && H > 0) { wEl.value = (L * W * H * m.density / 1000).toFixed(2); calc(); }
     }
+    function remember(m, price) {
+      if (!(m.isNew || m.custom)) return;
+      var a = loadCustom().filter(function (c) { return c.name !== m.name; });
+      a.unshift({ name: m.name, nt: price, density: m.density || null });
+      lsSet("custom_mats", a.slice(0, 30));
+      buildList(m.name); onMat();
+    }
+    forgetBtn.addEventListener("click", function () {
+      var m = cur(); if (!m.custom) return;
+      lsSet("custom_mats", loadCustom().filter(function (c) { return c.name !== m.name; }));
+      buildList(); matEl.value = 0; onMat();
+    });
+    var simUpdate = function () {};
     function calc() {
       var w = parseFloat(wEl.value) || 0, p = parseFloat(pEl.value) || 0;
       var proc = parseFloat(procEl.value) || 0, mg = parseFloat(mgEl.value) || 0;
-      var matCost = w * p, total = matCost + proc, quote = total * (1 + mg / 100);
-      document.getElementById("qMatCost").textContent = w && p ? ntd(matCost) : "—";
-      document.getElementById("qTotal").textContent = w && p ? ntd(total) : "—";
-      document.getElementById("qQuote").textContent = w && p ? ntd(quote) : "—";
+      var matCost = w * p, total = matCost + proc, quote = total * (1 + mg / 100), ok = w && p;
+      document.getElementById("qMatCost").textContent = ok ? ntd(matCost) : "—";
+      document.getElementById("qTotal").textContent = ok ? ntd(total) : "—";
+      document.getElementById("qQuote").textContent = ok ? ntd(quote) : "—";
+      document.getElementById("qMarginPct").textContent = ok && quote > 0 ? ((quote - total) / quote * 100).toFixed(1) + "%" : "—";
+      var sens = document.getElementById("qSens");
+      if (sens) {
+        if (ok && quote > 0) {
+          var m3 = (quote - (matCost * 1.03 + proc)) / quote * 100;
+          sens.innerHTML = "若料價再漲 3%，毛利率剩 <b>" + m3.toFixed(1) + "%</b>（約少賺 " + ntd(matCost * 0.03) + "）";
+        } else sens.textContent = "填好重量就會即時算出報價";
+      }
+      simUpdate();
     }
+    simUpdate = initSim(function () {
+      var w = parseFloat(wEl.value) || 0, p = parseFloat(pEl.value) || 0, proc = parseFloat(procEl.value) || 0, mg = parseFloat(mgEl.value) || 0, cost = w * p + proc;
+      return { ok: !!(w && p), w: w, p: p, proc: proc, mg: mg, cost: cost, quote: cost * (1 + mg / 100) };
+    });
     matEl.addEventListener("change", onMat);
     [wEl, pEl, procEl, mgEl].forEach(function (e) { e.addEventListener("input", calc); });
     document.getElementById("qCalc").addEventListener("click", calcWeight);
 
-    // 報價歷史（存/列/刪）
+    // 最近 5 筆
     var histEl = document.getElementById("qHistory"), saveBtn = document.getElementById("qSave");
     function renderHist() {
       if (!histEl) return;
-      histEl.innerHTML = Quotes.length ? Quotes.map(function (q) {
-        var d = new Date(q.ts); var ds = (d.getMonth() + 1) + "/" + d.getDate() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
-        return '<div class="qh"><div><b>' + escAttr(q.material) + "</b>　" + q.weight + "kg × NT$" + q.price +
-          (q.proc ? "　+工 " + q.proc : "") + "　利 " + q.margin + "% → <b style='color:var(--accent)'>" + ntd(q.quote) + "</b>" +
-          '<div class="mnote">' + ds + "</div></div><button class=\"qdel\" data-ts=\"" + q.ts + "\">刪除</button></div>";
-      }).join("") : '<div class="mnote" style="padding:10px 4px">尚無報價紀錄（算好後按「存這筆」）</div>';
+      histEl.innerHTML = Quotes.length ? Quotes.slice(0, 5).map(function (q) {
+        var d = new Date(q.ts), ds = (d.getMonth() + 1) + "/" + d.getDate() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+        var nw = quoteNow(q, MATS), nowTxt = nw ? '<div class="qnow ' + nw.cls + '">現在料價 NT$' + nw.nt + "（比報價時 " + (nw.dp >= 0 ? "+" : "") + nw.dp.toFixed(1) + "%）→ 成本" +
+          (Math.abs(nw.dc) < 1 ? "沒變" : (nw.dc > 0 ? "多了 " : "少了 ") + ntd(Math.abs(nw.dc))) + "</div>" : "";
+        return '<div class="qh"><div>' + (q.note ? "<b>" + escAttr(q.note) + "</b>　" : "") + escAttr(q.material) + "　" + q.weight + "kg × NT$" + q.price +
+          (q.proc ? "　+工 " + q.proc : "") + "　利 " + q.margin + "% → <b style='color:var(--accent)'>" + ntd(q.quote) + "</b>" + nowTxt +
+          '<div class="mnote">' + ds + "</div></div></div>";
+      }).join("") : '<div class="mnote" style="padding:10px 4px">還沒有報價紀錄（算好後按「存這筆報價」）</div>';
     }
     window.__refreshQuotes = renderHist;
+    window.__refreshAuthHint = function () { authHint(document.getElementById("qLogin")); };
+
+    var savedEl = document.getElementById("qSaved");
     if (saveBtn) saveBtn.addEventListener("click", function () {
       var w = parseFloat(wEl.value) || 0, p = parseFloat(pEl.value) || 0;
       if (!(w && p)) { alert("請先填重量與料價"); return; }
       var proc = parseFloat(procEl.value) || 0, mg = parseFloat(mgEl.value) || 0;
-      quoteAdd({ ts: Date.now(), material: cur().name, weight: w, price: p, proc: proc, margin: mg, quote: Math.round((w * p + proc) * (1 + mg / 100)) });
-      renderHist();
+      var mat = cur(); if (mat.isNew && !(oName.value || "").trim()) { alert("請先填材料名稱"); oName.focus(); return; }
+      quoteAdd({ ts: Date.now(), material: mat.name, weight: w, price: p, proc: proc, margin: mg, note: custEl ? custEl.value.trim() : "", quote: Math.round((w * p + proc) * (1 + mg / 100)) });
+      renderHist(); remember(mat, p);
+      if (savedEl) { savedEl.hidden = false; savedEl.innerHTML = "已存好 ✓　" + (idToken ? "已同步到公司試算表。" : "目前只存在這個瀏覽器。") + ' <a href="records.html">到「報價紀錄」查看 →</a>'; }
     });
-    if (histEl) histEl.addEventListener("click", function (e) {
-      if (e.target.classList.contains("qdel")) { quoteDel(parseInt(e.target.getAttribute("data-ts"), 10)); renderHist(); }
+
+    var copyBtn = document.getElementById("qCopy");
+    if (copyBtn) copyBtn.addEventListener("click", function () {
+      var w = parseFloat(wEl.value) || 0, p = parseFloat(pEl.value) || 0;
+      if (!(w && p)) { alert("請先填重量與料價"); return; }
+      var proc = parseFloat(procEl.value) || 0, mg = parseFloat(mgEl.value) || 0, q = Math.round((w * p + proc) * (1 + mg / 100));
+      var d = new Date(), ds = d.getFullYear() + "/" + (d.getMonth() + 1) + "/" + d.getDate();
+      var txt = "【報價】" + ds + (custEl && custEl.value.trim() ? "\n客戶／品名：" + custEl.value.trim() : "") + "\n材質：" + cur().name + "　重量：" + w + " kg\n報價：" + ntd(q) + "（未稅）\n※ 原料價格會隨行情變動，本報價請於 3 天內確認。";
+      var done = function () { copyBtn.textContent = "已複製 ✓"; setTimeout(function () { copyBtn.innerHTML = ic("clipboard") + "複製報價文字"; }, 1800); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () { window.prompt("複製下面的文字：", txt); });
+      else window.prompt("複製下面的文字：", txt);
     });
-    var driveBtn = document.getElementById("qDrive");
-    if (driveBtn) driveBtn.addEventListener("click", function () {
-      if (needLogin()) { alert("請先用右上角「Google 登入」，才能存到公司 Drive。"); return; }
-      if (!API || !idToken) { alert("尚未設定 Google（見說明），目前報價只存在本機。"); return; }
-      if (!Quotes.length) { alert("尚無報價紀錄，先算好並「存這筆」。"); return; }
-      driveBtn.textContent = "存檔中…"; driveBtn.disabled = true;
-      dbCall("driveSave", { quotes: Quotes }).then(function (d) {
-        driveBtn.textContent = "報價歷史另存到 Drive"; driveBtn.disabled = false;
-        if (d && d.url) { window.open(d.url, "_blank"); }
-        else alert("存檔失敗，請稍後再試。");
-      });
-    });
-    onMat(); renderHist();
+    onMat(); renderHist(); authHint(document.getElementById("qLogin"));
   }
 
-  // ===========================================================================
-  // 資料庫操作中心（db.html）— schema 驅動的通用資料表：查/篩/排/增/改/刪/匯出
-  //   後端 = Apps Script 通用 CRUD（tList/tUpsert/tRemove）。日後加訂單/庫存只要加 schema。
-  // ===========================================================================
-  var SCHEMAS = {
-    mylist: {
-      title: "我的名單 / 待辦", icon: "list", table: "mylist", canAdd: true, canEdit: true, canDelete: true,
-      cols: [
-        { k: "name", label: "名稱", wide: true },
-        { k: "category", label: "分類", filter: true },
-        { k: "status", label: "狀態", type: "select", opts: ["", "待處理", "進行中", "已完成", "擱置"], filter: true, stat: true },
-        { k: "owner", label: "負責人" },
-        { k: "due", label: "到期", type: "date" },
-        { k: "note", label: "備註", wide: true }
-      ],
-      sample: [
-        { name: "聯絡大雅精密報價", category: "報價", status: "進行中", owner: "我", due: "", note: "316 不鏽鋼件" },
-        { name: "追蹤神岡工業樣品", category: "供應商", status: "待處理", owner: "我", due: "", note: "" },
-        { name: "整理本月客戶開發名單", category: "客戶開發", status: "待處理", owner: "我", due: "", note: "" }
-      ]
-    },
-    marks: {
-      title: "收藏與標記", icon: "star", table: "marks", canAdd: false, canEdit: true, canDelete: true,
-      cols: [
-        { k: "id", label: "對象", wide: true, ro: true },
-        { k: "status", label: "狀態", type: "select", opts: ["", "已聯絡", "合作中", "不合適"], filter: true, stat: true },
-        { k: "note", label: "備註", wide: true },
-        { k: "fav", label: "收藏", type: "bool" }
-      ]
-    },
-    quotes: {
-      title: "報價歷史", icon: "calc", table: "quotes", canAdd: false, canEdit: false, canDelete: true,
-      delKey: "ts", delAction: "quoteDel",
-      cols: [
-        { k: "ts", label: "時間", type: "time", ro: true },
-        { k: "material", label: "材質", filter: true, stat: true },
-        { k: "weight", label: "重量kg", type: "num" },
-        { k: "price", label: "料價", type: "num" },
-        { k: "quote", label: "報價NT$", type: "num" }
-      ]
-    },
-    orders: {
-      title: "訂單", icon: "box", table: "orders", canAdd: true, canEdit: true, canDelete: true,
-      cols: [
-        { k: "customer", label: "客戶", filter: true },
-        { k: "product", label: "品名", wide: true },
-        { k: "qty", label: "數量", type: "num" },
-        { k: "price", label: "單價", type: "num" },
-        { k: "amount", label: "金額", type: "num" },
-        { k: "status", label: "狀態", type: "select", opts: ["報價", "接單", "生產", "出貨", "結案", "取消"], filter: true, stat: true },
-        { k: "order_date", label: "下單日", type: "date" },
-        { k: "due", label: "交期", type: "date" },
-        { k: "email", label: "客戶信箱" },
-        { k: "note", label: "備註", wide: true }
-      ]
-    },
-  };
-  // 訂單狀態流程（看板欄位順序；取消單獨處理）
-  var ORDER_FLOW = ["報價", "接單", "生產", "出貨", "結案"];
-
-  function initDbConsole() {
-    var mount = document.getElementById("dbConsole");
-    if (!mount) return;
-    var state = { cur: "mylist", rows: [], sortK: "", sortDir: 1, q: "", filters: {} };
-    var cache = {};  // table -> rows（本機快取，離線也看得到）
-
-    function schema() { return SCHEMAS[state.cur]; }
-    function cacheKey(t) { return "console_" + t; }
-    function fmtCell(col, v) {
-      if (v === undefined || v === null || v === "") return "";
-      if (col.type === "time") { var d = new Date(Number(v) || v); return isNaN(d) ? String(v) : d.toLocaleString("zh-TW", { hour12: false }).replace(/:\d\d$/, ""); }
-      if (col.type === "bool") return (v === true || v === "TRUE" || v === "true") ? "是" : "";
-      if (col.type === "num") { var n = Number(v); return isNaN(n) ? String(v) : n.toLocaleString(); }
-      return String(v);
+  // ============================================================ 報價紀錄頁（搜尋／篩選／刪除／清除舊資料／匯出）
+  function initRecords(MATS) {
+    var body = document.getElementById("rBody"), qEl = document.getElementById("rSearch"), mEl = document.getElementById("rMat"), dEl = document.getElementById("rDays");
+    var cntEl = document.getElementById("rCount"), purge = document.getElementById("rPurge"), pDays = document.getElementById("rPurgeDays"), pInfo = document.getElementById("rPurgeInfo");
+    var DAY = 86400000;
+    function fillMats() {
+      var keep = mEl.value, names = MATS.map(function (m) { return m.name; });
+      Quotes.forEach(function (q) { if (q.material && names.indexOf(q.material) < 0) names.push(q.material); });
+      mEl.innerHTML = '<option value="">全部材質</option>' + names.map(function (n) { return '<option value="' + escAttr(n) + '">' + escAttr(n) + "</option>"; }).join("");
+      mEl.value = keep;
     }
-    function isFav(v) { return v === true || v === "TRUE" || v === "true"; }
-
-    function load(t) {
-      state.rows = lsGet(cacheKey(t), []) || [];   // 先用快取畫
-      render();
-      if (!idToken) { render(); return; }           // 未登入：只看快取
-      dbCall("tList", { table: SCHEMAS[t].table }).then(function (d) {
-        if (!d || d.error || !d.rows) return;
-        cache[t] = d.rows; lsSet(cacheKey(t), d.rows);
-        if (state.cur === t) { state.rows = d.rows; render(); }
-      });
-    }
-    window.__refreshConsole = function () { load(state.cur); };
-
     function filtered() {
-      var s = schema(), q = state.q.toLowerCase();
-      var rows = state.rows.filter(function (r) {
-        for (var fk in state.filters) { if (state.filters[fk] && String(r[fk] || "") !== state.filters[fk]) return false; }
-        if (!q) return true;
-        return s.cols.some(function (c) { return String(r[c.k] || "").toLowerCase().indexOf(q) >= 0; });
-      });
-      if (state.sortK) {
-        rows = rows.slice().sort(function (a, b) {
-          var x = a[state.sortK], y = b[state.sortK];
-          var nx = Number(x), ny = Number(y);
-          if (!isNaN(nx) && !isNaN(ny) && x !== "" && y !== "") return (nx - ny) * state.sortDir;
-          return String(x || "").localeCompare(String(y || ""), "zh-TW") * state.sortDir;
-        });
-      }
-      return rows;
+      var kw = qEl.value.trim().toLowerCase(), mat = mEl.value, days = parseInt(dEl.value, 10) || 0, now = Date.now();
+      return Quotes.filter(function (q) {
+        if (mat && q.material !== mat) return false;
+        if (days && now - q.ts > days * DAY) return false;
+        if (kw && (String(q.note || "") + " " + q.material).toLowerCase().indexOf(kw) < 0) return false;
+        return true;
+      }).sort(function (a, b) { return b.ts - a.ts; });
     }
-
-    function statBlock(rows) {
-      var s = schema();
-      var chips = '<span class="dbchip strong">共 ' + rows.length + ' 筆</span>';
-      var statCol = s.cols.filter(function (c) { return c.stat; })[0];
-      var bars = "";
-      if (statCol) {
-        var counts = {}, order = statCol.opts ? statCol.opts.slice() : [];
-        rows.forEach(function (r) { var v = String(r[statCol.k] || "（空）"); counts[v] = (counts[v] || 0) + 1; if (order.indexOf(v) < 0) order.push(v); });
-        var mx = 1; for (var k in counts) mx = Math.max(mx, counts[k]);
-        order.forEach(function (v) {
-          var label = v === "" ? "（未填）" : v, n = counts[v] || 0;
-          if (!n) return;
-          chips += '<span class="dbchip">' + escAttr(label) + ' ' + n + '</span>';
-          bars += '<div class="dbrow"><div class="dblabel">' + escAttr(label) + '</div>'
-            + '<div class="dbtrack"><div class="dbbar" style="width:' + Math.round(n / mx * 100) + '%"></div></div>'
-            + '<div class="dbval">' + n + '</div></div>';
-        });
-      }
-      return '<div class="dbchips">' + chips + '</div>' + (bars ? '<div class="dbbars">' + bars + '</div>' : "");
-    }
-
+    function fmtDate(ts) { var d = new Date(ts); return d.getFullYear() + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + ("0" + d.getDate()).slice(-2) + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
     function render() {
-      var s = schema(), rows = filtered();
-      var tabs = Object.keys(SCHEMAS).map(function (k) {
-        return '<button class="dbtab' + (k === state.cur ? " on" : "") + '" data-tab="' + k + '">' + ic(SCHEMAS[k].icon) + SCHEMAS[k].title + '</button>';
-      }).join("");
+      fillMats();
+      var rows = filtered();
+      cntEl.textContent = "共 " + Quotes.length + " 筆" + (rows.length !== Quotes.length ? "，符合條件 " + rows.length + " 筆" : "");
+      body.innerHTML = rows.length ? rows.map(function (q) {
+        var nw = quoteNow(q, MATS), nowTxt = nw ? '<span class="qnow ' + nw.cls + '">' + (nw.dp >= 0 ? "+" : "") + nw.dp.toFixed(1) + "%　" + (Math.abs(nw.dc) < 1 ? "成本沒變" : (nw.dc > 0 ? "成本多 " : "成本少 ") + ntdFmt(Math.abs(nw.dc))) + "</span>" : "—";
+        return "<tr><td>" + fmtDate(q.ts) + "</td><td>" + (escAttr(q.note) || '<span class="rdim">—</span>') + "</td><td>" + escAttr(q.material) + "</td><td>" + q.weight + " kg</td><td>" + q.price + "</td><td>" +
+          (q.proc || 0) + "</td><td>" + q.margin + "%</td><td><b>" + ntdFmt(q.quote) + "</b></td><td>" + nowTxt + '</td><td><button class="qdel" data-ts="' + q.ts + '">刪除</button></td></tr>';
+      }).join("") : '<tr><td colspan="10" class="rempty">' + (Quotes.length ? "沒有符合條件的紀錄" : "還沒有報價紀錄。到「報價試算」算好後按「存這筆報價」就會出現在這裡。") + "</td></tr>";
+      purgeInfo();
+    }
+    function oldList() { var days = parseInt(pDays.value, 10) || 0, now = Date.now(); return days > 0 ? Quotes.filter(function (q) { return now - q.ts > days * DAY; }) : []; }
+    function purgeInfo() { var n = oldList().length; pInfo.textContent = "→ 會刪除 " + n + " 筆"; pInfo.style.color = n ? "var(--up)" : "var(--muted)"; }
+    [qEl, mEl, dEl].forEach(function (e) { e.addEventListener("input", render); e.addEventListener("change", render); });
+    body.addEventListener("click", function (e) {
+      if (!e.target.classList.contains("qdel")) return;
+      var ts = parseInt(e.target.getAttribute("data-ts"), 10), q = Quotes.filter(function (x) { return x.ts === ts; })[0];
+      if (q && !window.confirm("刪除這筆報價？\n" + (q.note ? q.note + " " : "") + q.material + " " + ntdFmt(q.quote))) return;
+      quoteDel(ts); render();
+    });
+    document.getElementById("rPurgeBtn").addEventListener("click", function () { purge.hidden = !purge.hidden; purgeInfo(); });
+    document.getElementById("rPurgeCancel").addEventListener("click", function () { purge.hidden = true; });
+    pDays.addEventListener("input", purgeInfo);
+    document.getElementById("rPurgeGo").addEventListener("click", function () {
+      var list = oldList(); if (!list.length) return;
+      list.forEach(function (q) { quoteDel(q.ts); });
+      purge.hidden = true; render(); cntEl.textContent += "　（已刪除 " + list.length + " 筆舊資料）";
+    });
+    document.getElementById("rCsv").addEventListener("click", function () {
+      var rows = filtered(), cell = function (v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+      var lines = [["日期", "客戶／備註", "材質", "重量(kg)", "料價(NT$/kg)", "加工費", "利潤%", "報價"].join(",")].concat(rows.map(function (q) {
+        return [fmtDate(q.ts), q.note || "", q.material, q.weight, q.price, q.proc || 0, q.margin, q.quote].map(cell).join(",");
+      }));
+      var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+      a.download = "報價紀錄.csv"; document.body.appendChild(a); a.click(); a.remove();
+    });
+    window.__refreshQuotes = render;
+    window.__refreshAuthHint = function () { authHint(document.getElementById("rLogin")); };
+    render(); authHint(document.getElementById("rLogin"));
+  }
 
-      var filterCtrls = s.cols.filter(function (c) { return c.filter; }).map(function (c) {
-        var vals = {}; state.rows.forEach(function (r) { if (r[c.k]) vals[r[c.k]] = 1; });
-        var opts = ['<option value="">' + escAttr(c.label) + '：全部</option>'].concat(Object.keys(vals).sort().map(function (v) {
-          return '<option value="' + escAttr(v) + '"' + (state.filters[c.k] === v ? " selected" : "") + '>' + escAttr(v) + '</option>';
-        }));
-        return '<select class="dbfilter" data-k="' + c.k + '">' + opts.join("") + '</select>';
-      }).join("");
+  // ============================================================ 首頁：報價自動盯盤
+  // 拿「已存的報價」和「現在的料價」比：料價漲超過 3% → 這筆報價可能偏低，該重報；降超過 3% → 成本有下降空間。
+  function initWatch(MATS) {
+    var box = document.getElementById("watchBox"); if (!box) return;
+    var TH = 3, WINDOW_DAYS = 30, DAY = 86400000;
+    function render() {
+      var now = Date.now(), up = [], down = [];
+      Quotes.forEach(function (q) {
+        if (now - q.ts > WINDOW_DAYS * DAY) return;
+        var nw = quoteNow(q, MATS); if (!nw) return;
+        if (nw.dp >= TH) up.push({ q: q, nw: nw }); else if (nw.dp <= -TH) down.push({ q: q, nw: nw });
+      });
+      up.sort(function (a, b) { return b.nw.dp - a.nw.dp; });
+      var total = Quotes.filter(function (q) { return now - q.ts <= WINDOW_DAYS * DAY; }).length;
+      if (!total) { box.hidden = false; box.className = "watchbox"; box.innerHTML = '<div class="adv-k">' + ic("clipboard") + '報價盯盤</div><div class="wb-t">還沒有近期報價可以盯</div><div class="adv-f">在「報價試算」存報價後，系統會每天比對最新料價，成本漲超過 ' + TH + '% 就提醒你重報。</div>'; return; }
+      box.hidden = false; box.className = "watchbox" + (up.length ? " wb-warn" : "");
+      var li = function (x) { return "<li><b>" + (x.q.note ? escAttr(x.q.note) + "　" : "") + escAttr(x.q.material) + " " + ntdFmt(x.q.quote) + "</b>　料價 " + x.q.price + " → " + x.nw.nt + "（" + (x.nw.dp >= 0 ? "+" : "") + x.nw.dp.toFixed(1) + "%）→ 成本" + (x.nw.dc > 0 ? "多了 " : "少了 ") + ntdFmt(Math.abs(x.nw.dc)) + "</li>"; };
+      box.innerHTML = '<div class="adv-k">' + ic(up.length ? "alert" : "check") + '報價盯盤（近 ' + WINDOW_DAYS + ' 天共 ' + total + ' 筆報價）</div>' +
+        '<div class="wb-t">' + (up.length ? up.length + " 筆報價的料價已經漲超過 " + TH + "%，可能需要重報" : "目前沒有需要重報的報價") + "</div>" +
+        (up.length ? "<ul>" + up.slice(0, 5).map(li).join("") + "</ul>" : "") +
+        (down.length ? '<div class="adv-f">另有 ' + down.length + " 筆報價的料價下降超過 " + TH + "%，成本有下降空間。</div>" : "") +
+        '<div class="adv-f"><a href="records.html">到報價紀錄查看全部 →</a>　（比的是你存報價時的料價與現在行情；沒登入時只看得到這個瀏覽器的報價）</div>';
+    }
+    window.__refreshQuotes = render; render();
+  }
 
-      var toolbar = '<div class="dbtoolbar">'
-        + '<input id="dbSearch" class="dbsearch" placeholder="搜尋…" value="' + escAttr(state.q) + '">'
-        + filterCtrls
-        + (s.canAdd ? '<button class="dbbtn primary" id="dbAdd">' + ic("plus") + '新增</button>' : "")
-        + '<button class="dbbtn" id="dbExport">' + ic("download") + '匯出 CSV</button>'
-        + '<button class="dbbtn" id="dbReload">' + ic("refresh") + '重新整理</button>'
-        + '</div>';
+  // ============================================================ 報價頁：情境模擬滑桿
+  function initSim(getState) {
+    var box = document.getElementById("qSim"); if (!box) return function () {};
+    var aEl = document.getElementById("qSimA"), fEl = document.getElementById("qSimF"), out = document.getElementById("qSimOut");
+    function update() {
+      var s = getState(), a = parseFloat(aEl.value) || 0, f = parseFloat(fEl.value) || 0;
+      document.getElementById("qSimAV").textContent = (a > 0 ? "+" : "") + a + "%";
+      document.getElementById("qSimFV").textContent = (f > 0 ? "+" : "") + f + "%";
+      if (!s.ok) { box.hidden = true; return; }
+      box.hidden = false;
+      var p2 = s.p * (1 + a / 100) * (1 + f / 100), cost2 = s.w * p2 + s.proc;
+      var m0 = (s.quote - s.cost) / s.quote * 100, m1 = (s.quote - cost2) / s.quote * 100, need = cost2 * (1 + s.mg / 100);
+      var dm = m1 - m0, dq = need - s.quote;
+      out.innerHTML = "新料價 <b>NT$" + p2.toFixed(1) + "</b> / 公斤（原本 " + s.p + "）<br>" +
+        "報價不變 → 毛利率 <b class='" + (dm < -0.05 ? "bad" : dm > 0.05 ? "good" : "") + "'>" + m1.toFixed(1) + "%</b>（" + (dm >= 0 ? "+" : "") + dm.toFixed(1) + " 個百分點）<br>" +
+        "要維持原本的加成 → 報價要調到 <b>" + ntdFmt(need) + "</b>（" + (dq >= 0 ? "+" : "") + ntdFmt(dq).replace("NT$-", "-NT$") + "）";
+    }
+    [aEl, fEl].forEach(function (e) { e.addEventListener("input", update); });
+    document.getElementById("qSimReset").addEventListener("click", function () { aEl.value = 0; fEl.value = 0; update(); });
+    return update;
+  }
 
-      // 表頭
-      var ths = s.cols.map(function (c) {
-        var ar = state.sortK === c.k ? (state.sortDir > 0 ? " ▲" : " ▼") : "";
-        return '<th class="dbsort" data-k="' + c.k + '">' + escAttr(c.label) + '<span class="dbarrow">' + ar + "</span></th>";
-      }).join("") + (s.canEdit || s.canDelete ? "<th></th>" : "");
+  // ============================================================ 數字動畫（尊重「減少動態效果」設定）
+  function animateNumbers() {
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var els = document.querySelectorAll("[data-count]"); if (reduce || !els.length) return;
+    Array.prototype.forEach.call(els, function (el) {
+      var target = parseFloat(el.getAttribute("data-count")), dp = (String(el.getAttribute("data-count")).split(".")[1] || "").length, t0 = null, dur = 900;
+      if (isNaN(target)) return;
+      function step(ts) {
+        if (t0 == null) t0 = ts;
+        var k = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - k, 3), v = target * e;
+        el.textContent = v.toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp });
+        if (k < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
 
-      var body = rows.map(function (r) {
-        var tds = s.cols.map(function (c) {
-          var cell = c.type === "bool" ? (isFav(r[c.k]) ? '<span class="star">' + ic("star") + "</span>" : "") : escAttr(fmtCell(c, r[c.k]));
-          return '<td data-label="' + escAttr(c.label) + '"' + (c.wide ? ' class="wide"' : "") + '>' + cell + "</td>";
-        }).join("");
-        var act = "";
-        if (s.canEdit || s.canDelete) {
-          act = '<td class="dbact">'
-            + (s.canEdit ? '<button class="dbmini" data-edit="' + escAttr(r.id !== undefined ? r.id : r[s.delKey]) + '" title="編輯">' + ic("edit") + '</button>' : "")
-            + (s.canDelete ? '<button class="dbmini" data-del="' + escAttr(r.id !== undefined && r.id !== "" ? r.id : r[s.delKey]) + '" title="刪除">' + ic("trash") + '</button>' : "")
-            + "</td>";
+  // ============================================================ 我的提醒（原料頁）
+  // 規則先存本機；登入 Google 後同步到試算表的 alerts 分頁，由 price-alerts.gs 在行情更新後寄 Email。
+  function initAlerts() {
+    var CTX = window.ALERT_CTX || {}, NAME = { copper: "銅", aluminum: "鋁" };
+    var HDR = ["id", "email", "metal", "type", "value", "active", "fired", "firedAt", "t"];
+    var listEl = document.getElementById("alList"), noteEl = document.getElementById("alNote");
+    var typeEl = document.getElementById("alType"), valEl = document.getElementById("alVal"), metalEl = document.getElementById("alMetal"), unitEl = document.getElementById("alUnit");
+    var rules = lsGet("alerts", []);
+    function me() { return gUser && gUser.email ? String(gUser.email).toLowerCase() : ""; }
+    function isPrice(t) { return t === "above" || t === "below"; }
+    function txt(r) {
+      var n = NAME[r.metal] || r.metal, v = Number(r.value);
+      if (r.type === "above") return n + "價格超過 NT$" + Math.round(v).toLocaleString("en-US") + " / 噸";
+      if (r.type === "below") return n + "價格低於 NT$" + Math.round(v).toLocaleString("en-US") + " / 噸";
+      if (r.type === "week_up") return n + "近 7 天漲幅超過 " + v + "%";
+      return n + "近 7 天跌幅超過 " + v + "%";
+    }
+    function met(r) {
+      var c = CTX[r.metal], v = Number(r.value); if (!c || isNaN(v)) return null;
+      if (r.type === "above") return c.price_twd == null ? null : c.price_twd >= v;
+      if (r.type === "below") return c.price_twd == null ? null : c.price_twd <= v;
+      if (r.type === "week_up") return c.d7 == null ? null : c.d7 >= v;
+      return c.d7 == null ? null : c.d7 <= -v;
+    }
+    function nowTxt(r) {
+      var c = CTX[r.metal]; if (!c) return "";
+      return isPrice(r.type) ? (c.price_twd != null ? "目前 NT$" + c.price_twd.toLocaleString("en-US") : "") : (c.d7 != null ? "目前近 7 天 " + (c.d7 > 0 ? "+" : "") + c.d7 + "%" : "");
+    }
+    function render() {
+      var mine = rules;
+      listEl.innerHTML = mine.length ? mine.map(function (r) {
+        var m = met(r), st = m === true ? "目前已達標" : m === false ? "監看中" : "資料不足";
+        return '<div class="alrow"><div class="al-tx">' + escAttr(txt(r)) + '<div class="al-st' + (m === true ? " hit" : "") + '">' + st + (nowTxt(r) ? "　·　" + nowTxt(r) : "") +
+          (Number(r.fired) === 1 ? "　·　已寄過通知" : "") + '</div></div><button type="button" data-del="' + escAttr(r.id) + '">刪除</button></div>';
+      }).join("") : '<div class="al-st" style="padding:8px 0">還沒有提醒。選金屬、條件、填數字，按「新增提醒」。</div>';
+      if (!API || !CLIENT_ID) noteEl.textContent = "目前還沒設定 Google 登入，提醒只存在這台電腦，不會寄信。";
+      else if (!idToken) noteEl.textContent = "提醒目前只存在這台電腦。用右上角「Google 登入」後才會同步，並寄 Email 通知你。";
+      else noteEl.textContent = "已登入 " + me() + "：提醒會寄到這個信箱。";
+    }
+    function syncUp(r) { if (idToken && API) dbCall("tUpsert", { table: "alerts", row: r, header: HDR }); }
+    function pull() {
+      if (!API || !idToken) { render(); return; }
+      // 登入前建立的本機規則，補上 email 並上傳
+      rules.forEach(function (r) { if (!r.email) { r.email = me(); syncUp(r); } });
+      dbCall("tList", { table: "alerts" }).then(function (d) {
+        if (d && d.rows) {
+          var mine = d.rows.filter(function (r) { return String(r.email || "").toLowerCase() === me(); });
+          var ids = {}; mine.forEach(function (r) { ids[r.id] = 1; });
+          rules = mine.concat(rules.filter(function (r) { return !ids[r.id] && String(r.email || "").toLowerCase() === me(); }));
+          lsSet("alerts", rules);
         }
-        return "<tr>" + tds + act + "</tr>";
-      }).join("");
-
-      var emptyHint = "";
-      if (!rows.length) {
-        emptyHint = '<div class="dbempty">目前沒有資料。'
-          + (state.cur === "mylist" ? '<button class="dbbtn primary" id="dbSample">載入範例資料</button>' : "")
-          + (!idToken ? '<div class="dbnote">（請先用右上角「使用 Google 帳戶登入」，登入後才會同步公司試算表的資料）</div>' : "")
-          + '</div>';
-      }
-
-      mount.innerHTML =
-        '<div class="dbtabs">' + tabs + '</div>'
-        + (!idToken ? '<div class="dbbanner">' + ic("lock") + '尚未登入：目前顯示的是本機快取。登入後可新增/編輯並同步到公司試算表。</div>' : "")
-        + statBlock(rows)
-        + toolbar
-        + '<div class="dbtablewrap"><table class="dbtable"><thead><tr>' + ths + "</tr></thead><tbody>" + body + "</tbody></table></div>"
-        + emptyHint
-        + '<div class="dbfoot">資料存在公司 Google 試算表；也可 <a id="dbSheet" href="#" target="_blank" rel="noopener">開啟原始試算表</a>。</div>';
-
-      wire();
-    }
-
-    function wire() {
-      var s = schema();
-      Array.prototype.forEach.call(mount.querySelectorAll(".dbtab"), function (b) {
-        b.onclick = function () { state.cur = b.getAttribute("data-tab"); state.q = ""; state.filters = {}; state.sortK = ""; load(state.cur); };
-      });
-      var se = document.getElementById("dbSearch");
-      if (se) se.oninput = function () { state.q = se.value; renderKeepFocus(); };
-      Array.prototype.forEach.call(mount.querySelectorAll(".dbfilter"), function (f) {
-        f.onchange = function () { state.filters[f.getAttribute("data-k")] = f.value; render(); };
-      });
-      Array.prototype.forEach.call(mount.querySelectorAll(".dbsort"), function (h) {
-        h.onclick = function () { var k = h.getAttribute("data-k"); if (state.sortK === k) state.sortDir *= -1; else { state.sortK = k; state.sortDir = 1; } render(); };
-      });
-      var add = document.getElementById("dbAdd"); if (add) add.onclick = function () { if (requireAuth()) openForm(null); };
-      var exp = document.getElementById("dbExport"); if (exp) exp.onclick = exportCsv;
-      var rl = document.getElementById("dbReload"); if (rl) rl.onclick = function () { load(state.cur); };
-      var sp = document.getElementById("dbSample"); if (sp) sp.onclick = loadSample;
-      var sheet = document.getElementById("dbSheet");
-      if (sheet) { var u = (window.APP_CONFIG || {}).SHEET_URL || ""; if (u) sheet.href = u; else sheet.style.display = "none"; }
-      Array.prototype.forEach.call(mount.querySelectorAll("[data-edit]"), function (b) {
-        b.onclick = function () { if (!requireAuth()) return; var id = b.getAttribute("data-edit"); openForm(findRow(id)); };
-      });
-      Array.prototype.forEach.call(mount.querySelectorAll("[data-del]"), function (b) {
-        b.onclick = function () { if (!requireAuth()) return; delRow(b.getAttribute("data-del")); };
+        render();
       });
     }
-    function renderKeepFocus() {
+    function onType() {
+      unitEl.textContent = isPrice(typeEl.value) ? "NT$ / 噸" : "%";
+      var c = CTX[metalEl.value];
+      valEl.placeholder = isPrice(typeEl.value) && c && c.price_twd ? "例如 " + Math.round(c.price_twd / 1000) * 1000 : "例如 3";
+    }
+    typeEl.addEventListener("change", onType); metalEl.addEventListener("change", onType);
+    document.getElementById("alAdd").addEventListener("click", function () {
+      var v = parseFloat(valEl.value);
+      if (!(v > 0)) { valEl.focus(); return; }
+      var r = { id: "a" + Date.now(), email: me(), metal: metalEl.value, type: typeEl.value, value: v, active: 1, fired: 0, t: Date.now() };
+      rules.push(r); lsSet("alerts", rules); syncUp(r); valEl.value = ""; render();
+    });
+    listEl.addEventListener("click", function (e) {
+      var id = e.target.getAttribute && e.target.getAttribute("data-del"); if (!id) return;
+      rules = rules.filter(function (r) { return String(r.id) !== id; }); lsSet("alerts", rules);
+      if (idToken && API) dbCall("tRemove", { table: "alerts", id: id });
       render();
-      var se = document.getElementById("dbSearch");
-      if (se) { se.focus(); se.setSelectionRange(se.value.length, se.value.length); }
-    }
-    function findRow(id) {
-      var s = schema();
-      return state.rows.filter(function (r) { return String(r.id !== undefined && r.id !== "" ? r.id : r[s.delKey]) === String(id); })[0] || null;
-    }
-    function requireAuth() {
-      if (!idToken) { alert(CLIENT_ID ? "請先用右上角「使用 Google 帳戶登入」再操作。" : "尚未設定 Google（見說明頁）。"); return false; }
-      return true;
-    }
-
-    // 新增 / 編輯 彈出表單
-    function openForm(row) {
-      var s = schema(), editing = !!row; row = row || {};
-      var fields = s.cols.filter(function (c) { return !(c.ro && !editing); }).map(function (c) {
-        var v = row[c.k] !== undefined ? row[c.k] : "";
-        var input;
-        if (c.ro) input = '<input disabled value="' + escAttr(fmtCell(c, v)) + '">';
-        else if (c.type === "select") input = '<select data-f="' + c.k + '">' + c.opts.map(function (o) { return '<option' + (String(v) === o ? " selected" : "") + '>' + escAttr(o) + "</option>"; }).join("") + "</select>";
-        else if (c.type === "bool") input = '<label class="dbcheck"><input type="checkbox" data-f="' + c.k + '"' + (isFav(v) ? " checked" : "") + '> 收藏</label>';
-        else if (c.type === "date") input = '<input type="date" data-f="' + c.k + '" value="' + escAttr(v) + '">';
-        else if (c.type === "num") input = '<input type="number" step="any" data-f="' + c.k + '" value="' + escAttr(v) + '">';
-        else input = '<input data-f="' + c.k + '" value="' + escAttr(v) + '">';
-        return '<label class="dbfield"><span>' + escAttr(c.label) + "</span>" + input + "</label>";
-      }).join("");
-      var ov = document.createElement("div");
-      ov.className = "dbmodal";
-      ov.innerHTML = '<div class="dbdialog"><h3>' + (editing ? "編輯" : "新增") + " · " + ic(s.icon) + escAttr(s.title) + "</h3>"
-        + '<div class="dbform">' + fields + "</div>"
-        + '<div class="dbdlgbtns"><button class="dbbtn" data-x>取消</button><button class="dbbtn primary" data-ok>儲存</button></div></div>';
-      document.body.appendChild(ov);
-      function close() { document.body.removeChild(ov); }
-      ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
-      ov.querySelector("[data-x]").onclick = close;
-      ov.querySelector("[data-ok]").onclick = function () {
-        var out = {};
-        if (editing && row.id !== undefined) out.id = row.id;
-        Array.prototype.forEach.call(ov.querySelectorAll("[data-f]"), function (el) {
-          out[el.getAttribute("data-f")] = el.type === "checkbox" ? el.checked : el.value;
-        });
-        save(out); close();
-      };
-    }
-    function save(row) {
-      var s = schema(), header = s.cols.map(function (c) { return c.k; });
-      // 樂觀更新畫面
-      if (row.id) { var f = findRow(row.id); if (f) for (var k in row) f[k] = row[k]; }
-      else { row.id = "tmp" + Date.now(); state.rows.unshift(row); }
-      lsSet(cacheKey(state.cur), state.rows); render();
-      dbCall("tUpsert", { table: s.table, row: row, header: header }).then(function (d) { if (d && d.ok) load(state.cur); });
-    }
-    function delRow(id) {
-      var s = schema(), r = findRow(id);
-      if (!confirm("確定刪除這筆？")) return;
-      state.rows = state.rows.filter(function (x) { return String(x.id !== undefined && x.id !== "" ? x.id : x[s.delKey]) !== String(id); });
-      lsSet(cacheKey(state.cur), state.rows); render();
-      if (s.delAction) dbCall(s.delAction, { ts: r ? r[s.delKey] : id });
-      else dbCall("tRemove", { table: s.table, id: id });
-    }
-    function loadSample() {
-      if (!requireAuth()) return;
-      var s = SCHEMAS.mylist, header = s.cols.map(function (c) { return c.k; });
-      dbCall("tImport", { table: s.table, rows: s.sample, header: header }).then(function () { load("mylist"); });
-    }
-    function exportCsv() {
-      var s = schema(), rows = filtered();
-      var head = s.cols.map(function (c) { return c.label; });
-      var lines = [head.map(csvCell).join(",")];
-      rows.forEach(function (r) { lines.push(s.cols.map(function (c) { return csvCell(fmtCell(c, r[c.k])); }).join(",")); });
-      var blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
-      var a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = s.table + "_" + new Date().toISOString().slice(0, 10) + ".csv";
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }
-    function csvCell(v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
-
-    load(state.cur);
-  }
-
-  // ===========================================================================
-  // 訂單 + 進度儀表板（orders.html）— 讀 orders 資料表，做 KPI/狀態看板（不顯示金額）
-  //   後端沿用通用 CRUD（table="orders"），不需改 Apps Script。
-  // ===========================================================================
-  function initOrders() {
-    var mount = document.getElementById("ordersView");
-    if (!mount) return;
-    var ORD = SCHEMAS.orders;
-    var rows = [];
-    function ck() { return "console_orders"; }
-    function amt(o) { var a = Number(o.amount); if (!isNaN(a) && o.amount !== "" && o.amount != null) return a; var q = Number(o.qty) || 0, p = Number(o.price) || 0; return q * p; }
-    function todayStr() { var d = new Date(); return d.getFullYear() + "-" + z(d.getMonth() + 1) + "-" + z(d.getDate()); }
-    function z(n) { return (n < 10 ? "0" : "") + n; }
-    function ym(s) { s = String(s || ""); return s.length >= 7 ? s.slice(0, 7) : ""; }
-    function ntfmt(n) { return "NT$ " + Math.round(n).toLocaleString(); }
-    function overdue(o) { return o.due && String(o.due) < todayStr() && ORDER_FLOW.indexOf(o.status) >= 0 && o.status !== "出貨" && o.status !== "結案"; }
-
-    function load() {
-      rows = lsGet(ck(), []) || [];
-      render();
-      if (!idToken) return;
-      dbCall("tList", { table: "orders" }).then(function (d) {
-        if (!d || d.error || !d.rows) return;
-        rows = d.rows; lsSet(ck(), rows); render();
-      });
-    }
-    window.__refreshOrders = load;
-
-    function kpis() {
-      var tm = todayStr().slice(0, 7), rev = 0, cnt = 0, ship = 0, late = 0;
-      rows.forEach(function (o) {
-        if (o.status === "取消") return;
-        if (ym(o.order_date) === tm) { rev += amt(o); cnt++; }
-        if (o.status === "接單" || o.status === "生產") ship++;
-        if (overdue(o)) late++;
-      });
-      return { rev: rev, cnt: cnt, ship: ship, late: late };
-    }
-    function render() {
-      var k = kpis();
-      var kpiHTML = '<div class="okpis">'
-        + kcard(ic("file") + "本月訂單", k.cnt + " 筆", "")
-        + kcard(ic("truck") + "待出貨", k.ship + " 筆", "")
-        + kcard(ic("clock") + "逾期未出", k.late + " 筆", k.late ? "warn" : "")
-        + '</div>';
-      var tools = '<div class="otools">'
-        + '<button class="dbbtn primary" id="oAdd">' + ic("plus") + '新增訂單</button>'
-        + '<button class="dbbtn" id="oConv">' + ic("calc") + '從報價轉單</button>'
-        + '<a class="dbbtn" href="db.html">' + ic("db") + '在資料庫管理全部訂單</a>'
-        + '</div>';
-      // 看板（每欄依狀態上色 oks0..oks4）
-      var board = '<div class="okanban">' + ORDER_FLOW.map(function (st, si) {
-        var cards = rows.filter(function (o) { return o.status === st; });
-        var body = cards.map(function (o) {
-          return '<div class="ocardk' + (overdue(o) ? " od" : "") + '" data-edit="' + escAttr(o.id) + '">'
-            + '<div class="ock-cust">' + escAttr(o.customer || "（未填客戶）") + '</div>'
-            + '<div class="ock-prod">' + escAttr(o.product || "") + '</div>'
-            + (o.due ? '<div class="ock-meta"><span class="' + (overdue(o) ? "od" : "") + '">' + ic("calendar") + escAttr(o.due) + '</span></div>' : '')
-            + '<select class="ock-move" data-id="' + escAttr(o.id) + '">'
-            + ORDER_FLOW.concat(["取消"]).map(function (s) { return '<option' + (s === st ? " selected" : "") + '>' + s + '</option>'; }).join("")
-            + '</select></div>';
-        }).join("") || '<div class="ock-empty">尚無</div>';
-        return '<div class="okcol oks' + si + '"><div class="okhead">' + st + ' <span>' + cards.length + '</span></div>' + body + '</div>';
-      }).join("") + '</div>';
-
-      mount.innerHTML = (!idToken ? '<div class="dbbanner">' + ic("lock") + '尚未登入：目前顯示本機快取。登入後可新增/更新訂單並同步到公司試算表。</div>' : "")
-        + kpiHTML + tools + board;
-      wire();
-    }
-    function kcard(label, val, cls) {
-      return '<div class="okpi ' + cls + '"><div class="okpi-l">' + label + '</div><div class="okpi-v">' + escAttr(val) + '</div></div>';
-    }
-    function wire() {
-      var add = document.getElementById("oAdd"); if (add) add.onclick = function () { if (auth()) openOrderForm(null); };
-      var conv = document.getElementById("oConv"); if (conv) conv.onclick = fromQuote;
-      Array.prototype.forEach.call(mount.querySelectorAll(".ocardk"), function (c) {
-        c.onclick = function (e) { if (e.target.classList.contains("ock-move")) return; if (auth()) openOrderForm(findRow(c.getAttribute("data-edit"))); };
-      });
-      Array.prototype.forEach.call(mount.querySelectorAll(".ock-move"), function (sel) {
-        sel.onclick = function (e) { e.stopPropagation(); };
-        sel.onchange = function () { if (!auth()) { load(); return; } moveStatus(sel.getAttribute("data-id"), sel.value); };
-      });
-    }
-    function auth() { if (!idToken) { alert(CLIENT_ID ? "請先用右上角「使用 Google 帳戶登入」再操作。" : "尚未設定 Google（見說明頁）。"); return false; } return true; }
-    function findRow(id) { return rows.filter(function (o) { return String(o.id) === String(id); })[0] || null; }
-    function moveStatus(id, st) {
-      var o = findRow(id); if (o) o.status = st; lsSet(ck(), rows); render();
-      dbCall("tUpsert", { table: "orders", row: { id: id, status: st }, header: ORD.cols.map(function (c) { return c.k; }) }).then(function (d) { if (d && d.ok) load(); });
-    }
-    function save(row) {
-      if ((row.amount === "" || row.amount == null) && (row.qty || row.price)) row.amount = (Number(row.qty) || 0) * (Number(row.price) || 0);
-      if (row.id) { var f = findRow(row.id); if (f) for (var kk in row) f[kk] = row[kk]; }
-      else { row.id = "tmp" + Date.now(); rows.unshift(row); }
-      lsSet(ck(), rows); render();
-      dbCall("tUpsert", { table: "orders", row: row, header: ORD.cols.map(function (c) { return c.k; }) }).then(function (d) { if (d && d.ok) load(); });
-    }
-    function fromQuote() {
-      if (!auth()) return;
-      if (!Quotes || !Quotes.length) { alert("尚無報價紀錄。請先到「報價」頁算一筆並「存這筆」。"); return; }
-      var q = Quotes[0];
-      openOrderForm({ product: q.material || "", qty: 1, price: q.quote || 0, amount: q.quote || 0, status: "報價", order_date: todayStr() }, "已帶入最新一筆報價（" + (q.material || "") + " " + ntfmt(q.quote || 0) + "），可修改");
-    }
-    function openOrderForm(row, hint) {
-      var editing = !!(row && row.id); row = row || { status: "報價", order_date: todayStr() };
-      var fields = ORD.cols.map(function (c) {
-        var v = row[c.k] !== undefined ? row[c.k] : "";
-        var input;
-        if (c.type === "select") input = '<select data-f="' + c.k + '">' + c.opts.map(function (o) { return '<option' + (String(v) === o ? " selected" : "") + '>' + escAttr(o) + "</option>"; }).join("") + "</select>";
-        else if (c.type === "date") input = '<input type="date" data-f="' + c.k + '" value="' + escAttr(v) + '">';
-        else if (c.type === "num") input = '<input type="number" step="any" data-f="' + c.k + '" value="' + escAttr(v) + '"' + (c.k === "amount" ? ' placeholder="留空=數量×單價"' : '') + '>';
-        else input = '<input data-f="' + c.k + '" value="' + escAttr(v) + '">';
-        return '<label class="dbfield"><span>' + escAttr(c.label) + "</span>" + input + "</label>";
-      }).join("");
-      var ov = document.createElement("div");
-      ov.className = "dbmodal";
-      ov.innerHTML = '<div class="dbdialog"><h3>' + (editing ? "編輯訂單" : "新增訂單") + "</h3>"
-        + (hint ? '<div class="dbnote" style="margin-bottom:10px">' + ic("info") + escAttr(hint) + '</div>' : "")
-        + '<div class="dbform">' + fields + "</div>"
-        + '<div class="dbdlgbtns">'
-        + (editing ? '<button class="dbbtn" data-del style="margin-right:auto;color:var(--up)">' + ic("trash") + '刪除</button>' : "")
-        + '<button class="dbbtn" data-x>取消</button><button class="dbbtn primary" data-ok>儲存</button></div></div>';
-      document.body.appendChild(ov);
-      function close() { document.body.removeChild(ov); }
-      ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
-      ov.querySelector("[data-x]").onclick = close;
-      var del = ov.querySelector("[data-del]");
-      if (del) del.onclick = function () { if (confirm("確定刪除這筆訂單？")) { rows = rows.filter(function (o) { return String(o.id) !== String(row.id); }); lsSet(ck(), rows); render(); dbCall("tRemove", { table: "orders", id: row.id }); close(); } };
-      ov.querySelector("[data-ok]").onclick = function () {
-        var out = {}; if (editing) out.id = row.id;
-        Array.prototype.forEach.call(ov.querySelectorAll("[data-f]"), function (el) { out[el.getAttribute("data-f")] = el.value; });
-        save(out); close();
-      };
-    }
-    load();
-  }
-
-  // ===========================================================================
-  // AI 助手（assistant.html）— 快速問答本地即時算（免設定）；自由提問走 Gemini（Apps Script 代理）
-  // ===========================================================================
-  // 首頁「今日數字」大看板：登入後由訂單即時算出（未登入顯示 —）
-  function initHome() {
-    if (!document.getElementById("stShip")) return;
-    function num(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
-    function set(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
-    function today() { var d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
-    function render(orders) {
-      var tm = today().slice(0, 7), t = today(), cnt = 0, ship = 0, over = 0;
-      orders.forEach(function (o) {
-        if (o.status === "取消") return;
-        if (String(o.order_date || "").slice(0, 7) === tm) cnt++;
-        if (o.status === "接單" || o.status === "生產") ship++;
-        if (o.due && String(o.due) < t && ["報價", "接單", "生產"].indexOf(o.status) >= 0) over++;
-      });
-      set("stShip", ship + " 筆"); set("stOver", over + " 筆"); set("stCnt", cnt + " 筆");
-      var oc = document.getElementById("stOverCard"); if (oc) oc.classList.toggle("warn", over > 0);
-      var hint = document.getElementById("stHint"); if (hint) hint.style.display = "none";
-    }
-    function load() {
-      if (!idToken) {
-        ["stShip", "stOver", "stCnt"].forEach(function (id) { set(id, "—"); });
-        var hint = document.getElementById("stHint"); if (hint) hint.style.display = "";
-        return;
-      }
-      var cached = lsGet("console_orders", null);
-      if (cached && cached.length) render(cached);
-      dbCall("tList", { table: "orders" }).then(function (d) { if (d && d.rows) { lsSet("console_orders", d.rows); render(d.rows); } });
-    }
-    window.__refreshHome = load;
-    load();
+    });
+    window.__refreshAlerts = pull;
+    onType(); render();
   }
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -1207,12 +852,11 @@
     if (window.METALS_DATA) initMetals(window.METALS_DATA);
     if (window.SUPPLIERS_DATA) { initSuppliers(window.SUPPLIERS_DATA); initSupplierMap(window.SUPPLIERS_DATA); }
     if (window.QUOTE_MATERIALS) initQuote(window.QUOTE_MATERIALS);
+    if (window.RECORD_MATERIALS && document.getElementById("rBody")) initRecords(window.RECORD_MATERIALS);
     if (window.CUSTOMERS_DATA) initCustomers(window.CUSTOMERS_DATA);
-    if (document.getElementById("dbConsole")) initDbConsole();  // 資料庫操作中心
-    if (document.getElementById("ordersView")) initOrders();     // 訂單 + 老闆儀表板
-    if (document.getElementById("stShip")) initHome();            // 首頁今日數字看板
-    kriBadges(); ntPaint();
-    setInterval(function () { if (!document.hidden && idToken) noticePull(); }, 300000);     // 通知中心每 5 分鐘更新
+    if (document.getElementById("alertBox")) initAlerts();
+    if (document.getElementById("watchBox") && window.RECORD_MATERIALS) initWatch(window.RECORD_MATERIALS);
+    animateNumbers();
     initAuth();  // Google 登入（GIS 若已載入）；登入後 cloudPull 拉雲端資料
     // 情報下拉：點空白處收起（原生 details 負責開關）
     document.addEventListener("click", function (e) {

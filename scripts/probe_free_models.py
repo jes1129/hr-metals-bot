@@ -21,9 +21,9 @@
 只印結果。
 
 用法（需要環境變數提供金鑰）：
-    GEMINI_API_KEY=... GROQ_API_KEY=... python scripts/probe_free_models.py
+    GROQ_API_KEY=... python scripts/probe_free_models.py
     python scripts/probe_free_models.py --size 20    # 改用 20 家做規模測試
-    python scripts/probe_free_models.py --gemini gemini-3.6-flash,gemini-3.5-flash
+    python scripts/probe_free_models.py --groq openai/gpt-oss-20b
 """
 import io
 import json
@@ -37,14 +37,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 SIZE = 10
-ONLY_GEMINI = []     # 指定要測哪些 Gemini 模型（空 = 自動挑 flash 系列）
 ONLY_GROQ = []
 for i, a in enumerate(sys.argv):
     nxt = sys.argv[i + 1] if i + 1 < len(sys.argv) else ""
     if a == "--size" and nxt:
         SIZE = int(nxt)
-    elif a == "--gemini" and nxt:
-        ONLY_GEMINI = [x.strip() for x in nxt.split(",") if x.strip()]
     elif a == "--groq" and nxt:
         ONLY_GROQ = [x.strip() for x in nxt.split(",") if x.strip()]
 
@@ -127,91 +124,6 @@ SYSTEM = _system()
 
 
 # ---------------------------------------------------------------------------
-# Gemini
-# ---------------------------------------------------------------------------
-def probe_gemini(key: str):
-    import httpx
-
-    base = "https://generativelanguage.googleapis.com/v1beta"
-
-    hr("Gemini — 這把金鑰實際能用哪些模型")
-    usable = []
-    try:
-        r = httpx.get(f"{base}/models", params={"key": key}, timeout=60)
-        if r.status_code != 200:
-            print(f"  ✗ 列模型失敗 HTTP {r.status_code}：{r.text[:300]}")
-            return
-        for m in r.json().get("models", []):
-            name = m.get("name", "").replace("models/", "")
-            methods = m.get("supportedGenerationMethods", [])
-            if "generateContent" not in methods:
-                continue
-            usable.append(name)
-        print(f"  支援 generateContent 的模型共 {len(usable)} 個：")
-        for n in usable:
-            print(f"    {n}")
-    except Exception as e:  # noqa: BLE001
-        print(f"  ✗ 列模型例外：{type(e).__name__}: {e}")
-        return
-
-    if ONLY_GEMINI:
-        prefer = ONLY_GEMINI
-    else:
-        # 挑最可能適用的：flash 系列（快、免費額度較寬），排除非文字用途的
-        prefer = [n for n in usable if "flash" in n
-                  and not any(x in n for x in
-                              ("image", "tts", "live", "omni", "banana"))]
-        prefer.sort()
-    if not prefer:
-        prefer = usable[:3]
-
-    for model in prefer:
-        hr(f"Gemini {model} — 規模測試（{SIZE} 家中文資料）")
-        body = {
-            "systemInstruction": {"parts": [{"text": SYSTEM}]},
-            "contents": [{"role": "user", "parts": [
-                {"text": json.dumps(sample_payload(SIZE), ensure_ascii=False)}]}],
-            "generationConfig": {
-                "temperature": 0,
-                "responseMimeType": "application/json",
-                # 用正式設定的上限，否則測過的與上線跑的不是同一件事
-                "maxOutputTokens": _cap("gemini", 16384),
-            },
-        }
-        try:
-            t0 = time.time()
-            r = httpx.post(f"{base}/models/{model}:generateContent",
-                           params={"key": key}, json=body, timeout=180)
-            secs = time.time() - t0
-            if r.status_code != 200:
-                print(f"  ✗ HTTP {r.status_code}")
-                print(f"    {r.text[:420]}")
-                continue
-            d = r.json()
-            usage = d.get("usageMetadata", {})
-            txt = ""
-            for c in d.get("candidates", []):
-                for p in c.get("content", {}).get("parts", []):
-                    txt += p.get("text", "")
-            try:
-                got = len(json.loads(txt).get("ranked", []))
-                ok = "✓"
-            except Exception:  # noqa: BLE001
-                got, ok = 0, "✗ JSON 解析失敗"
-            print(f"  {ok} 送 {SIZE} 家 → 回 {got} 筆評分，耗時 {secs:.1f} 秒")
-            print(f"    tokens：輸入 {usage.get('promptTokenCount')} ／ "
-                  f"輸出 {usage.get('candidatesTokenCount')} ／ "
-                  f"合計 {usage.get('totalTokenCount')}")
-            if usage.get("thoughtsTokenCount"):
-                print(f"    思考 tokens：{usage['thoughtsTokenCount']}"
-                      f"（也計入額度）")
-            if got and got < SIZE:
-                print(f"    ⚠️ 少回 {SIZE - got} 筆——指令遵循不完整")
-        except Exception as e:  # noqa: BLE001
-            print(f"  ✗ 例外：{type(e).__name__}: {e}")
-
-
-# ---------------------------------------------------------------------------
 # Groq
 # ---------------------------------------------------------------------------
 def probe_groq(key: str):
@@ -280,20 +192,11 @@ def probe_groq(key: str):
 
 def main() -> int:
     print(f"規模測試每批 {SIZE} 家（可用 --size N 調整）")
-    gk = os.environ.get("GEMINI_API_KEY")
     qk = os.environ.get("GROQ_API_KEY")
-    ak = os.environ.get("ANTHROPIC_API_KEY")
 
     hr("金鑰盤點")
-    for n, v in (("GEMINI_API_KEY", gk), ("GROQ_API_KEY", qk),
-                 ("ANTHROPIC_API_KEY", ak)):
+    for n, v in (("GROQ_API_KEY", qk),):
         print(f"  {n:<20}{'已設定' if v else '未設定'}")
-
-    if gk:
-        probe_gemini(gk)
-    else:
-        hr("Gemini")
-        print("  跳過：未設定 GEMINI_API_KEY")
 
     if qk:
         probe_groq(qk)

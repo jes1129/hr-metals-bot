@@ -5,4 +5,3 @@
 #                                    （CI 裡最慢的一步「安裝 Chrome」隨之省掉）
 #   modal / fastapi                  早期部署於 Modal，現已改為 GitHub Actions
 httpx
-anthropic
