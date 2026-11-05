@@ -3,56 +3,82 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="assets/style.css?v=202611050902">
-<script src="config.js?v=202611050902"></script>
-<script src="assets/palette.js?v=202611050902" defer></script>
+<link rel="stylesheet" href="assets/style.css?v=202611051406">
+<script src="config.js?v=202611051406"></script>
+<script src="assets/palette.js?v=202611051406" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <title>報價試算器 · 九上科技</title>
 </head>
 <body>
   <div class="wrap">
-    <div class="topbar"><a class="brand" href="index.html"><span class="brand-mark">九</span><span class="brand-name">九上科技<small>智慧儀表板</small></span></a><nav class="side" aria-label="主要功能"><div class="side-label">總覽</div><a href="index.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#home"/></svg><span>今日總覽</span></a><a href="metals.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#ingot"/></svg><span>原料行情</span></a><div class="side-label">營運</div><a class="on" aria-current="page" href="quote.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#calc"/></svg><span>報價試算</span></a><a href="orders.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#clipboard"/></svg><span>訂單看板</span></a><a href="erp.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#factory"/></svg><span>ERP 作業</span></a><a href="schedule.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#gantt"/></svg><span>生產排程</span></a><a href="admin.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#users"/></svg><span>行政工作台</span></a><div class="side-label">工具</div><a href="db.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#db"/></svg><span>資料庫</span></a><a href="help.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#book"/></svg><span>使用說明</span></a></nav><div class="toplinks"><button type="button" id="paletteBtn" class="tsearch" aria-label="搜尋（Ctrl+K）"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#search"/></svg>搜尋<kbd>Ctrl K</kbd></button><a href="help.html#start"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#play"/></svg>快速上手</a><a href="quote.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#plus"/></svg>新增報價</a></div><span id="gAuth" class="gauth"></span><button id="themeBtn" class="theme-btn" aria-label="切換深淺色"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#moon"/></svg></button></div>
+    <div class="topbar"><a class="brand" href="index.html"><span class="brand-mark">九</span><span class="brand-name">九上科技<small>智慧儀表板</small></span></a><nav class="side" aria-label="主要功能"><div class="side-label">總覽</div><a href="index.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#home"/></svg><span>今日總覽</span></a><a href="metals.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#ingot"/></svg><span>原料行情</span></a><div class="side-label">報價</div><a class="on" aria-current="page" href="quote.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#calc"/></svg><span>報價試算</span></a><a href="records.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#clipboard"/></svg><span>報價紀錄</span></a><div class="side-label">工具</div><a href="help.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#book"/></svg><span>使用說明</span></a></nav><div class="toplinks"><button type="button" id="paletteBtn" class="tsearch" aria-label="搜尋（Ctrl+K）"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#search"/></svg>搜尋<kbd>Ctrl K</kbd></button><a href="help.html#start"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#play"/></svg>快速上手</a><a href="quote.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#plus"/></svg>新增報價</a></div><span id="gAuth" class="gauth"></span><button id="themeBtn" class="theme-btn" aria-label="切換深淺色"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#moon"/></svg></button></div>
     <div class="eyebrow">QUOTE · 原料成本 / 報價試算</div>
     <h1>報價試算器</h1>
-    <div class="sub">選材質、填重量，用<b>當前原料行情</b>幫你算料錢＋建議報價 · 料價已帶入最新價、可自行修改</div>
+    <div class="sub">選材質、填重量，用<b>當前原料行情</b>算料錢與建議報價 · 料價已帶入最新價、可自行修改</div>
 
-    <div class="panel" style="padding:18px 20px;margin-bottom:16px">
-      <div class="qform">
-        <label class="qf"><span>材質</span>
-          <select id="qMat"></select></label>
-        <label class="qf"><span>重量（公斤）</span>
-          <input id="qWeight" type="number" min="0" step="0.01" placeholder="直接輸入重量"></label>
-        <div class="qf qdim"><span>或用尺寸算重量（公分）</span>
-          <div class="qrow">
-            <input id="qL" type="number" min="0" step="0.1" placeholder="長">
-            <input id="qW" type="number" min="0" step="0.1" placeholder="寬">
-            <input id="qH" type="number" min="0" step="0.1" placeholder="高">
-            <button id="qCalc" type="button">算重量</button>
-          </div></div>
-        <label class="qf"><span>每公斤料價（NT$）</span>
-          <input id="qPrice" type="number" min="0" step="0.1"></label>
-        <div class="qnote" id="qPriceNote"></div>
-        <label class="qf"><span>加工費（NT$，選填）</span>
-          <input id="qProc" type="number" min="0" step="1" placeholder="車削/表面處理等"></label>
-        <label class="qf"><span>利潤（%）</span>
-          <input id="qMargin" type="number" min="0" step="1" value="20"></label>
+    <div class="qstrip"><div class="qs"><div class="qs-n">銅</div><div class="qs-p">NT$467.5<small> /公斤</small></div><div class="qs-r">今天 <span class="pm ">+0.00%</span>　7 天 <span class="pm down">-0.39%</span></div><div class="qs-s"><svg width="200" height="26" viewBox="0 0 200 26"><polyline fill="none" stroke="#1e8449" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" pathLength="1" points="2.0,8.2 8.8,19.0 15.5,19.7 22.3,18.1 29.0,24.0 35.8,23.2 42.6,17.9 49.3,16.8 56.1,15.5 62.8,20.4 69.6,10.5 76.3,6.0 83.1,4.6 89.9,8.6 96.6,14.4 103.4,12.9 110.1,9.8 116.9,5.8 123.7,11.2 130.4,22.2 137.2,12.9 143.9,10.7 150.7,2.0 157.4,2.2 164.2,7.9 171.0,14.8 177.7,7.2 184.5,21.1 191.2,16.7 198.0,9.9"/></svg></div></div><div class="qs"><div class="qs-n">鋁</div><div class="qs-p">NT$103.2<small> /公斤</small></div><div class="qs-r">今天 <span class="pm ">+0.00%</span>　7 天 <span class="pm down">-1.36%</span></div><div class="qs-s"><svg width="200" height="26" viewBox="0 0 200 26"><polyline fill="none" stroke="#1e8449" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" pathLength="1" points="2.0,2.0 8.8,5.7 15.5,9.8 22.3,12.1 29.0,18.2 35.8,18.6 42.6,16.3 49.3,16.1 56.1,17.3 62.8,21.0 69.6,19.2 76.3,22.4 83.1,21.6 89.9,24.0 96.6,22.3 103.4,21.1 110.1,17.5 116.9,19.7 123.7,16.2 130.4,13.5 137.2,8.0 143.9,11.6 150.7,7.3 157.4,8.6 164.2,5.0 171.0,5.2 177.7,4.6 184.5,10.5 191.2,8.1 198.0,8.2"/></svg></div></div></div>
+    <div class="qhint" id="qHint" hidden></div>
+    <div class="qlogin" id="qLogin" hidden></div>
+
+    <div class="qgrid">
+      <div class="panel qformp">
+        <div class="qform">
+          <label class="qf"><span>客戶／備註（選填，之後可以用它查找）</span>
+            <input id="qNote" type="text" maxlength="60" placeholder="例如：○○公司 銅軸套"></label>
+          <label class="qf"><span>材質</span>
+            <select id="qMat"></select></label>
+          <div class="qf qother" id="qOther" hidden><span>其他材料：名稱與密度</span>
+            <div class="qrow"><input id="qOName" type="text" maxlength="30" placeholder="例如：不鏽鋼 304">
+              <input id="qODen" type="number" min="0" step="0.01" placeholder="密度 g/cm³（選填）"></div>
+            <div class="qnote">密度只用在「用尺寸算重量」，不知道可以不填，直接輸入重量。常見密度：鐵 7.85、不鏽鋼 7.93、黃銅 8.5、鈦 4.5。存報價時會記住這個材料，下次直接從選單選。</div></div>
+          <button type="button" class="qforget" id="qForget" hidden>從「我的材料」移除這一項</button>
+          <label class="qf"><span>重量（公斤）</span>
+            <input id="qWeight" type="number" min="0" step="0.01" placeholder="直接輸入重量"></label>
+          <div class="qf qdim"><span>或用尺寸算重量（公分）</span>
+            <div class="qrow">
+              <input id="qL" type="number" min="0" step="0.1" placeholder="長">
+              <input id="qW" type="number" min="0" step="0.1" placeholder="寬">
+              <input id="qH" type="number" min="0" step="0.1" placeholder="高">
+              <button id="qCalc" type="button">算重量</button>
+            </div></div>
+          <label class="qf"><span>每公斤料價（NT$）</span>
+            <input id="qPrice" type="number" min="0" step="0.1"></label>
+          <div class="qnote" id="qPriceNote"></div>
+          <label class="qf"><span>加工費（NT$，選填）</span>
+            <input id="qProc" type="number" min="0" step="1" placeholder="車削/表面處理等"></label>
+          <label class="qf"><span>利潤（%）</span>
+            <input id="qMargin" type="number" min="0" step="1" value="20"></label>
+        </div>
+      </div>
+
+      <div class="qside">
+        <div class="qresult" id="qResult">
+          <div class="qr big"><div class="qk">建議報價</div><div class="qv" id="qQuote">—</div></div>
+          <div class="qr"><div class="qk">料錢</div><div class="qv" id="qMatCost">—</div></div>
+          <div class="qr"><div class="qk">總成本（料＋工）</div><div class="qv" id="qTotal">—</div></div>
+          <div class="qr"><div class="qk">毛利率</div><div class="qv" id="qMarginPct">—</div></div>
+        </div>
+        <div class="qsens" id="qSens"></div>
+        <div class="qbtns"><button id="qCopy" class="dbbtn"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#clipboard"/></svg>複製報價文字</button><button id="qSave" class="dbbtn primary"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#save"/></svg>存這筆報價</button></div>
+        <div class="qsaved" id="qSaved" hidden></div>
+        <div class="qsim" id="qSim" hidden>
+          <div class="adv-k"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#calc"/></svg>情境模擬：行情變了，報價會怎樣？</div>
+          <label>料價變動 <b id="qSimAV">0%</b><input type="range" id="qSimA" min="-20" max="20" step="1" value="0"></label>
+          <label>匯率變動 <b id="qSimFV">0%</b><input type="range" id="qSimF" min="-5" max="5" step="0.5" value="0"></label>
+          <div class="qsim-out" id="qSimOut"></div>
+          <button type="button" class="qforget" id="qSimReset">滑桿歸零</button>
+        </div>
       </div>
     </div>
 
-    <div class="qresult" id="qResult">
-      <div class="qr"><div class="qk">料錢</div><div class="qv" id="qMatCost">—</div></div>
-      <div class="qr"><div class="qk">總成本（料＋工）</div><div class="qv" id="qTotal">—</div></div>
-      <div class="qr big"><div class="qk">建議報價</div><div class="qv" id="qQuote">—</div></div>
-    </div>
-    <div style="text-align:center;margin:14px 0 18px"><button id="qSave" class="dbbtn primary"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#save"/></svg>存這筆報價</button></div>
-
     <div class="panel">
-      <h3>報價歷史</h3>
-      <div id="qHistory" style="padding:8px 16px 14px"></div>
+      <h3>最近的報價</h3>
+      <div id="qHistory" style="padding:8px 16px 4px"></div>
+      <div style="padding:0 16px 14px"><a href="records.html" class="qmore">查看全部報價紀錄、搜尋與清理 →</a></div>
     </div>
-    <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。報價歷史存在瀏覽器（設定 Google 後改存公司試算表、可同步）。</div>
+    <div class="foot">料價為 LME/期貨原料行情換算之參考值，不含供應商加價、運費、稅；實際採購價請以報價單為準。此工具僅供快速估算。報價存在你的瀏覽器；登入 Google 後會同步到公司試算表（團隊共用）。</div>
   </div>
-<script>window.QUOTE_MATERIALS = [{"key": "copper", "name": "銅", "nt": 467.4, "density": 8.96, "live": true}, {"key": "aluminum", "name": "鋁", "nt": 103.2, "density": 2.7, "live": true}];</script>
-  <script src="assets/app.js?v=202611050902"></script>
+<script>window.QUOTE_MATERIALS = [{"key": "copper", "name": "銅", "nt": 467.5, "density": 8.96, "live": true, "day_pct": 0.0, "d7": -0.39, "hint": "", "spark": [469492, 460064, 459466, 460813, 455674, 456376, 460983, 461984, 463163, 458829, 467522, 471499, 472664, 469195, 464065, 465455, 468163, 471614, 466873, 457235, 465391, 467315, 474975, 474774, 469829, 463705, 470378, 458217, 462065, 468015]}, {"key": "aluminum", "name": "鋁", "nt": 103.2, "density": 2.7, "live": true, "day_pct": 0.0, "d7": -1.36, "hint": "", "spark": [109254, 107607, 105758, 104686, 101974, 101775, 102827, 102894, 102368, 100685, 101523, 100070, 100416, 99346, 100100, 100642, 102264, 101284, 102851, 104082, 106543, 104943, 106885, 106291, 107908, 107813, 108082, 105421, 106505, 106440]}];</script>
+  <script src="assets/app.js?v=202611051406"></script>
 </body>
 </html>

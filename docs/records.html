@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/style.css?v=202611051406">
+<script src="config.js?v=202611051406"></script>
+<script src="assets/palette.js?v=202611051406" defer></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<title>報價紀錄 · 九上科技</title>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar"><a class="brand" href="index.html"><span class="brand-mark">九</span><span class="brand-name">九上科技<small>智慧儀表板</small></span></a><nav class="side" aria-label="主要功能"><div class="side-label">總覽</div><a href="index.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#home"/></svg><span>今日總覽</span></a><a href="metals.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#ingot"/></svg><span>原料行情</span></a><div class="side-label">報價</div><a href="quote.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#calc"/></svg><span>報價試算</span></a><a class="on" aria-current="page" href="records.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#clipboard"/></svg><span>報價紀錄</span></a><div class="side-label">工具</div><a href="help.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#book"/></svg><span>使用說明</span></a></nav><div class="toplinks"><button type="button" id="paletteBtn" class="tsearch" aria-label="搜尋（Ctrl+K）"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#search"/></svg>搜尋<kbd>Ctrl K</kbd></button><a href="help.html#start"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#play"/></svg>快速上手</a><a href="quote.html"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#plus"/></svg>新增報價</a></div><span id="gAuth" class="gauth"></span><button id="themeBtn" class="theme-btn" aria-label="切換深淺色"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#moon"/></svg></button></div>
+    <div class="eyebrow">QUOTE · 報價資料庫</div>
+    <h1><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#clipboard"/></svg>報價紀錄</h1>
+    <div class="sub">在「報價試算」按「存這筆報價」的資料都在這裡 · 可搜尋、篩選、刪除，也能一次清掉舊資料</div>
+    <div class="qlogin" id="rLogin" hidden></div>
+
+    <div class="rbar">
+      <input id="rSearch" type="search" placeholder="搜尋客戶、備註、材質…">
+      <select id="rMat"><option value="">全部材質</option></select>
+      <select id="rDays"><option value="0">全部時間</option><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="90">近 90 天</option></select>
+      <button id="rCsv" class="dbbtn" type="button"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#save"/></svg>匯出 CSV</button>
+      <button id="rPurgeBtn" class="dbbtn" type="button"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg#alert"/></svg>清除舊資料…</button>
+    </div>
+    <div class="rpurge" id="rPurge" hidden>
+      刪除 <input id="rPurgeDays" type="number" min="1" value="90"> 天以前的報價紀錄
+      <span id="rPurgeInfo"></span>
+      <button id="rPurgeGo" class="dbbtn primary" type="button">確定刪除</button>
+      <button id="rPurgeCancel" class="dbbtn" type="button">取消</button>
+      <div class="rpurge-n">刪除後無法復原。如果已登入，公司試算表裡的紀錄也會一起刪除。建議先按「匯出 CSV」留一份。</div>
+    </div>
+    <div class="rcount" id="rCount"></div>
+    <div class="rwrap">
+      <table class="rtable">
+        <thead><tr><th>日期</th><th>客戶／備註</th><th>材質</th><th>重量</th><th>料價</th><th>加工費</th><th>利潤</th><th>報價</th><th>和現在比</th><th></th></tr></thead>
+        <tbody id="rBody"></tbody>
+      </table>
+    </div>
+    <div class="foot">紀錄存在這個瀏覽器；登入 Google 後同步到公司試算表「報價紀錄」分頁（團隊共用）。「和現在比」是用今天的料價重算成本，看當時報價現在是賺還是賠。</div>
+  </div>
+<script>window.RECORD_MATERIALS = [{"key": "copper", "name": "銅", "nt": 467.5}, {"key": "aluminum", "name": "鋁", "nt": 103.2}];</script>
+  <script src="assets/app.js?v=202611051406"></script>
+</body>
+</html>
